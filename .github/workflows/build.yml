@@ -81,10 +81,17 @@ jobs:
           code=${PIPESTATUS[1]}
           set -e
           if [ "$code" != "0" ]; then
-            # Причина ошибки — в сводку запуска (её видно без скачивания полного журнала)
-            { grep -n -iE "error|exception|failed|not found|No such" build.log | grep -viE "warning|-Werror|error_|errors\.py|_error\." | tail -25; echo "----- конец журнала -----"; tail -60 build.log; } > tail.txt
-            msg=$(sed -e 's/%/%25/g' tail.txt | sed -e ':a;N;$!ba;s/\n/%0A/g' | cut -c1-60000)
-            echo "::error title=Сборка APK::$msg"
+            # Причина ошибки — в сводку запуска (её видно без скачивания полного журнала).
+            # Сводка берёт до ~4 КБ на сообщение, поэтому только строки с ошибками, по частям.
+            sed -e 's/\x1b\[[0-9;]*m//g' build.log | grep -v -e "libtool: compile" -e "^#     " > clean.log || true
+            { grep -E "ERROR|Error|error:|Traceback|Exception|Command failed|No such file|not found" clean.log \
+                | grep -v -e "-Werror" -e "-fexceptions" | tail -30; echo "----- конец журнала -----"; \
+              grep -v "^\[DEBUG\]:   \s*$" clean.log | tail -40; } | cut -c1-260 > tail.txt
+            split -C 3800 tail.txt part_
+            for f in $(ls part_* | head -9); do
+              msg=$(sed -e 's/%/%25/g' "$f" | sed -e ':a;N;$!ba;s/\n/%0A/g')
+              echo "::error title=Сборка APK ($f)::$msg"
+            done
             exit 1
           fi
       - uses: actions/upload-artifact@v4

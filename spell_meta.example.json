@@ -1,0 +1,8 @@
+{
+  "_comment": "Переименуйте в spell_meta.json. Ключ — ID способности или её имя; значение — категория или {category, cd, charges, channel}. Категории: rotation, offensive, defensive, utility, potion, healthstone, racial, trinket, lust. charges — число зарядов, channel — длительность канала в секундах (это время не считается простоем).",
+  "12472": {"category": "offensive", "cd": 120},
+  "Ледяная глыба": {"category": "defensive", "cd": 240},
+  "443124": "trinket",
+  "_avoidable_comment": "Механики, урон от которых в разборе рейда считается ошибкой: ID или точное название.",
+  "_avoidable": ["Лужа холода"]
+}

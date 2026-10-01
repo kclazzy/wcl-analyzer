@@ -1,0 +1,15 @@
+# Render Blueprint, бесплатный тариф: New → Blueprint → выберите репозиторий с этим файлом.
+# Сервер ничего не хранит — все данные у пользователей в браузерах, поэтому диск не нужен.
+services:
+  - type: web
+    name: wcl-analyzer
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/status
+    envVars:
+      - key: WCL_PUBLIC
+        value: "1"
+      - key: WCL_MEMCACHE_MB
+        value: "100"
+      - key: WCL_MAX_JOBS
+        value: "2"

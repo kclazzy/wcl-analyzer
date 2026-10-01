@@ -1,0 +1,96 @@
+# Автосборка: Windows-программа (.exe) и Android-приложение (.apk).
+# Запускается при каждой загрузке файлов в репозиторий и вручную (Actions → Сборка → Run workflow).
+# Готовые файлы: вкладка Actions → последний запуск → Artifacts.
+# Если создать тег vX.Y.Z — файлы появятся в разделе Releases.
+name: Сборка
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt
+      - run: python tests/test_pipeline.py
+      - run: python tests/test_web.py
+
+  windows:
+    needs: tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt pyinstaller
+      - run: pyinstaller --noconfirm packaging/windows/wcl_analyzer.spec
+      - name: Проверка запуска программы
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\WCL Analyzer.exe" -ArgumentList "ui","--no-browser","--port","8799" -PassThru
+          Start-Sleep -Seconds 15
+          $r = Invoke-RestMethod http://127.0.0.1:8799/api/status
+          if ($r.app -ne "exe") { throw "Программа не ответила как ожидалось" }
+          $job = (Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8799/api/analyze -ContentType "application/json" -Body '{"demo":true}').job
+          Start-Sleep -Seconds 25
+          $s = Invoke-RestMethod "http://127.0.0.1:8799/api/job/$job"
+          if ($s.state -ne "done") { throw "Демо-разбор не завершился: $($s.state) $($s.error)" }
+          Stop-Process -Id $p.Id
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WCL-Analyzer-Windows
+          path: dist/WCL Analyzer.exe
+
+  android:
+    needs: tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: "17"}
+      - name: Системные пакеты для сборки
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip autoconf automake libtool pkg-config zlib1g-dev \
+            libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev ccache
+      - run: pip install --upgrade buildozer "cython<3.1" setuptools
+      - name: Кэш Android SDK/NDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            android/.buildozer
+          key: buildozer-${{ hashFiles('android/buildozer.spec') }}
+      - name: Сборка APK
+        run: |
+          cp -r wcl_analyzer android/
+          cd android
+          yes | buildozer -v android debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WCL-Analyzer-Android
+          path: android/bin/*.apk
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, android]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {path: out}
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/WCL-Analyzer-Windows/*.exe
+            out/WCL-Analyzer-Android/*.apk

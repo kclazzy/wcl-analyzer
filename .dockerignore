@@ -1,0 +1,8 @@
+.env
+.venv
+reports
+wcl_cache.sqlite
+settings.json
+__pycache__
+*.xlsx
+tests

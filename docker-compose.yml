@@ -1,0 +1,11 @@
+# Свой сервер: docker compose up -d --build — сервис на порту 8000.
+# Для HTTPS поставьте перед ним Caddy (пример в README). Данные пользователей сервер не хранит.
+services:
+  wcl-analyzer:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      WCL_PUBLIC: "1"
+      WCL_MAX_JOBS: "3"

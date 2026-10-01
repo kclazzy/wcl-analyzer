@@ -1,0 +1,338 @@
+"""Сквозной тест без сети: фейковый клиент отвечает событиями в формате WCL API.
+
+Запуск: python tests/test_pipeline.py
+"""
+from __future__ import annotations
+
+import random
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from wcl_analyzer.collect import collect_reference, load_my_log  # noqa: E402
+from wcl_analyzer.compare import compare  # noqa: E402
+from wcl_analyzer.demo import my_policy, simulate, top_policy  # noqa: E402
+from wcl_analyzer.excel_report import write_compare_workbook  # noqa: E402
+from wcl_analyzer.logs import parse_report_url  # noqa: E402
+from wcl_analyzer.reference import build_reference  # noqa: E402
+
+
+class FakeClient:
+    """Минимальная замена WCLClient: те же методы, данные из демо-симуляции."""
+
+    def __init__(self):
+        self.reports, self.raws, self.ranks = {}, {}, []
+        self.requests_made = self.cache_hits = 0
+        rng = random.Random(7)
+        for i in range(30):
+            dur = rng.uniform(250, 360)
+            code = f"TOPREPORT{i:03d}"
+            rep, fight, actor, raw = simulate(top_policy(rng, dur), dur, rng.uniform(691, 699), 100 + i,
+                                              f"Top{i}", code, 1_788_000_000_000, (1, 2))
+            self.reports[code], self.raws[code] = rep, raw
+            total = sum(e["total"] for e in raw["dmg_table"]["entries"])
+            self.ranks.append({"name": f"Top{i}", "amount": total / dur, "duration": dur * 1000,
+                               "report": {"code": code, "fightID": 1, "startTime": 0}})
+        self.ranks.sort(key=lambda r: -r["amount"])
+        rep, fight, actor, raw = simulate(my_policy(rng), 305.0, 690, 999, "Me", "MYREPORT0001",
+                                          1_788_000_000_000, (1, 3), with_damage_events=True)
+        self.reports["MYREPORT0001"], self.raws["MYREPORT0001"] = rep, raw
+
+    def report(self, code):
+        return self.reports[code]
+
+    def player_details(self, code, fight_id):
+        a = self.reports[code]["masterData"]["actors"][0]
+        return {"dps": [{"name": a["name"], "id": a["id"], "type": "Mage", "specs": [{"spec": "Frost"}]}]}
+
+    def events(self, code, fight_id, start, end, data_type, source_id=None, target_id=None,
+               hostility=None, include_resources=False):
+        raw = self.raws[code]
+        key = {"Casts": "boss_casts" if hostility == "Enemies" else "casts", "Buffs": "buffs",
+               "Debuffs": "debuffs", "DamageTaken": "dmg_taken", "Deaths": "deaths",
+               "CombatantInfo": "combatant", "DamageDone": "dmg_done"}[data_type]
+        return raw.get(key, [])
+
+    def damage_table(self, code, fight_id, source_id):
+        return self.raws[code]["dmg_table"]
+
+    def rankings(self, encounter_id, class_name, spec_name, difficulty, page=1, force=False, max_age_s=None):
+        import time
+        if force or not getattr(self, "_ranks_at", None):
+            self._ranks_at = time.time()
+        return {"name": "Демо-босс", "_fetched_at": self._ranks_at,
+                "characterRankings": {"rankings": self.ranks[(page - 1) * 100: page * 100], "hasMorePages": False}}
+
+
+def test_refresh():
+    """Эталон сохраняется в список и обновляется принудительно."""
+    import os
+    import time
+    from wcl_analyzer import settings
+    from wcl_analyzer.api import Cache
+    from wcl_analyzer.collect import refresh_refs
+    tmp = Path(tempfile.mkdtemp())
+    old = os.getcwd()
+    os.chdir(tmp)
+    try:
+        client = FakeClient()
+        client.cache = Cache(tmp / "wcl_cache.sqlite")
+        collect_reference(client, 9999, "Mage", "Frost", 5, top_n=10, duration=300, log=lambda *_: None)
+        refs = settings.list_refs(tmp / "wcl_cache.sqlite")
+        assert len(refs) == 1 and refs[0]["n_logs"] == 10 and not refs[0]["stale"]
+        first = refs[0]["collected_at"]
+        time.sleep(0.05)
+        assert refresh_refs(client, log=lambda *_: None) == 1
+        assert settings.list_refs(tmp / "wcl_cache.sqlite")[0]["collected_at"] > first
+        settings.save_user_prefs(tmp / "wcl_cache.sqlite", "local", ref_max_age_days=1)
+        assert settings.user_prefs(tmp / "wcl_cache.sqlite", "local")["ref_max_age_days"] == 1
+        assert settings.list_refs(tmp / "wcl_cache.sqlite", "someone-else") == []
+        assert settings.load()["token"]
+        print("OK эталоны: сохранение и обновление")
+    finally:
+        os.chdir(old)
+
+
+def main():
+    assert parse_report_url("https://www.warcraftlogs.com/reports/AbCd1234EfGh#fight=12&source=5") == \
+        ("AbCd1234EfGh", "12", 5)
+    assert parse_report_url("https://www.warcraftlogs.com/reports/AbCd1234EfGh") == ("AbCd1234EfGh", None, None)
+    assert parse_report_url("AbCd1234EfGh")[0] == "AbCd1234EfGh"
+
+    client = FakeClient()
+    me = load_my_log(client, "https://www.warcraftlogs.com/reports/MYREPORT0001#fight=last&source=7")
+    assert me.name == "Me" and me.spec == "Frost" and me.cls == "Mage"
+    assert me.casts and me.dmg_timeline and me.ilvl
+
+    tops, label = collect_reference(client, me.encounter_id, me.cls, me.spec, me.difficulty,
+                                    top_n=25, duration=me.duration, log=lambda *_: None)
+    assert "±" in label, label
+    assert all(abs(t.duration - me.duration) / me.duration <= 0.2 for t in tops)
+
+    ref = build_reference(tops, label=label)
+    r = compare(me, ref)
+    sections = {f.section for f in r.findings}
+    for expected in ("Простой", "Кулдауны", "Бурст", "Защита", "Проки", "Зелья"):
+        assert expected in sections, (expected, sections)
+    assert len(r.top5) == 5 and r.plan
+    out = Path(tempfile.gettempdir()) / "wcl_test_compare.xlsx"
+    write_compare_workbook(r, out)
+    assert out.exists() and out.stat().st_size > 20_000
+    print(f"OK: {len(tops)} эталонных логов ({label}), {len(r.findings)} отличий, "
+          f"надёжность {r.reliability['overall']}, отчёт {out}")
+
+
+if __name__ == "__main__":
+    main()
+
+
+def test_raid():
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+
+    R = run_raid(FakeRaidClient(), DEMO_URL, log=lambda *_: None)
+    assert R["info"]["size"] == 20 and R["info"]["kill"]
+    cats = {a["name"]: a["category"] for a in R["abilities"]}
+    assert cats["Ледяная волна"] == "По всему рейду" and cats["Лужа холода"] == "Выборочно"
+    assert cats["Сокрушение"] == "По танкам" and cats["Осколки льда"] == "Выборочно"
+    texts = {(i["player"], i["kind"]) for i in R["issues"]}
+    for expected in (("Лиана", "Смерть"), ("Мирель", "Смерть"), ("Торвин", "Механики"), ("Мирель", "Механики"),
+                     ("Брам", "Активность"), ("Квелл", "Механики"), ("Ровен", "Зелья")):
+        assert expected in texts, expected
+    assert R["deaths"][0]["player"] == "Лиана" and R["deaths"][0]["first"]
+    assert len(R["pulls"]) == 6 and R["pulls"][-1]["kill"] and R["pulls"][0]["boss_pct"] == 78.4
+    out = Path(tempfile.gettempdir()) / "wcl_test_raid.xlsx"
+    write_raid_workbook(R, out)
+    assert out.exists()
+    print(f"OK рейд: {len(R['players'])} игроков, {len(R['issues'])} замечаний, {len(R['pulls'])} пуллов")
+
+
+if __name__ == "__main__":
+    test_raid()
+    test_refresh()
+
+
+def test_analysis_quality():
+    """Смерть не порождает ложных находок; топ против остальных почти без находок;
+    дебаффы на боссе и выжимка на месте."""
+    import copy
+    from wcl_analyzer.compare import compare
+    from wcl_analyzer.demo import demo_logs
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_AVOIDABLE, DEMO_URL, FakeRaidClient
+    from wcl_analyzer.reference import build_reference
+
+    tops, me = demo_logs()
+    # 1. Топ, умерший на середине боя
+    v = copy.deepcopy(tops[0])
+    td = v.duration / 2
+    v.casts = [c for c in v.casts if c.t <= td]
+    v.deaths = [td]
+    v.dmg_taken = [h for h in v.dmg_taken if h[0] <= td]
+    v.buff_events = [e for e in v.buff_events if e[0] <= td]
+    v.buffs = {k: [(a, min(b, td)) for a, b in iv if a <= td] for k, iv in v.buffs.items()}
+    v.debuffs = {k: [(a, min(b, td)) for a, b in iv if a <= td] for k, iv in v.debuffs.items()}
+    v.dps /= 2
+    r = compare(v, build_reference(tops[1:]))
+    high = [f for f in r.findings if f.impact_level == "HIGH" and not f.noise]
+    assert [f.section for f in high] == ["Смерти"], [f.title for f in high]
+
+    # 2. Шумовой порог: топ против остальных — суммарно меньше 2% «потерь»
+    for i in (0, 7, 14):
+        rr = compare(tops[i], build_reference([t for j, t in enumerate(tops) if j != i]))
+        tot = sum(f.impact or 0 for f in rr.findings if not f.noise and not f.context)
+        assert tot < 0.02, (i, tot)
+
+    # 3. Мой лог: дебаффы на боссе, внешние баффы, выжимка
+    ref = build_reference(tops, me=me)
+    r = compare(me, ref)
+    keys = {f.key for f in r.findings}
+    assert "raiddebuff:1490" in keys and "ext:10060" in keys, keys
+    assert any(k.startswith("vuln:") for k in keys), keys
+    assert any(k.startswith("prio:") for k in keys) and "res:waste" in keys, keys
+    assert 1 <= len(r.brief["actions"]) <= 3 and r.brief["context"], r.brief
+    assert all(not f.context for f in r.top5)
+    assert ref.build_note, "фильтр по билду не сработал"
+
+    # 4. Рейд: выжимка и дополнительные проверки
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, avoidable={str(x) for x in DEMO_AVOIDABLE})
+    X = R["extras"]
+    assert 2 <= len(R["brief"]) <= 7, R["brief"]
+    assert X["missed_kicks"] and X["consumables"]["no_flask"] == ["Брам"], X["consumables"]
+    assert [a["name"] for a in X["adds"]["low"]] == ["Норра"], X["adds"]
+    assert any(not s["covered_by"] for s in X["spikes"]) and X["avoidable"]
+    assert X["heaviest"][0]["abilities"][0] == "Ледяная волна", X["heaviest"][0]
+    names = {c["name"]: c for c in X["raid_cds"]}
+    assert {"Божественный гимн", "Тотем целительного потока", "Ободряющий клич"} <= set(names), names
+    assert names["Ободряющий клич"]["on_peak"] is None and names["Божественный гимн"]["on_peak"]
+    assert len(X["damage_timeline"]) >= 60
+    V = X["vs_top"]
+    assert V and V["n"] == 5 and V["top_cover"] == 1.0 and abs(V["my_cover"] - 2 / 3) < 0.01, V and V["my_cover"]
+    third = [r for r in V["plan"] if r["mechanic"].endswith("№3")][0]
+    assert third["cd"] == "Божественный гимн" and third["like_top"], third
+    assert X["pull_trend"]["rows"][0]["name"] == "Ледяная волна", X["pull_trend"]
+    # Вайп: план покрывает и пики, до которых рейд не дошёл
+    Rw = run_raid(FakeRaidClient(), DEMO_URL, 1, log=lambda m: None)
+    assert any(r["my"] is None for r in Rw["extras"]["vs_top"]["rows"]), Rw["extras"]["vs_top"]["rows"]
+    print("OK анализ: смерть нормирована, шум топа отсечён, дебаффы босса и выжимка на месте")
+
+
+if __name__ == "__main__":
+    test_analysis_quality()
+
+
+def test_raid_rotation():
+    """Ротация всего рейда: все DPS разобраны, общие проблемы найдены, Excel собирается."""
+    import json
+    import tempfile
+    from wcl_analyzer import web
+    from wcl_analyzer.raid_rotation import run_demo
+    R = run_demo(log=lambda m: None)
+    ok = [r for r in R["rows"] if "error" not in r]
+    assert len(ok) == 5, R["rows"]
+    worst = min(ok, key=lambda r: r["gap"])
+    assert worst["name"] == "Ильвен" and worst["actions"][0]["title"].startswith("Смерть"), worst["actions"]
+    best = max(ok, key=lambda r: r["gap"])
+    assert best["name"] == "Кассия", best["name"]
+    assert any("у 3 из 5" in line for line in R["brief"]), R["brief"]
+    job = {"id": "t", "progress": 0.0, "log": []}
+    web._run_raid_rotation(job, {"mode": "raidrot", "demo": True}, None, lambda m: None)
+    assert len(json.dumps(job["result"])) < 2_000_000 and job["xlsx"]
+    from openpyxl import load_workbook
+    with tempfile.NamedTemporaryFile(suffix=".xlsx") as f:
+        f.write(job["xlsx"]); f.flush()
+        wb = load_workbook(f.name)
+        assert wb.sheetnames[:2] == ["Ротация рейда", "Что исправить"] and "Ильвен" in wb.sheetnames, wb.sheetnames
+    print("OK ротация рейда: 5 DPS, общие проблемы, переход к игроку, Excel")
+
+
+if __name__ == "__main__":
+    test_raid_rotation()
+
+
+def test_batched_fetch():
+    """Пакетный запрос (все выборки игрока одним GraphQL) даёт те же данные, что и десять отдельных."""
+    import re
+    from wcl_analyzer.api import Cache, WCLClient
+    from wcl_analyzer.logs import _fetch_raw_batched, fetch_raw
+
+    fake = FakeClient()
+    code = "TOPREPORT001"
+    report = fake.report(code)
+    fight = report["fights"][0]
+    actor = report["masterData"]["actors"][0]
+
+    class Batched(WCLClient):
+        calls = 0
+
+        def query(self, q, variables=None, use_cache=True, max_age_s=None):
+            Batched.calls += 1
+            rep = {}
+            for alias, args in re.findall(r"(e\d+): events\(([^)]*)\)", q):
+                kv = dict(re.findall(r"(\w+): ([^,]+)", args))
+                data = fake.events(code, 1, float(kv["startTime"]), float(kv["endTime"]), kv["dataType"],
+                                   source_id=int(kv["sourceID"]) if "sourceID" in kv else None,
+                                   target_id=int(kv["targetID"]) if "targetID" in kv else None,
+                                   hostility=kv.get("hostilityType"))
+                rep[alias] = {"data": data, "nextPageTimestamp": None}
+            for alias in re.findall(r"(t\d+): table\(", q):
+                rep[alias] = {"data": fake.damage_table(code, 1, actor["id"])}
+            return {"reportData": {"report": rep}}
+
+    class FakeRes(FakeClient):
+        def events(self, *a, **k):
+            return [] if a[4] == "Resources" else super().events(*a, **k)
+
+    fake = FakeRes()
+    from wcl_analyzer.api import MemoryCache
+    b = Batched("id", "secret", MemoryCache(), verbose=False)
+    got = _fetch_raw_batched(b, report, fight, actor["id"], False)
+    want = fetch_raw(fake, report, fight, actor["id"])
+    for k in ("casts", "buffs", "debuffs", "dmg_taken", "deaths", "boss_casts", "combatant", "boss_debuffs"):
+        assert len(got[k]) == len(want[k]), (k, len(got[k]), len(want[k]))
+    assert got["dmg_table"] == want["dmg_table"] and Batched.calls == 1, Batched.calls
+    print("OK пакетный запрос: те же данные одним запросом вместо", 10)
+
+
+def test_limit_no_hang():
+    """Исчерпан часовой лимит: поиск боя сразу объясняет, а не висит; запрос лимита не зацикливается."""
+    import time as _t
+
+    from wcl_analyzer.api import MemoryCache, WCLClient, WCLError
+
+    class Resp:
+        status_code = 429
+        text = "Too many requests"
+
+        def json(self):
+            return {}
+
+    class Sess:
+        posts = 0
+
+        def post(self, url, **k):
+            Sess.posts += 1
+            if "token" in url:
+                r = Resp(); r.status_code = 200; r.json = lambda: {"access_token": "t", "expires_in": 3600}
+                return r
+            return Resp()
+
+    c = WCLClient("id", "secret", MemoryCache(), verbose=False)
+    c.session = Sess()
+    c.max_wait_s = 0
+    t0 = _t.time()
+    try:
+        c.query("query { x }")
+        raise AssertionError("должна быть ошибка")
+    except WCLError as e:
+        assert "лимит" in str(e) and "мин" in str(e), e
+    assert _t.time() - t0 < 2 and Sess.posts < 6, Sess.posts
+    print("OK лимит: поиск боя сразу сообщает о лимите, без зависания")
+
+
+if __name__ == "__main__":
+    test_batched_fetch()
+    test_limit_no_hang()

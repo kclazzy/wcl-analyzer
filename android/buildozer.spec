@@ -14,6 +14,8 @@ requirements = python3,openssl,requests,urllib3,certifi,charset-normalizer,idna,
 
 # Встроенное окно браузера показывает интерфейс сервера, запущенного внутри приложения
 p4a.bootstrap = webview
+# Стабильный выпуск python-for-android: свежая ветка сборщика меняется и ломает сборку
+p4a.branch = v2024.01.21
 p4a.port = 8765
 
 icon.filename = %(source.dir)s/wcl_analyzer/web/icon-512.png

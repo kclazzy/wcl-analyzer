@@ -392,6 +392,7 @@ def test_real_talent_data():
     talents._MEM.clear()
     if not data:
         print("ПРОПУЩЕН справочник талантов: нет доступа к Raidbots")
+        print("::notice title=Справочник талантов::пропущен — нет доступа к Raidbots")
         return
     for cls, spec in (("Mage", "Frost"), ("DeathKnight", "Unholy"), ("Hunter", "BeastMastery")):
         t = talents.spec_tree(data, cls, spec)
@@ -400,10 +401,37 @@ def test_real_talent_data():
         assert any(n["part"] == "hero" and n["sub"] for n in t["nodes"].values()), "нет героических узлов"
         assert t["subs"], "нет названий героических веток"
     print(f"OK справочник талантов Raidbots: {len(data)} спеков, героические ветки, узлы выбора")
+    print(f"::notice title=Справочник талантов::прочитан, {len(data)} спеков")
+
+
+def test_same_difficulty():
+    """Эталон собирается только из боёв той же сложности: бой другой сложности в рейтинге пропускается."""
+    import copy
+    from wcl_analyzer.collect import collect_reference
+    c = FakeClient()
+    my = c.reports["MYREPORT0001"]["fights"][0]
+    diff = int(my.get("difficulty") or 5)
+    # лучший лог рейтинга подменяем на бой другой сложности
+    best = c.ranks[0]["report"]["code"]
+    c.reports[best] = copy.deepcopy(c.reports[best])
+    for f in c.reports[best]["fights"]:
+        f["difficulty"] = 4 if diff != 4 else 5
+    msgs = []
+    logs, _ = collect_reference(c, int(my["encounterID"]), "Mage", "Frost", diff, top_n=5, log=msgs.append, save=False)
+    assert all(lg.report_code != best for lg in logs), "бой другой сложности попал в эталон"
+    assert any("другая сложность" in m for m in msgs), msgs
+    assert len(logs) == 5 and all(lg.difficulty == diff for lg in logs)
+    try:
+        collect_reference(c, int(my["encounterID"]), "Mage", "Frost", 0, top_n=5, log=lambda m: None, save=False)
+        raise AssertionError("без сложности эталон собираться не должен")
+    except LookupError as e:
+        assert "сложность" in str(e)
+    print("OK сложность: эталон только из боёв той же сложности, бой другой сложности пропущен")
 
 
 if __name__ == "__main__":
     test_batched_fetch()
+    test_same_difficulty()
     test_real_talent_data()
     test_pick_by_percentile()
     test_limit_no_hang()

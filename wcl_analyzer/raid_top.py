@@ -31,7 +31,8 @@ RAID_CD_COOLDOWN = {
 DEFAULT_CD_S = 180
 
 
-def light_raid(client, code: str, fid: int, report: dict | None = None) -> dict:
+def light_raid(client, code: str, fid: int, report: dict | None = None, difficulty: int | None = None,
+               encounter_id: int | None = None) -> dict:
     """Облегчённый разбор боя: только урон по рейду и рейдовые кулдауны (один пакетный запрос).
     Возвращает результат analyze_raid: пики урона, тяжёлые моменты, нажатия рейдовых кулдаунов."""
     from .api import WCLError
@@ -39,6 +40,10 @@ def light_raid(client, code: str, fid: int, report: dict | None = None) -> dict:
     ids = ", ".join(str(x) for x in sorted(RAID_CD_IDS))
     report = report or client.report(code)
     f = next(x for x in report["fights"] if int(x["id"]) == int(fid))
+    if difficulty and int(f.get("difficulty") or 0) and int(f["difficulty"]) != int(difficulty):
+        raise LookupError("другая сложность")
+    if encounter_id and f.get("encounterID") and int(f["encounterID"]) != int(encounter_id):
+        raise LookupError("другой босс")
     s, e = float(f["startTime"]), float(f["endTime"])
     got = None
     if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
@@ -65,6 +70,8 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
     from .api import WCLError
     from .collect import parallel_workers
 
+    if not difficulty:
+        raise LookupError("не удалось определить сложность боя")
     ranks = client.fight_rankings(encounter_id, difficulty, "speed")
     cands = [r for r in ranks if (r.get("report") or {}).get("code")][: n + 3]
 
@@ -72,7 +79,7 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
         rep = rk["report"]
         code, fid = rep["code"], int(rep.get("fightID") or rep.get("fightId") or 0)
         try:
-            R = light_raid(client, code, fid)
+            R = light_raid(client, code, fid, difficulty=difficulty, encounter_id=encounter_id)
             guild = (rk.get("guild") or {}).get("name") or rk.get("name") or code
             return {"guild": guild, "duration": R["info"]["duration_s"], "code": code, "fight": fid,
                     "spikes": R["extras"]["spikes"], "cds": R["extras"]["raid_cds"]}
@@ -105,6 +112,9 @@ def raid_cd_peaks(client, code: str, fid: int, log=print, progress=lambda x: Non
             kills = fetch_top_kills(client, int(f["encounterID"]), int(f.get("difficulty") or 0), log=log,
                                     progress=progress)
             vs = compare_with_top(R, kills)
+            if vs:
+                from .config import DIFFICULTY_NAMES
+                vs["difficulty"] = DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), "")
         except Exception as e:  # noqa: BLE001 — сравнение с топом не обязательно
             log(f"Сравнение с лучшими киллами недоступно: {e}")
     return {"info": {"duration_s": R["info"]["duration_s"]},

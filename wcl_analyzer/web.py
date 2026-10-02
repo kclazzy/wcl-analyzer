@@ -420,7 +420,9 @@ def to_json(r: CompareResult, job_id: str) -> dict:
                  "difficulty": me.difficulty_name, "duration": _fmt_t(me.duration), "kill": me.kill,
                  "url": me.url, "ref_label": ref.label, "ref_n": ref.n, "dps": _num(me.dps, 0),
                  "ref_dps": _num(agg["dps"]["median"], 0), "demo": me.report_code.startswith("DEMO"),
-                 "main_cd": name(ref.main_cd) if ref.main_cd else None},
+                 "main_cd": name(ref.main_cd) if ref.main_cd else None,
+                 # проверка сложности: сколько логов топа той же сложности, что и ваш бой
+                 "ref_same_diff": sum(1 for x in ref.logs if x.difficulty == me.difficulty)},
         "excel": f"/api/report/{job_id}",
         "brief": {**r.brief, "gap": _num(r.brief.get("gap"), 4), "explained": _num(r.brief.get("explained"), 4)},
         "progress_keys": {k: {"title": v["title"], "impact": _num(v["impact"], 4)} for k, v in r.progress_keys.items()},

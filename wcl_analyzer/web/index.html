@@ -671,7 +671,8 @@ function render(R){
     <div class="hero">
       <div>
         <div class="who"><strong>${esc(I.name)}, ${esc(who(I.cls, I.spec))}</strong>${esc(I.boss)}, ${esc(I.difficulty)}, ${I.kill?"килл":"вайп"} за ${I.duration}.
-          Эталон: ${esc(I.ref_label)}, ${I.ref_n} логов.</div>
+          Эталон: ${esc(I.ref_label)}, ${I.ref_n} ${plural(I.ref_n,"лог","лога","логов")}${I.ref_same_diff==null ? "" : I.ref_same_diff===I.ref_n
+            ? ` — все той же сложности (${esc(I.difficulty)})` : ` — <span class="stale">той же сложности только ${I.ref_same_diff} из ${I.ref_n}</span>`}.</div>
         ${I.ref_collected_at ? `<div class="refline">Рейтинг лучших логов от ${fmtDate(I.ref_collected_at)}${I.ref_stale?' — <span class="stale">устарел</span>':""}
           <button type="button" id="refAgain">Обновить эталон и пересчитать</button></div>` : ""}
         <div class="dps">${num(I.dps)} <small>DPS против ${num(I.ref_dps)} у медианы топа</small></div>
@@ -782,7 +783,7 @@ function renderRaidPeaks(P, el){
     ${box("Урон по рейду и рейдовые кулдауны", "Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники — рейдовые кулдауны вашего рейда (красная обводка — нажат вне пиков)" + (V ? ", полые бирюзовые — что жмут лучшие киллы." : "."),
       '<div class="chart" style="height:300px"><canvas id="cRaidDmg"></canvas></div>')}
     ${V ? `<div class="box"><h3>Пики урона: что нажал ваш рейд и что жмёт топ</h3>
-      <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${esc(k.duration)})`).join(", ")}.
+      <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы${V.difficulty?` той же сложности (${esc(V.difficulty)})`:""}: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${esc(k.duration)})`).join(", ")}.
       Кулдауном закрыто: у топа ${pct(V.top_cover,0)}, у вашего рейда ${pct(V.my_cover,0)}.</p>` +
       table(["Когда","Пик","Нажато у вас","У топа закрыт","Чем закрывает топ"], V.rows.map(r=>[r.time, esc(r.mechanic),
         r.my==null ? '<span style="color:var(--muted)">не дошли</span>' : r.my.length ? esc(r.my.join(", ")) : '<span class="worse">ничего</span>',
@@ -958,7 +959,7 @@ function renderRaid(R){
   const X = R.extras || {};
   const V = X.vs_top;
   if (V) $("#p-r-sum").insertAdjacentHTML("beforeend", `<div class="box"><h3>Пики урона: ваш бой и лучшие киллы</h3>
-      <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${k.duration})`).join(", ")}.
+      <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы${V.difficulty?` той же сложности (${esc(V.difficulty)})`:""}: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${k.duration})`).join(", ")}.
       Кулдауном закрыто: у топа ${pct(V.top_cover,0)}, у вас ${pct(V.my_cover,0)}.</p>
       ${table(["Когда","Пик","Ваши кулдауны","У топа закрыт","Чем закрывает топ"], V.rows.map(r=>[r.time, esc(r.mechanic),
         r.my==null ? '<span style="color:var(--muted)">не дошли</span>' : r.my.length ? esc(r.my.join(", ")) : '<span class="worse">нет</span>',

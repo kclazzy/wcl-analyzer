@@ -50,6 +50,11 @@ def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str,
     force=True скачивает рейтинг заново (бои игроков, уже бывшие в кэше, не перекачиваются).
     В meta записываются дата рейтинга и имя босса; эталон сохраняется в список эталонов."""
     from . import settings
+    from .config import DIFFICULTY_NAMES
+    if not difficulty:
+        # Без сложности Warcraft Logs отдаёт рейтинг самой высокой (эпохальной) — сравнение было бы нечестным
+        raise LookupError("Не удалось определить сложность боя: эталон не собран, чтобы не сравнить с чужой сложностью")
+    diff_name = DIFFICULTY_NAMES.get(int(difficulty), str(difficulty))
     candidates: list[dict] = []
     page = 1
     fetched_at, boss = None, ""
@@ -90,6 +95,12 @@ def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str,
         try:
             report = client.report(code)
             fight = next(f for f in report["fights"] if int(f["id"]) == int(fid))
+            # Проверка: бой топа той же сложности и того же босса, что и ваш
+            fd = int(fight.get("difficulty") or 0)
+            if fd and fd != int(difficulty):
+                return None, f"другая сложность ({DIFFICULTY_NAMES.get(fd, fd)}, нужна {diff_name})"
+            if fight.get("encounterID") and int(fight["encounterID"]) != int(encounter_id):
+                return None, "другой босс"
             actor = next(a for a in report["masterData"]["actors"]
                          if a["name"] == rk.get("name") and a.get("type") not in ("NPC", "Pet"))
             raw = fetch_raw(client, report, fight, int(actor["id"]))

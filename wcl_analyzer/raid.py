@@ -558,6 +558,9 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
             kills = fetch_top_kills(client, int(f["encounterID"]), int(f.get("difficulty") or 0), log=log,
                                     progress=lambda x: progress(0.5 + 0.45 * x))
             vs = compare_with_top(R, kills)
+            if vs:
+                from .config import DIFFICULTY_NAMES
+                vs["difficulty"] = DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), "")
         except Exception as e:  # noqa: BLE001 — сравнение с топом не обязательно для разбора
             log(f"Сравнение с топ-гильдиями недоступно: {e}")
             vs = None

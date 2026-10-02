@@ -17,6 +17,9 @@ from pathlib import Path
 REMOTE_URL = os.environ.get(
     "WCL_GAME_DATA_URL",
     "https://raw.githubusercontent.com/kclazzy/wcl-analyzer/main/wcl_analyzer/data/game_data.json")
+# Запасной адрес — то же через jsDelivr (если raw.githubusercontent.com недоступен)
+REMOTE_FALLBACK = os.environ.get(
+    "WCL_GAME_DATA_URL2", "https://cdn.jsdelivr.net/gh/kclazzy/wcl-analyzer@main/wcl_analyzer/data/game_data.json")
 BUNDLED = Path(__file__).parent / "data" / "game_data.json"
 MAX_AGE_S = 86400
 
@@ -46,11 +49,14 @@ def _load() -> dict:
                 return d
     except (OSError, ValueError):
         pass
-    try:
-        import requests
-        r = requests.get(REMOTE_URL, timeout=5)
-        r.raise_for_status()
-        d = r.json()
+    for url in (REMOTE_URL, REMOTE_FALLBACK):
+        try:
+            import requests
+            r = requests.get(url, timeout=5)
+            r.raise_for_status()
+            d = r.json()
+        except Exception:  # noqa: BLE001
+            continue
         if _valid(d):
             if local and SAVE["enabled"]:
                 try:
@@ -59,9 +65,7 @@ def _load() -> dict:
                 except OSError:
                     pass
             return d
-    except Exception:  # noqa: BLE001 — нет сети или файла в репозитории: берём копию из сборки
-        pass
-    return bundled
+    return bundled  # нет сети или файла в репозитории: копия из сборки
 
 
 def data() -> dict:

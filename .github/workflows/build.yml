@@ -35,7 +35,7 @@ jobs:
           # Отпечаток оболочки: Python, библиотеки и настройки сборки. Пока он тот же —
           # программа обновляется скачиванием одного кода, без переустановки
           SHELL_ID=$(cat requirements.txt android/buildozer.spec android/main.py packaging/windows/wcl_app.py \
-                     packaging/windows/wcl_analyzer.spec wcl_boot.py | sha256sum | cut -c1-12)
+                     packaging/windows/wcl_analyzer.spec wcl_boot.py | tr -d '\r' | sha256sum | cut -c1-12)
           printf '"""Номер сборки и отпечаток оболочки. Сборка на GitHub перезаписывает этот файл."""\nBUILD = "%s"\nSHELL_ID = "%s"\n' \
             "${{ github.run_number }}" "$SHELL_ID" > wcl_analyzer/_build.py
           sed -i "s/^SHELL_ID = \"dev\"/SHELL_ID = \"$SHELL_ID\"/" wcl_boot.py
@@ -73,7 +73,7 @@ jobs:
           # Отпечаток оболочки: Python, библиотеки и настройки сборки. Пока он тот же —
           # программа обновляется скачиванием одного кода, без переустановки
           SHELL_ID=$(cat requirements.txt android/buildozer.spec android/main.py packaging/windows/wcl_app.py \
-                     packaging/windows/wcl_analyzer.spec wcl_boot.py | sha256sum | cut -c1-12)
+                     packaging/windows/wcl_analyzer.spec wcl_boot.py | tr -d '\r' | sha256sum | cut -c1-12)
           printf '"""Номер сборки и отпечаток оболочки. Сборка на GitHub перезаписывает этот файл."""\nBUILD = "%s"\nSHELL_ID = "%s"\n' \
             "${{ github.run_number }}" "$SHELL_ID" > wcl_analyzer/_build.py
           sed -i "s/^SHELL_ID = \"dev\"/SHELL_ID = \"$SHELL_ID\"/" wcl_boot.py
@@ -162,7 +162,7 @@ jobs:
           # Отпечаток оболочки: Python, библиотеки и настройки сборки. Пока он тот же —
           # программа обновляется скачиванием одного кода, без переустановки
           SHELL_ID=$(cat requirements.txt android/buildozer.spec android/main.py packaging/windows/wcl_app.py \
-                     packaging/windows/wcl_analyzer.spec wcl_boot.py | sha256sum | cut -c1-12)
+                     packaging/windows/wcl_analyzer.spec wcl_boot.py | tr -d '\r' | sha256sum | cut -c1-12)
           printf '"""Номер сборки и отпечаток оболочки. Сборка на GitHub перезаписывает этот файл."""\nBUILD = "%s"\nSHELL_ID = "%s"\n' \
             "${{ github.run_number }}" "$SHELL_ID" > wcl_analyzer/_build.py
           sed -i "s/^SHELL_ID = \"dev\"/SHELL_ID = \"$SHELL_ID\"/" wcl_boot.py
@@ -175,6 +175,7 @@ jobs:
           printf '{"build": %s, "shell": "%s", "sha256": "%s", "date": "%s"}\n' \
             "${{ github.run_number }}" "$SHELL_ID" "$SHA" "$(date -u +%FT%TZ)" > update.json
           cat update.json
+          echo "UPDATE_JSON=$(cat update.json)" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with: {path: out}
       - name: Файлы выпуска
@@ -184,12 +185,14 @@ jobs:
           ls -la WCL-Analyzer.* wcl_analyzer-code.zip update.json
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
+          # метка вида v1.1.N: по ней зеркало jsDelivr находит последнюю версию
+          tag_name: v1.1.${{ github.run_number }}
           name: Сборка ${{ github.run_number }}
           make_latest: true
           body: |
             Скачать: WCL-Analyzer.apk — для телефона, WCL-Analyzer.exe — для ПК.
             Уже установленная программа обновляется сама: «Проверить обновления» внизу страницы.
+            <!--update ${{ env.UPDATE_JSON }} -->
           files: |
             WCL-Analyzer.exe
             WCL-Analyzer.apk

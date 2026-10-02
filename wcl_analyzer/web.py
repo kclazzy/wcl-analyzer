@@ -413,6 +413,10 @@ def _page() -> bytes:
 def _friendly(e: Exception) -> str:
     msg = str(e)
     if "ConnectionError" in type(e).__name__ or "Max retries" in msg:
+        import re as _re
+        host = (_re.search(r"host='([^']+)'", msg) or [None, ""])[1]
+        if host and "warcraftlogs" not in host:
+            return f"Нет связи с {host}. Проверьте интернет и попробуйте ещё раз."
         return "Нет связи с Warcraft Logs. Проверьте интернет и попробуйте ещё раз."
     if isinstance(e, (KeyError, IndexError, TypeError)):
         # Не голое «'id'», а понятное сообщение: в данных Warcraft Logs нет ожидаемого поля
@@ -746,8 +750,11 @@ class Handler(BaseHTTPRequestHandler):
                 if SERVER["public"] or not self._is_local():
                     return self._json({"error": "Обновление доступно только в самой программе"}, 403)
                 from . import update
-                if path == "/api/update/check":
-                    return self._json(update.check())
+                try:
+                    if path == "/api/update/check":
+                        return self._json(update.check())
+                except update.UpdateError as e:
+                    return self._json({"error": str(e)}, 502)
                 if body.get("kind") == "full":
                     return self._json(update.apply_full())
                 res = update.apply_code()

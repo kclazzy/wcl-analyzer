@@ -12,6 +12,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -25,7 +26,37 @@ from ._build import SHELL_ID as _CODE_SHELL_ID
 
 REPO = os.environ.get("WCL_UPDATE_REPO", "kclazzy/wcl-analyzer")
 BASE = f"https://github.com/{REPO}/releases/latest/download/"
+API = f"https://api.github.com/repos/{REPO}/releases/latest"
+# Запасной источник — jsDelivr, бесплатное зеркало файлов GitHub: доступен, когда сервер файлов GitHub — нет
+JSD_DATA = f"https://data.jsdelivr.com/v1/packages/gh/{REPO}"
+JSD_CDN = f"https://cdn.jsdelivr.net/gh/{REPO}"
 CODE_ZIP, APK, EXE = "wcl_analyzer-code.zip", "WCL-Analyzer.apk", "WCL-Analyzer.exe"
+# Файлы оболочки — по ним считается её отпечаток (как в сборке на GitHub)
+SHELL_FILES = ["requirements.txt", "android/buildozer.spec", "android/main.py", "packaging/windows/wcl_app.py",
+               "packaging/windows/wcl_analyzer.spec", "wcl_boot.py"]
+
+
+class UpdateError(Exception):
+    pass
+
+
+def _why(e: Exception) -> str:
+    """Коротко и по-русски: почему не открылся адрес."""
+    import requests
+    if isinstance(e, requests.HTTPError) and e.response is not None:
+        return f"ответ {e.response.status_code}"
+    if isinstance(e, requests.Timeout):
+        return "не отвечает (тайм-аут)"
+    if isinstance(e, requests.exceptions.SSLError):
+        return "ошибка защищённого соединения"
+    if isinstance(e, requests.ConnectionError):
+        return "нет соединения"
+    return f"{type(e).__name__}: {e}"[:120]
+
+
+def shell_fingerprint(texts: list[bytes]) -> str:
+    """Отпечаток оболочки — как в сборке: без символов \r (на Windows окончания строк другие)."""
+    return hashlib.sha256(b"".join(t.replace(b"\r", b"") for t in texts)).hexdigest()[:12]
 
 
 def _boot():
@@ -71,10 +102,35 @@ def _get(url: str, timeout: float = 30) -> bytes:
     return r.content
 
 
+def latest_info() -> dict:
+    """Последняя сборка: с GitHub (файл выпуска или API), а если GitHub недоступен — через jsDelivr."""
+    errors = []
+    try:
+        return {**json.loads(_get(BASE + "update.json", 15)), "source": "github"}
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"github.com — {_why(e)}")
+    try:
+        rel = json.loads(_get(API, 15))
+        m = re.search(r"<!--update (\{.*?\}) -->", rel.get("body") or "", re.S)
+        if m:
+            return {**json.loads(m.group(1)), "tag": rel.get("tag_name"), "source": "api"}
+        errors.append("api.github.com — в выпуске нет данных о версии")
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"api.github.com — {_why(e)}")
+    try:
+        ver = json.loads(_get(JSD_DATA + "/resolved?specifier=latest", 15))["version"]
+        texts = [_get(f"{JSD_CDN}@{ver}/{f}", 15) for f in SHELL_FILES]
+        return {"build": _num(str(ver).split(".")[-1]), "shell": shell_fingerprint(texts), "tag": ver,
+                "source": "jsdelivr"}
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"jsdelivr.net — {_why(e)}")
+    raise UpdateError("Сервер обновлений недоступен с этого устройства: " + "; ".join(errors))
+
+
 def check() -> dict:
     """Есть ли новая сборка и какое обновление нужно: только код или программа целиком."""
     cur = current()
-    info = json.loads(_get(BASE + "update.json", 15))
+    info = latest_info()
     new = _num(info.get("build"))
     have = _num(cur["build"])
     available = new > have
@@ -82,28 +138,36 @@ def check() -> dict:
     if available:
         kind = "code" if info.get("shell") == cur["shell"] else "full"
     return {**cur, "latest": new, "available": available, "kind": kind, "date": info.get("date"),
-            "page": f"https://github.com/{REPO}/releases/latest"}
+            "source": info.get("source"), "page": f"https://github.com/{REPO}/releases/latest"}
 
 
 def apply_code() -> dict:
     """Скачивает код новой сборки в папку данных. Подключится при следующем запуске программы."""
-    info = json.loads(_get(BASE + "update.json", 15))
+    info = latest_info()
     if info.get("shell") != shell_id():
         raise ValueError("Для этой сборки нужна новая программа целиком, а не только код")
-    data = _get(BASE + CODE_ZIP, 60)
-    if info.get("sha256") and hashlib.sha256(data).hexdigest() != info["sha256"]:
-        raise ValueError("Архив обновления повреждён (контрольная сумма не совпала) — попробуйте ещё раз")
     build = _num(info.get("build"))
     root = code_root()
     dest = root / f"build-{build}"
     tmp = root / f".tmp-{build}-{int(time.time())}"
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(io.BytesIO(data)) as z:
-        for n in z.namelist():  # только пакет wcl_analyzer, без выхода за пределы папки
-            if not n.startswith("wcl_analyzer/") or ".." in Path(n).parts:
-                raise ValueError(f"Неожиданный файл в архиве обновления: {n}")
-        z.extractall(tmp)
+    data = None
+    if info.get("source") == "github":
+        try:
+            data = _get(BASE + CODE_ZIP, 60)
+        except Exception:  # noqa: BLE001 — архив с GitHub не скачался: берём файлы через jsDelivr
+            data = None
+    if data is not None:
+        if info.get("sha256") and hashlib.sha256(data).hexdigest() != info["sha256"]:
+            raise ValueError("Архив обновления повреждён (контрольная сумма не совпала) — попробуйте ещё раз")
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            for n in z.namelist():  # только пакет wcl_analyzer, без выхода за пределы папки
+                if not n.startswith("wcl_analyzer/") or ".." in Path(n).parts:
+                    raise ValueError(f"Неожиданный файл в архиве обновления: {n}")
+            z.extractall(tmp)
+    else:
+        _download_jsdelivr(info, tmp)
     pkg = tmp / "wcl_analyzer"
     if not (pkg / "__init__.py").exists() or not (pkg / "web" / "index.html").exists():
         raise ValueError("В архиве обновления нет программы")
@@ -117,6 +181,24 @@ def apply_code() -> dict:
         if old != dest and old.name != f"build-{os.environ.get('WCL_CODE_BUILD')}":
             shutil.rmtree(old, ignore_errors=True)
     return {"ok": True, "build": build, "restart": restart_hint()}
+
+
+def _download_jsdelivr(info: dict, tmp: Path) -> None:
+    """Код сборки по файлам через jsDelivr (если архив с GitHub не скачивается)."""
+    ver = info.get("tag") or f"v1.1.{info.get('build')}"
+    listing = json.loads(_get(f"{JSD_DATA}@{ver}?structure=flat", 30))
+    names = [f["name"] for f in listing.get("files") or []
+             if f["name"].startswith("/wcl_analyzer/") and "__pycache__" not in f["name"] and ".." not in f["name"]]
+    if not names:
+        raise UpdateError("В зеркале jsDelivr нет файлов программы для этой версии")
+    for n in names:
+        target = tmp / n.lstrip("/")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(_get(f"{JSD_CDN}@{ver}{n}", 30))
+    # номер сборки и отпечаток оболочки — как их проставляет сборка на GitHub
+    (tmp / "wcl_analyzer" / "_build.py").write_text(
+        f'"""Номер сборки и отпечаток оболочки (обновление через jsDelivr)."""\nBUILD = "{info.get("build")}"\n'
+        f'SHELL_ID = "{info.get("shell")}"\n', encoding="utf-8")
 
 
 def restart_hint() -> str:

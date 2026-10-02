@@ -604,6 +604,39 @@ def test_code_update():
             raise AssertionError("испорченный архив принят")
         except ValueError as e:
             assert "контрольная сумма" in str(e)
+        # GitHub недоступен — номер сборки и код берутся через jsDelivr (по файлам)
+        import requests as _rq
+        files = {"/" + f.relative_to(root).as_posix(): f.read_bytes() for f in (root / "wcl_analyzer").rglob("*")
+                 if f.is_file() and "__pycache__" not in f.parts}
+        shell_j = update.shell_fingerprint([(root / f).read_bytes() for f in update.SHELL_FILES])
+
+        def fake_get(url, timeout=30):
+            if "github.com" in url:
+                raise _rq.ConnectionError("blocked")
+            if url.endswith("/resolved?specifier=latest"):
+                return b'{"version": "1.1.78"}'
+            if "structure=flat" in url:
+                return _json.dumps({"files": [{"name": n} for n in files]}).encode()
+            path = url.split("@1.1.78", 1)[1]
+            return files[path] if path in files else (root / path.lstrip("/")).read_bytes()
+        update._get, update.shell_id = fake_get, (lambda: shell_j)
+        chk = update.check()
+        assert chk["source"] == "jsdelivr" and chk["latest"] == 78 and chk["kind"] == "code", chk
+        res = update.apply_code()
+        assert res["build"] == 78
+        built = (tmp / "code" / "build-78" / "wcl_analyzer" / "_build.py").read_text()
+        assert 'BUILD = "78"' in built and shell_j in built
+        # всё недоступно — понятная причина, а не «нет связи с Warcraft Logs»
+        update._get = lambda url, timeout=30: (_ for _ in ()).throw(_rq.ConnectionError("down"))
+        try:
+            update.check()
+            raise AssertionError("ошибка не выдана")
+        except update.UpdateError as e:
+            assert "github.com — нет соединения" in str(e) and "jsdelivr.net" in str(e), e
+        # вернуть «сборку 77» для проверок загрузчика ниже
+        update._get = lambda url, timeout=30: _json.dumps(info).encode() if url.endswith("update.json") else code
+        update.shell_id = lambda: shell
+        update.apply_code()
     finally:
         update._get, update.shell_id, update.code_root = old
     probe = (f"import sys; sys.path.insert(0, {str(root)!r}); import wcl_boot; wcl_boot.SHELL_ID = {shell!r}; "

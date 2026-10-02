@@ -569,8 +569,65 @@ def test_single_sources():
     print("OK один источник: таблица игровых данных и словарь названий")
 
 
+def test_code_update():
+    """Обновление без переустановки: скачанный код подключается при запуске; сломанный — откат на встроенный."""
+    import hashlib, io, json as _json, subprocess, tempfile, zipfile
+    from pathlib import Path as _P
+    from wcl_analyzer import update
+    root = _P(__file__).resolve().parents[1]
+    tmp = _P(tempfile.mkdtemp())
+    shell = "testshell01"
+    # архив кода «сборки 77» — как его собирает GitHub
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for f in (root / "wcl_analyzer").rglob("*"):
+            if f.is_file() and "__pycache__" not in f.parts:
+                rel = f.relative_to(root).as_posix()
+                data = f.read_bytes()
+                if rel == "wcl_analyzer/_build.py":
+                    data = f'BUILD = "77"\nSHELL_ID = "{shell}"\n'.encode()
+                z.writestr(rel, data)
+    code = buf.getvalue()
+    info = {"build": 77, "shell": shell, "sha256": hashlib.sha256(code).hexdigest()}
+    old = (update._get, update.shell_id, update.code_root)
+    update._get = lambda url, timeout=30: _json.dumps(info).encode() if url.endswith("update.json") else code
+    update.shell_id = lambda: shell
+    update.code_root = lambda: tmp / "code"
+    try:
+        res = update.apply_code()
+        assert res["ok"] and res["build"] == 77 and (tmp / "code" / "current.json").exists()
+        # испорченный архив не принимается
+        update._get = lambda url, timeout=30: (_json.dumps({**info, "sha256": "0" * 64}).encode()
+                                               if url.endswith("update.json") else code)
+        try:
+            update.apply_code()
+            raise AssertionError("испорченный архив принят")
+        except ValueError as e:
+            assert "контрольная сумма" in str(e)
+    finally:
+        update._get, update.shell_id, update.code_root = old
+    probe = (f"import sys; sys.path.insert(0, {str(root)!r}); import wcl_boot; wcl_boot.SHELL_ID = {shell!r}; "
+             "b = wcl_boot.activate(log=lambda m: print('LOG', m)); import wcl_analyzer, wcl_analyzer._build as v; "
+             "print(b, v.BUILD, 'code' in wcl_analyzer.__file__)")
+    env = {**__import__("os").environ, "WCL_DATA_DIR": str(tmp)}
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, env=env, cwd=str(tmp)).stdout.split()
+    assert out[-3:] == ["77", "77", "True"], out
+    # другая оболочка — скачанный код не берётся
+    out = subprocess.run([sys.executable, "-c", probe.replace(repr(shell), "'other'", 1)], capture_output=True, text=True,
+                         env=env, cwd=str(tmp)).stdout.split()
+    assert out[-3:] == ["None", "dev", "False"], out
+    # сломанный код — откат на встроенный, обновление помечено сломанным
+    cur = _json.loads((tmp / "code" / "current.json").read_text())
+    (_P(cur["path"]) / "wcl_analyzer" / "web.py").write_text("def broken(:\n")
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, env=env, cwd=str(tmp)).stdout
+    assert out.split()[-3:] == ["None", "dev", "False"] and "не запустилось" in out, out
+    assert (tmp / "code" / "failed.json").exists()
+    print("OK обновление кода: подключается при запуске, чужая оболочка и сломанный код — встроенная версия")
+
+
 if __name__ == "__main__":
     test_batched_fetch()
+    test_code_update()
     test_single_sources()
     test_talent_data_without_ids()
     test_two_references()

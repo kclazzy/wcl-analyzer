@@ -196,6 +196,9 @@ dialog .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
 
 .pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .pill.plain{font-weight:500}
+.pill.upd i{background:var(--you)}
+.appfoot{margin:36px 0 8px;padding-top:14px;border-top:1px solid var(--line);font-size:13.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.appfoot .btn{padding:7px 14px;font-size:14px}
 .pill.limit{cursor:default;font-variant-numeric:tabular-nums;white-space:nowrap}
 header h1{white-space:nowrap}.pill{white-space:nowrap}.pill.limit i{background:var(--good)}
 .pill.limit.mid i{background:var(--warn)}.pill.limit.high i{background:var(--bad)}
@@ -253,6 +256,7 @@ dialog label.check input{width:auto;margin:0}
     <h1>Разбор лога <span>Warcraft Logs</span></h1>
     <div class="pills">
       <button class="pill plain" id="phonePill" type="button" hidden>На другом устройстве</button>
+      <button class="pill plain upd" id="updPill" type="button" hidden><i></i><span>Доступно обновление</span></button>
       <span class="pill plain limit" id="limitPill" hidden title="Часовой лимит запросов Warcraft Logs для вашего ключа: сколько очков потрачено в этом часе и когда счётчик обнулится"><i></i><span></span></span>
       <button class="pill" id="keyPill" type="button"><i></i><span>Проверяю ключ API…</span></button>
     </div>
@@ -347,6 +351,12 @@ dialog label.check input{width:auto;margin:0}
   </section>
 
   <section id="result" hidden></section>
+  <footer class="appfoot" id="appFoot" hidden>
+    <span>Версия: <b id="verBuild"></b></span>
+    <button class="linkbtn" id="updBtn" type="button">Проверить обновления</button>
+    <span id="updMsg" aria-live="polite"></span>
+    <button class="btn you" id="updApply" type="button" hidden>Обновить</button>
+  </footer>
 </div>
 
 <dialog id="phoneDlg" aria-labelledby="phoneTitle">
@@ -1366,10 +1376,48 @@ $("#pasteBtn").onclick = async () => {
   } else $("#keyDlg").close();
 };
 
+/* ---------- обновление программы ----------
+   Новая сборка с GitHub: если изменился только код — он скачивается внутрь программы и подключается
+   при перезапуске (без переустановки); если новая оболочка — скачивается программа целиком. */
+let UPD = null;
+async function initUpdates(){
+  let v; try { v = await api("/api/version"); } catch(e){ return; }
+  if (!v.updates) return;
+  $("#appFoot").hidden = false;
+  $("#verBuild").textContent = v.build === "dev" ? "из исходников" : `сборка ${v.build}`;
+  if (!v.can_update) { $("#updBtn").hidden = true; $("#updMsg").textContent = "Обновление — через git pull."; return; }
+  let last = 0; try { last = +localStorage.getItem("wclUpdCheck") || 0; } catch(e){}
+  if (Date.now() - last > 86400000) checkUpdates(true);  // сама — раз в сутки, молча
+}
+async function checkUpdates(silent){
+  const msg = $("#updMsg"); if (!silent) msg.textContent = "Проверяю…";
+  try {
+    UPD = await api("/api/update/check", {}, 30);
+    try { localStorage.setItem("wclUpdCheck", String(Date.now())); } catch(e){}
+  } catch(e){ if (!silent) msg.textContent = "Не удалось проверить: " + e.message; return; }
+  $("#updPill").hidden = !UPD.available;
+  $("#updApply").hidden = !UPD.available;
+  if (!UPD.available) { msg.textContent = silent ? "" : "У вас последняя версия."; return; }
+  msg.textContent = UPD.kind === "code"
+    ? `Доступна сборка ${UPD.latest}: обновится без переустановки, займёт несколько секунд.`
+    : `Доступна сборка ${UPD.latest}: нужна новая версия программы целиком` + (UPD.mode === "android" ? " (APK скачается в браузере, установите поверх)." : ".");
+}
+$("#updBtn").onclick = () => checkUpdates(false);
+$("#updPill").onclick = () => { $("#appFoot").scrollIntoView({behavior:"smooth"}); };
+$("#updApply").onclick = async () => {
+  const b = $("#updApply"), msg = $("#updMsg"); b.disabled = true; msg.textContent = "Скачиваю обновление…";
+  try {
+    const r = await api("/api/update/apply", {kind: UPD && UPD.kind}, 600);
+    msg.textContent = r.ok ? `Готово. ${r.restart || ""}` : "Откройте страницу выпусков и скачайте новую версию: " + (r.url || "");
+    $("#updPill").hidden = true; b.hidden = true;
+  } catch(e){ msg.textContent = "Не удалось обновить: " + e.message; b.disabled = false; }
+};
+
 /* ---------- запуск ---------- */
 (async () => {
   importFromLink();
   await refreshKey().catch(()=>{});
+  initUpdates();
   renderRefs();
   await renderHistory();
   const stale = getRefs().filter(r => r.stale);

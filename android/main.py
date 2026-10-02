@@ -13,6 +13,12 @@ os.environ["WCL_APP"] = "android"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
+    import wcl_boot  # скачанное обновление кода, если есть, подключается до импорта программы
+    wcl_boot.activate()
+except Exception:  # загрузчик не должен мешать запуску
+    traceback.print_exc()
+
+try:
     from wcl_analyzer.web import serve
     serve(port=8765, open_browser=False, local_only=True)
 except Exception:  # ошибка запуска видна в журнале Android (adb logcat)

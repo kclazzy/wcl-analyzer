@@ -646,6 +646,9 @@ class Handler(BaseHTTPRequestHandler):
             self._file((WEB / name).read_bytes(), ctype, "max-age=86400")
         elif path == "/manifest.webmanifest":
             self._file(json.dumps(MANIFEST, ensure_ascii=False).encode("utf-8"), "application/manifest+json")
+        elif path == "/api/version":
+            from . import update
+            self._json({**update.current(), "updates": not SERVER["public"] and self._is_local()})
         elif path == "/api/limit":
             # Часовой лимит Warcraft Logs для ключа из заголовков: сколько очков потрачено и когда сброс.
             # Запрос rateLimitData лёгкий; страница спрашивает раз в минуту и после каждого разбора.
@@ -738,6 +741,20 @@ class Handler(BaseHTTPRequestHandler):
                 where = android_save_download(name, base64.b64decode(body.get("data") or ""),
                                               str(body.get("mime") or "application/octet-stream"))
                 return self._json({"saved": where})
+            if path in ("/api/update/check", "/api/update/apply"):
+                # Обновление программы — только на самом устройстве с программой, не на публичном сервере
+                if SERVER["public"] or not self._is_local():
+                    return self._json({"error": "Обновление доступно только в самой программе"}, 403)
+                from . import update
+                if path == "/api/update/check":
+                    return self._json(update.check())
+                if body.get("kind") == "full":
+                    return self._json(update.apply_full())
+                res = update.apply_code()
+                from .platform_support import app_mode
+                if app_mode() == "exe":
+                    update.restart_exe()
+                return self._json(res)
             if path == "/api/phone":
                 if SERVER["public"] or not self._is_local():
                     return self._json({"error": "Доступно только на компьютере с программой"}, 403)

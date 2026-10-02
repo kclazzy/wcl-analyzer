@@ -6,6 +6,12 @@ try:  # в окне консоли сообщения должны появля�
 except Exception:
     pass
 
+import wcl_boot  # noqa: E402 — скачанное обновление кода, если есть, подключается до импорта программы
+
+_build = wcl_boot.activate()
+if _build:
+    print(f"Обновлённая версия кода: сборка {_build}")
+
 from wcl_analyzer.__main__ import main  # noqa: E402
 
 if __name__ == "__main__":

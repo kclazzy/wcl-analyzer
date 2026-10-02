@@ -93,6 +93,11 @@ def main():
     assert st == 200 and s["available"] and s["limit"] == 3600 and s["spent"] == 120.5 and s["reset_in"] == 900, s
     del _FC.rate_limit
 
+    # Обновление программы: на публичном сервере его нет
+    st, s = anna.req("GET", "/api/version")
+    assert st == 200 and s["updates"] is False and s["build"], s
+    assert anna.req("POST", "/api/update/check", {})[0] == 403
+
     # Анна сравнивает лог; Борис параллельно разбирает рейд
     st, s = anna.req("POST", "/api/analyze", {"url": url, "fight": "1", "actor": "7", "ref": "top10",
                                               "max_age_days": 7})

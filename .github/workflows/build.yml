@@ -29,6 +29,18 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Версия сборки
+        shell: bash
+        run: |
+          # Отпечаток оболочки: Python, библиотеки и настройки сборки. Пока он тот же —
+          # программа обновляется скачиванием одного кода, без переустановки
+          SHELL_ID=$(cat requirements.txt android/buildozer.spec android/main.py packaging/windows/wcl_app.py \
+                     packaging/windows/wcl_analyzer.spec wcl_boot.py | sha256sum | cut -c1-12)
+          printf '"""Номер сборки и отпечаток оболочки. Сборка на GitHub перезаписывает этот файл."""\nBUILD = "%s"\nSHELL_ID = "%s"\n' \
+            "${{ github.run_number }}" "$SHELL_ID" > wcl_analyzer/_build.py
+          sed -i "s/^SHELL_ID = \"dev\"/SHELL_ID = \"$SHELL_ID\"/" wcl_boot.py
+          echo "SHELL_ID=$SHELL_ID" >> "$GITHUB_ENV"
+          cat wcl_analyzer/_build.py
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install -r requirements.txt pyinstaller
@@ -55,6 +67,18 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      - name: Версия сборки
+        shell: bash
+        run: |
+          # Отпечаток оболочки: Python, библиотеки и настройки сборки. Пока он тот же —
+          # программа обновляется скачиванием одного кода, без переустановки
+          SHELL_ID=$(cat requirements.txt android/buildozer.spec android/main.py packaging/windows/wcl_app.py \
+                     packaging/windows/wcl_analyzer.spec wcl_boot.py | sha256sum | cut -c1-12)
+          printf '"""Номер сборки и отпечаток оболочки. Сборка на GitHub перезаписывает этот файл."""\nBUILD = "%s"\nSHELL_ID = "%s"\n' \
+            "${{ github.run_number }}" "$SHELL_ID" > wcl_analyzer/_build.py
+          sed -i "s/^SHELL_ID = \"dev\"/SHELL_ID = \"$SHELL_ID\"/" wcl_boot.py
+          echo "SHELL_ID=$SHELL_ID" >> "$GITHUB_ENV"
+          cat wcl_analyzer/_build.py
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
       - uses: actions/setup-java@v4
@@ -97,6 +121,7 @@ jobs:
       - name: Сборка APK
         run: |
           cp -r wcl_analyzer android/
+          cp wcl_boot.py android/
           cd android
           # Номер версии растёт с каждой сборкой — Android ставит обновление поверх
           sed -i "s/^version = .*/version = 1.1.${{ github.run_number }}/" buildozer.spec
@@ -123,15 +148,50 @@ jobs:
           name: WCL-Analyzer-Android
           path: android/bin/*.apk
 
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
+  # После каждой успешной сборки main — выпуск с прямыми ссылками (без входа в GitHub и без zip):
+  # программа сама проверяет его кнопкой «Проверить обновления»
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [windows, android]
     runs-on: ubuntu-22.04
     steps:
+      - uses: actions/checkout@v4
+      - name: Версия сборки
+        shell: bash
+        run: |
+          # Отпечаток оболочки: Python, библиотеки и настройки сборки. Пока он тот же —
+          # программа обновляется скачиванием одного кода, без переустановки
+          SHELL_ID=$(cat requirements.txt android/buildozer.spec android/main.py packaging/windows/wcl_app.py \
+                     packaging/windows/wcl_analyzer.spec wcl_boot.py | sha256sum | cut -c1-12)
+          printf '"""Номер сборки и отпечаток оболочки. Сборка на GitHub перезаписывает этот файл."""\nBUILD = "%s"\nSHELL_ID = "%s"\n' \
+            "${{ github.run_number }}" "$SHELL_ID" > wcl_analyzer/_build.py
+          sed -i "s/^SHELL_ID = \"dev\"/SHELL_ID = \"$SHELL_ID\"/" wcl_boot.py
+          echo "SHELL_ID=$SHELL_ID" >> "$GITHUB_ENV"
+          cat wcl_analyzer/_build.py
+      - name: Архив кода и update.json
+        run: |
+          zip -qr wcl_analyzer-code.zip wcl_analyzer -x '*/__pycache__/*' '*.pyc'
+          SHA=$(sha256sum wcl_analyzer-code.zip | cut -d' ' -f1)
+          printf '{"build": %s, "shell": "%s", "sha256": "%s", "date": "%s"}\n' \
+            "${{ github.run_number }}" "$SHELL_ID" "$SHA" "$(date -u +%FT%TZ)" > update.json
+          cat update.json
       - uses: actions/download-artifact@v4
         with: {path: out}
+      - name: Файлы выпуска
+        run: |
+          cp "out/WCL-Analyzer-Windows/WCL Analyzer.exe" WCL-Analyzer.exe
+          cp out/WCL-Analyzer-Android/*.apk WCL-Analyzer.apk
+          ls -la WCL-Analyzer.* wcl_analyzer-code.zip update.json
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: build-${{ github.run_number }}
+          name: Сборка ${{ github.run_number }}
+          make_latest: true
+          body: |
+            Скачать: WCL-Analyzer.apk — для телефона, WCL-Analyzer.exe — для ПК.
+            Уже установленная программа обновляется сама: «Проверить обновления» внизу страницы.
           files: |
-            out/WCL-Analyzer-Windows/*.exe
-            out/WCL-Analyzer-Android/*.apk
+            WCL-Analyzer.exe
+            WCL-Analyzer.apk
+            wcl_analyzer-code.zip
+            update.json

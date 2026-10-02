@@ -95,9 +95,6 @@ jobs:
             echo "P4A_RELEASE_KEYALIAS_PASSWD=$PW"
           } >> "$GITHUB_ENV"
       - name: Сборка APK
-        env:
-          # NDK r25b знает Android API до 33; нативные части собираются под minapi, приложение нацелено на 35
-          APP_PLATFORM: android-24
         run: |
           cp -r wcl_analyzer android/
           cd android

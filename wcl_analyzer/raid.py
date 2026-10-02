@@ -547,9 +547,17 @@ def _pull_trend(pulls: list[dict], death_abs: dict[int, list]) -> dict:
 
 
 def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = None,
-             compare_top: bool = True, progress=lambda x: None) -> dict:
+             compare_top: bool = True, progress=lambda x: None, talent_data=None,
+             save_talents: bool = True) -> dict:
     raw = fetch_raid_raw(client, url, fight, log)
     R = analyze_raid(raw, avoidable)
+    try:  # кулдауны состава — для плана сейвов на следующий пулл
+        from .raid_cds import roster_cds
+        from .talents import load_tree_data
+        R["extras"]["roster_cds"] = roster_cds(raw, R, talent_data if talent_data is not None
+                                               else load_tree_data(log, save=save_talents))
+    except Exception as e:  # noqa: BLE001
+        log(f"Кулдауны состава не определены: {e}")
     if compare_top and hasattr(client, "fight_rankings"):
         from .raid_top import TOP_KILLS, brief_lines, compare_with_top, fetch_top_kills
         f = raw["fight"]

@@ -147,6 +147,8 @@ def _run_job(job: dict, params: dict, creds) -> None:
             _run_raid(job, params, creds, log)
         elif mode == "raidrot":
             _run_raid_rotation(job, params, creds, log)
+        elif mode == "raidcd":
+            _run_raid_cd(job, params, creds, log)
         elif mode == "refresh":
             _run_refresh(job, params, creds, log)
         else:
@@ -290,27 +292,53 @@ def _player_result(job, params, client, me, tops, label, ref_meta, top_diff, log
         result["info"]["ref_stale"] = time.time() - ref_meta["collected_at"] > _max_age_s(params)
     result["params"] = {k: params.get(k) for k in ("url", "fight", "actor", "ref")}
     result["talents"] = r.talents
-    result["raid_peaks"] = _raid_peaks(job, params, client, me, log, top_diff=top_diff)
     return result
 
 
-def _raid_peaks(job: dict, params: dict, client, me, log, top_diff=None):
-    """Вкладка «Рейдовые кулдауны в пики урона»: что рейд нажимал в самые тяжёлые моменты
-    и что в те же моменты жмут лучшие гильдии. Не обязательна: при ошибке разбор игрока не ломается."""
+def _run_raid_cd(job: dict, params: dict, creds, log) -> None:
+    """Урон и сейвы рейда: пики урона, нажатые рейдовые кулдауны, сравнение с лучшими киллами
+    (той же сложности и эпохальными), кулдауны состава и план сейвов на следующий пулл."""
+    from .config import DIFFICULTY_NAMES
+    from .excel_raid import write_raid_cd_workbook
+    from .collect import _pick_fight
+    from .logs import parse_report_url
     from .raid_top import raid_cd_peaks
-    job["progress"] = max(job["progress"], 0.85)
-    try:
-        if params.get("demo"):
-            from .raid_demo import CODE, FakeRaidClient
-            c = FakeRaidClient()
-            fid = next(int(f["id"]) for f in c.report(CODE)["fights"] if f.get("kill"))
-            return raid_cd_peaks(c, CODE, fid, log=lambda m: None)
-        log("Пики урона по рейду и рейдовые кулдауны — ваш бой и лучшие киллы босса…")
-        return raid_cd_peaks(client, me.report_code, me.fight_id, log=log, top_difficulty=top_diff,
-                             progress=lambda x: job.__setitem__("progress", max(job["progress"], 0.85 + 0.1 * x)))
-    except Exception as e:  # noqa: BLE001
-        log(f"Пики урона по рейду недоступны: {e}")
-        return None
+    from .talents import load_tree_data
+
+    def progress(x: float) -> None:
+        job["progress"] = max(job["progress"], min(0.95, x))
+
+    if params.get("demo"):
+        from .raid_demo import CODE, FakeRaidClient
+        client, code = FakeRaidClient(), CODE
+        fid = next(int(f["id"]) for f in client.report(CODE)["fights"] if f.get("kill"))
+        talents = []
+    else:
+        client = _client(creds, job, log)
+        code, url_fight, _ = parse_report_url(params["url"])
+        f = _pick_fight(client.report(code), params.get("fight") if params.get("fight") not in (None, "") else url_fight)
+        fid = int(f["id"])
+        talents = load_tree_data(log, save=not SERVER["public"])
+    log("Урон по рейду, рейдовые кулдауны и состав — одним запросом…")
+    progress(0.1)
+    R = raid_cd_peaks(client, code, fid, log=log, talent_data=talents, progress=lambda x: progress(0.15 + 0.4 * x))
+    if R is None:
+        raise LookupError("В этом бою нет данных об уроне по рейду")
+    fd = int(next(x for x in client.report(code)["fights"] if int(x["id"]) == fid).get("difficulty") or 0)
+    want_mythic = params.get("mythic") is not False
+    if want_mythic and fd and fd != MYTHIC and not params.get("demo"):
+        log("Лучшие киллы на эпохальной сложности…")
+        alt = raid_cd_peaks(client, code, fid, log=log, top_difficulty=MYTHIC, talent_data=talents,
+                            progress=lambda x: progress(0.6 + 0.3 * x))
+        if alt and alt["extras"].get("vs_top"):
+            R["alt"] = alt
+    I = R["info"]
+    R["info"].update({"code": code, "fight_id": fid, "demo": bool(params.get("demo")),
+                      "url": f"https://www.warcraftlogs.com/reports/{code}#fight={fid}",
+                      "difficulty": I.get("difficulty") or DIFFICULTY_NAMES.get(fd, "")})
+    _excel_bytes(job, f"Сейвы_рейда_{I.get('boss', '')}", write_raid_cd_workbook, R)
+    job["result"] = {**R, "mode": "raidcd", "excel": f"/api/report/{job['id']}", "source_url": params.get("url")}
+    log("Готово.")
 
 
 def _avoidable_list() -> list[str]:
@@ -379,6 +407,7 @@ def _run_raid(job: dict, params: dict, creds, log) -> None:
     else:
         client, url = _client(creds, job, log), params["url"]
     R = run_raid(client, url, params.get("fight"), log=step, avoidable=avoidable,
+                 talent_data=[] if params.get("demo") else None, save_talents=not SERVER["public"],
                  progress=lambda x: job.__setitem__("progress", max(job["progress"], min(0.97, x))))
     _excel_bytes(job, f"Рейд_{R['info']['boss']}_пулл{R['summary']['pull_n']}", write_raid_workbook, R)
     job["result"] = {**R, "excel": f"/api/report/{job['id']}", "source_url": url}
@@ -697,7 +726,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against",
                                                    "refresh", "max_age_days", "pick", "mythic")}
-                if params["mode"] not in (None, "raid", "raidrot"):
+                if params["mode"] not in (None, "raid", "raidrot", "raidcd"):
                     params["mode"] = None
                 return self._json({"job": start_job(creds, params)})
             if path == "/api/refs/refresh":

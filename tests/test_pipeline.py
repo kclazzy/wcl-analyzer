@@ -366,11 +366,30 @@ def test_pick_by_percentile():
     from wcl_analyzer import web
     job = {"id": "t", "progress": 0.0, "log": []}
     web._run_player(job, {"demo": True}, None, lambda m: None)
-    rp = job["result"]["raid_peaks"]
-    assert rp and rp["extras"]["damage_timeline"] and rp["extras"]["heaviest"], rp
-    assert rp["extras"]["vs_top"] and rp["extras"]["vs_top"]["rows"], "нет сравнения с лучшими киллами"
     import json
-    json.dumps(job["result"]["raid_peaks"])
+    assert "raid_peaks" not in job["result"], "урон и сейвы рейда теперь — отдельный режим"
+    # отдельный режим «Урон и сейвы рейда»: состав, план с перезарядкой, сравнение с топом
+    jc = {"id": "cd", "progress": 0.0, "log": []}
+    web._run_raid_cd(jc, {"mode": "raidcd", "demo": True}, None, lambda m: None)
+    rc = jc["result"]
+    X = rc["extras"]
+    assert rc["mode"] == "raidcd" and X["damage_timeline"] and X["heaviest"] and X["vs_top"]["rows"]
+    roster = X["roster_cds"]
+    assert any(c["used"] for c in roster) and any(not c["used"] for c in roster), "в составе нет ненажатых кулдаунов"
+    plan = X["plan"]
+    assert plan and all(r["picks"] for r in plan), "пик без кулдауна, хотя в составе их хватает"
+    # перезарядка: один и тот же кулдаун игрока не назначается чаще, чем он откатывается
+    by = {}
+    for r in plan:
+        for p in r["picks"]:
+            by.setdefault((p["player"], p["cd"]), []).append(r["t"])
+    cdmap = {(c["player"], c["name"]): c["cd"] for c in roster}
+    for k, ts in by.items():
+        ts.sort()
+        assert all(b - a >= cdmap[k] - 0.01 for a, b in zip(ts, ts[1:])), (k, ts)
+    assert plan[0]["picks"][0]["like_top"], "на пик, где топ жмёт гимн, план должен ставить гимн"
+    assert jc.get("xlsx")
+    json.dumps(rc)
     # сравнение талантов с топом
     T = job["result"]["talents"]
     kinds = {r["kind"] for r in T["rows"]}

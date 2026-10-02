@@ -392,6 +392,59 @@ def _timeline(wb, R, demo):
 
 
 # ------------------------------------------------------------- Против топа
+def _plan_text(r: dict) -> str:
+    """«Божественный гимн — Элария (откат 3:00, снова готов в 4:05); …»"""
+    picks = r.get("picks")
+    if picks is None:  # разборы старых версий
+        return (r["cd"] + " — " + (r["player"] or "") + (" (как у топа)" if r["like_top"] else "")) if r["cd"] else "нет свободного кулдауна"
+    if not picks:
+        return "нет свободного кулдауна"
+    return "; ".join(f"{p['cd']} — {p['player']}{' (как у топа)' if p['like_top'] else ''}, откат {p['cooldown']}, "
+                     f"снова готов в {p['ready']}" for p in picks)
+
+
+def write_raid_cd_workbook(R: dict, path: str | Path) -> Path:
+    """Урон и сейвы рейда: план на следующий пулл, пики урона против топа, тяжёлые моменты, кулдауны состава."""
+    wb = Workbook()
+    wb.remove(wb.active)
+    demo = bool((R.get("info") or {}).get("demo"))
+    for variant, title in ((R, "Сейвы"), (R.get("alt"), "Сейвы — эпох. топ")):
+        if not variant:
+            continue
+        X, I = variant.get("extras") or {}, R.get("info") or {}
+        V = X.get("vs_top")
+        s = Sheet(wb, title, demo, {"A": 12, "B": 30, "C": 70, "D": 4, "E": 30})
+        s.title(f"Урон и сейвы рейда: {I.get('boss', '')}, {I.get('difficulty', '')}",
+                ("Лучшие киллы: " + (V.get("difficulty") or "") + ". " if V else "") +
+                "План построен по составу: кулдауны классов и спеков, взятые таланты, перезарядка.")
+        for line in variant.get("brief") or []:
+            s.cell(s.row, 1, "• " + line)
+            s.row += 1
+        s.row += 1
+        s.section("План сейвов на следующий пулл", "На самые тяжёлые пики — два кулдауна разных игроков.")
+        s.table(["Нажать в", "Пик", "Кулдауны и кто", "", "У топа здесь"],
+                [[r["time"], r["mechanic"] + (" (тяжёлый)" if r.get("heavy") else ""), _plan_text(r), "", r.get("top") or "—"]
+                 for r in X.get("plan") or []])
+        if V:
+            s.section("Пики урона: ваш бой и лучшие киллы")
+            s.table(["Когда", "Пик", "Нажато у вас", "", "Чем закрывает топ (доля киллов)"],
+                    [[r["time"], r["mechanic"], "не дошли" if r["my"] is None else (", ".join(r["my"]) or "ничего"), "",
+                      (", ".join(r["top_cds"]) or "—") + (f" ({r['top_share']:.0%})" if r["top_share"] is not None else "")]
+                     for r in V["rows"]])
+        s.section("Самые тяжёлые моменты")
+        s.table(["Когда", "Урон за 5 с", "Механики и нажатые кулдауны"],
+                [[h["time"], _v(h["damage"], 0), ", ".join(h["abilities"]) + " | " + (", ".join(h["cds"]) or "ничего не нажато")]
+                 for h in X.get("heaviest") or []], [None, F_INT, None])
+        if variant is R:
+            s.section("Рейдовые кулдауны состава")
+            s.table(["Игрок", "Кулдаун", "Откуда известно", "", "Откат, с / нажато / можно за бой"],
+                    [[c["player"], c["name"], c["source"], "", f"{c['cd']:.0f} / {c['used']} / {c['max_uses'] or '—'}"]
+                     for c in X.get("roster_cds") or []])
+    path = Path(path)
+    wb.save(path)
+    return path
+
+
 def _vs_top(wb, R, demo):
     X = R.get("extras") or {}
     V, T = X.get("vs_top"), X.get("pull_trend") or {}
@@ -403,9 +456,8 @@ def _vs_top(wb, R, demo):
     if V:
         s.section("План рейдовых кулдаунов на следующий пулл",
                   "Кулдауны, которые ваш рейд нажимал в этом бою, расставлены на пики с учётом перезарядки.")
-        f, l = s.table(["Нажать в", "Пик", "Кулдаун", "Кто", "У топа здесь"],
-                       [[r["time"], r["mechanic"], (r["cd"] + (" (как у топа)" if r["like_top"] else "")) if r["cd"]
-                         else "нет свободного кулдауна", r["player"] or "—", r["top"] or "—"] for r in V["plan"]])
+        f, l = s.table(["Нажать в", "Пик", "Кулдауны и кто", "", "У топа здесь"],
+                       [[r["time"], r["mechanic"], _plan_text(r), "", r["top"] or "—"] for r in V["plan"]])
         if V["plan"]:
             s.ws.conditional_formatting.add(f"C{f}:C{l}", CellIsRule(operator="equal", formula=['"нет свободного кулдауна"'], fill=RED))
         s.section("Пики урона: ваш бой и лучшие киллы",

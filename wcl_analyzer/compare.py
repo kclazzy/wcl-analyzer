@@ -20,6 +20,7 @@ from .metrics import CATEGORY_RU, compute_metrics, med, pct
 from .reference import Reference, aggregate, phase_rel
 
 LEVELS = ["LOW", "MEDIUM", "HIGH"]
+BURST_KIND = {"trinket": "Тринкет", "potion": "Зелье", "racial": "Расовая", "lust": "Жажда крови"}
 
 
 @dataclass
@@ -404,6 +405,11 @@ def _collect(me: PlayerLog, mm: dict, ref: Reference) -> tuple[list[Finding], di
 
     # ------------------------------------------------------------ бурст
     burst_rows = []
+
+    def kind(ab):
+        cat = ref.spells[ab].category if ab in ref.spells else ""
+        return BURST_KIND.get(cat, "Способность")
+
     if agg["burst"] and ref.main_cd:
         for w_ref in agg["burst"][:3]:
             w = w_ref["window"] - 1
@@ -413,6 +419,7 @@ def _collect(me: PlayerLog, mm: dict, ref: Reference) -> tuple[list[Finding], di
                 for ab, off in my_win["components"]:
                     my_comp.setdefault(ab, off)
             burst_rows.append({"window": w_ref["window"], "id": ref.main_cd, "name": name(ref.main_cd),
+                               "kind": kind(ref.main_cd),
                                "ref_offset": 0.0, "my_offset": 0.0 if my_win else None,
                                "share": 1.0, "ref_t0": w_ref["t0"]["median"],
                                "my_t0": my_win["t0"] if my_win else None})
@@ -422,6 +429,7 @@ def _collect(me: PlayerLog, mm: dict, ref: Reference) -> tuple[list[Finding], di
                     continue
                 mo = my_comp.get(c["id"])
                 burst_rows.append({"window": w_ref["window"], "id": c["id"], "name": name(c["id"]),
+                                   "kind": kind(c["id"]),
                                    "ref_offset": c["offset"], "my_offset": mo, "share": c["share"],
                                    "ref_t0": w_ref["t0"]["median"], "my_t0": my_win["t0"] if my_win else None})
                 if mo is None or abs(mo - c["offset"]) > 3:
@@ -670,8 +678,17 @@ def _collect(me: PlayerLog, mm: dict, ref: Reference) -> tuple[list[Finding], di
     tables["mechanics"] = mech_rows
 
     ilvl_s = agg["ilvl"]
+    from .gear import compare_gear
+    gear = compare_gear(me, ref_logs)
     tables["gear"] = {"my_ilvl": me.ilvl, "ref_ilvl": ilvl_s["median"], "my_trinkets": me.trinket_ids,
-                      "ref_trinkets": _common_trinkets(ref_logs)}
+                      "ref_trinkets": _common_trinkets(ref_logs), **gear}
+    miss = gear["missing_enchants"] + [f"{x} (временное усиление)" for x in gear["missing_temp"]]
+    if gear["has_my"] and miss:
+        add(Finding(
+            "Экипировка", f"Нет зачарования: {', '.join(miss)}",
+            my=len(miss), ref=0, unit="слотов без зачарования", severity=2 + len(miss), key="gear:enchant",
+            note="Эти слоты зачарованы у большинства игроков топа.",
+            focus="Зачаровать: " + ", ".join(miss), evidence=me.url))
     return findings, tables, offsets
 
 

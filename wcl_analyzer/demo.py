@@ -14,6 +14,8 @@ MAX_HP = 8_000_000
 
 FB, IL, FL, GS, ORB, IV, BER, POT, AT, IB = 116, 30455, 44614, 199786, 84714, 12472, 26297, 431932, 342245, 45438
 BF, FOF, WC, LUST = 190446, 44544, 228358, 2825
+TRK = 443124                                  # применение тринкета (демо)
+TRK_ICON = "inv_trinket_demo_frozenshard"
 CRUSH, WAVE, SHARD_HIT = 900001, 900002, 900004
 BRAND, CRACK, PI = 1490, 900010, 10060      # рейдовый дебафф, окно уязвимости, внешний бафф
 CRACK_WINDOWS = [(118.0, 138.0), (238.0, 258.0)]
@@ -25,7 +27,11 @@ ABILITIES = {
     FOF: "Ледяные пальцы", WC: "Зимний холод", LUST: "Bloodlust",
     CRUSH: "Сокрушение", WAVE: "Ледяная волна", SHARD_HIT: "Осколки льда",
     BRAND: "Хаотическое клеймо", CRACK: "Трещина в броне", PI: "Придание сил",
+    TRK: "Застывший осколок",
 }
+SLOT_NAMES = {0: "Капюшон", 1: "Ожерелье", 2: "Наплечники", 4: "Мантия", 5: "Кушак", 6: "Поножи",
+              7: "Сапоги", 8: "Наручи", 9: "Перчатки", 10: "Перстень", 11: "Кольцо", 14: "Плащ", 15: "Посох"}
+ENCH_SLOTS = (2, 4, 6, 7, 10, 11, 15)
 BASE_DMG = {FB: 110_000, IL: 55_000, FL: 90_000, GS: 480_000, ORB: 42_000}
 
 
@@ -45,6 +51,9 @@ class Policy:
     raid_brand: bool = True      # в рейде есть охотник на демонов (дебафф на боссе)
     pi_times: tuple = ()         # когда жрец даёт «Придание сил»
     alt_build: bool = False      # другой набор талантов
+    trk_delay: float = 0.3       # через сколько секунд после Стылой крови жать тринкет
+    missing_enchants: tuple = () # слоты без зачарования
+    weapon_oil: bool = True      # временное усиление на оружии
 
 
 def top_policy(rng: random.Random, dur: float) -> Policy:
@@ -65,7 +74,7 @@ def my_policy(rng: random.Random) -> Policy:
         reaction=0.24, reaction_sd=0.14, pause_p=0.03,
         iv_delays=[0.0, 8.0, 3.5, 0.0], ber_times=[4.0], prepot=False, potion_times=[11.0],
         at_leads=[-3.0, None, 2.5], gs_hold_p=0.45, fof_ignore_p=0.3, move_idle=1.8,
-        raid_brand=False,
+        raid_brand=False, trk_delay=7.0, missing_enchants=(11,), weapon_oil=False,
     )
 
 
@@ -104,6 +113,7 @@ def simulate(policy: Policy, dur: float, ilvl: float, seed: int, name: str,
     iv_ready, orb_ready, pot_used = 0.0, 0.0, 0
     iv_until = ber_until = lust_until = pot_until = at_until = -1.0
     iv_n = 0
+    trk_at = None
     ber_plan = list(policy.ber_times)
     pot_plan = list(policy.potion_times)
     at_plan = [(w - lead) if lead is not None else None for w, lead in zip(waves, policy.at_leads)]
@@ -195,6 +205,11 @@ def simulate(policy: Policy, dur: float, ilvl: float, seed: int, name: str,
             buff(t + 12, "removebuff", BER)
             ber_until = t + 12
             ber_plan.pop(0)
+        if trk_at is not None and t >= trk_at:
+            cast(t, TRK)
+            buff(t, "applybuff", TRK)
+            buff(t + 15, "removebuff", TRK)
+            trk_at = None
         if pot_plan and t >= pot_plan[0]:
             cast(t, POT)
             buff(t, "applybuff", POT)
@@ -234,6 +249,7 @@ def simulate(policy: Policy, dur: float, ilvl: float, seed: int, name: str,
         if ab == IV:
             iv_until, iv_ready = t_done + 20, t_done + 120
             iv_n += 1
+            trk_at = t_done + policy.trk_delay
             buff(t_done, "applybuff", IV)
             buff(t_done + 20, "removebuff", IV)
         elif ab == ORB:
@@ -334,10 +350,16 @@ def simulate(policy: Policy, dur: float, ilvl: float, seed: int, name: str,
     # 0–9 — дерево класса, 10–39 — спека, 40–43 / 44–47 — две героические ветки
     talents = (list(range(40)) if not policy.alt_build else list(range(8, 40))) + \
               (list(range(40, 44)) if not policy.alt_build else list(range(44, 48)))
-    gear = [{"id": 200000 + i, "itemLevel": round(ilvl + rng.uniform(-3, 3))} for i in range(16)]
+    gear = [{"id": 200000 + i, "itemLevel": round(ilvl + rng.uniform(-3, 3)), "name": SLOT_NAMES.get(i),
+             "permanentEnchant": 7000 + i if i in ENCH_SLOTS and i not in policy.missing_enchants else 0,
+             "gems": [{"id": 213743, "itemLevel": 619}] * {1: 2, 10: 1, 11: 1}.get(i, 0)} for i in range(16)]
+    if policy.weapon_oil:
+        gear[15]["temporaryEnchant"] = 7500
+    if policy.missing_enchants:
+        gear[1]["gems"] = gear[1]["gems"][:1]
     gear[3] = {"id": 0, "itemLevel": 1}
-    gear[12] = {"id": trinkets[0], "itemLevel": round(ilvl)}
-    gear[13] = {"id": trinkets[1], "itemLevel": round(ilvl)}
+    gear[12] = {"id": trinkets[0], "itemLevel": round(ilvl), "icon": TRK_ICON, "name": "Застывший осколок"}
+    gear[13] = {"id": trinkets[1], "itemLevel": round(ilvl), "name": "Демо-тринкет"}
     raw = {
         "casts": casts, "buffs": buffs, "debuffs": debuffs, "dmg_taken": taken,
         "boss_debuffs": debuffs + boss_debuffs, "resources": resources,
@@ -361,7 +383,8 @@ def simulate(policy: Policy, dur: float, ilvl: float, seed: int, name: str,
                        {"id": SHAMAN_ID, "name": "Шаман", "type": "Shaman", "subType": "Shaman"},
                        {"id": DH_ID, "name": "Охотник", "type": "DemonHunter", "subType": "DemonHunter"},
                        {"id": PRIEST_ID, "name": "Жрец", "type": "Priest", "subType": "Priest"}],
-            "abilities": [{"gameID": k, "name": v, "type": 0} for k, v in ABILITIES.items()],
+            "abilities": [{"gameID": k, "name": v, "type": 0, **({"icon": TRK_ICON} if k == TRK else {})}
+                          for k, v in ABILITIES.items()],
         },
     }
     return report, report["fights"][0], report["masterData"]["actors"][0], raw

@@ -70,6 +70,9 @@ class PlayerLog:
     res_gain: float | None = None               # получено основного ресурса (события Resources)
     res_waste: float | None = None              # потеряно сверх максимума
     phases: list[tuple[float, int]] = field(default_factory=list)  # (начало, номер фазы)
+    gear: list[dict] = field(default_factory=list)  # экипировка: слот, предмет, уровень, зачарование, камни
+    icons: dict[int, str] = field(default_factory=dict)  # иконки способностей (masterData)
+    trinket_spells: set = field(default_factory=set)     # касты, которые являются применением аксессуара
 
     @property
     def difficulty_name(self) -> str:
@@ -152,6 +155,26 @@ def _ilvl_from_gear(gear: list[dict]) -> float | None:
     return round(mean(levels), 1) if levels else None
 
 
+def gear_slots(gear: list[dict]) -> list[dict]:
+    """Экипировка из CombatantInfo → [{slot, id, ilvl, enchant, temp, gems, name, icon, bonus}].
+    Рубашка и гербовая накидка (слоты 3 и 18) и пустые слоты пропускаются."""
+    out = []
+    for i, g in enumerate(gear or []):
+        if not isinstance(g, dict):
+            continue
+        slot = int(g["slot"]) if isinstance(g.get("slot"), int) else i
+        if slot in (3, 18) or not int(g.get("id") or 0):
+            continue
+        out.append({"slot": slot, "id": int(g["id"]), "ilvl": int(g.get("itemLevel") or 0) or None,
+                    "enchant": int(g.get("permanentEnchant") or 0) or None,
+                    "enchant_name": g.get("permanentEnchantName") or None,
+                    "temp": int(g.get("temporaryEnchant") or 0) or None,
+                    "gems": len([x for x in g.get("gems") or [] if isinstance(x, dict) and x.get("id")]),
+                    "name": g.get("name") or None, "icon": g.get("icon") or None,
+                    "bonus": [int(b) for b in g.get("bonusIDs") or [] if str(b).lstrip("-").isdigit()]})
+    return out
+
+
 def _damage_by_ability(table: dict) -> dict[int, float]:
     entries = (table or {}).get("entries") or []
     out: dict[int, float] = defaultdict(float)
@@ -174,6 +197,7 @@ def build_player_log(report: dict, fight: dict, actor: dict, raw: dict,
     rel = lambda ev: (float(ev["timestamp"]) - f0) / 1000.0  # noqa: E731
 
     names = {int(a["gameID"]): a["name"] for a in report["masterData"]["abilities"]}
+    icons = {int(a["gameID"]): a["icon"] for a in report["masterData"]["abilities"] if a.get("icon")}
     boss_ids = {int(a["id"]) for a in report["masterData"]["actors"]
                 if a.get("subType") == "Boss"}
 
@@ -183,7 +207,7 @@ def build_player_log(report: dict, fight: dict, actor: dict, raw: dict,
         encounter_id=int(fight.get("encounterID") or 0),
         encounter_name=fight.get("name", ""), difficulty=int(fight.get("difficulty") or 0),
         kill=bool(fight.get("kill")), duration=duration,
-        report_start=float(report.get("startTime") or 0), rank=rank, names=names,
+        report_start=float(report.get("startTime") or 0), rank=rank, names=names, icons=icons,
     )
 
     # Касты: begincast даёт начало произнесения, cast — момент применения
@@ -321,10 +345,22 @@ def build_player_log(report: dict, fight: dict, actor: dict, raw: dict,
             tree = ev.get("talentTree") or ev.get("talents") or []
             # (узел, талант, ранг); если узла нет в событии — 0, узел найдётся по таланту в справочнике
             log.talent_tree = talent_tree_from(tree)
+            log.gear = gear_slots(gear)
             if len(gear) > 13:
                 log.trinket_ids = [int(gear[12].get("id", 0)), int(gear[13].get("id", 0))]
             break
+    mark_trinket_spells(log)
     return log
+
+
+def mark_trinket_spells(log: PlayerLog) -> None:
+    """Касты применения аксессуаров: у такой способности та же иконка (или имя), что у надетого аксессуара."""
+    trinkets = [g for g in log.gear if g["slot"] in (12, 13)]
+    t_icons = {g["icon"] for g in trinkets if g.get("icon")}
+    t_names = {g["name"].lower() for g in trinkets if g.get("name")}
+    log.trinket_spells = {c.id for c in log.casts
+                          if (log.icons.get(c.id) in t_icons)
+                          or (log.names.get(c.id, "").lower() in t_names)}
 
 
 def talent_tree_from(tree) -> list[tuple[int, int, int]]:
@@ -346,6 +382,28 @@ def talents_from_details(details: dict, actor_id: int) -> list[tuple[int, int, i
             tree = ci.get("talentTree") or p.get("talentTree") or ci.get("talents") or []
             return talent_tree_from(tree)
     return []
+
+
+def gear_from_details(pl: PlayerLog, details: dict) -> None:
+    """Названия предметов и зачарований из playerDetails; если экипировки из боя нет — вся экипировка."""
+    for role in ("dps", "healers", "tanks"):
+        for p in (details or {}).get(role) or []:
+            if int(p.get("id", -1)) != int(pl.actor_id):
+                continue
+            ci = p.get("combatantInfo") or {}
+            if isinstance(ci, list):
+                ci = ci[0] if ci else {}
+            slots = gear_slots(ci.get("gear") or [])
+            if not pl.gear:
+                pl.gear = slots
+                return
+            by_id = {g["id"]: g for g in slots}
+            for g in pl.gear:
+                d = by_id.get(g["id"])
+                if d:
+                    for k in ("name", "enchant_name", "icon"):
+                        g[k] = g.get(k) or d.get(k)
+            return
 
 
 # ----------------------------------------------------------- API loading

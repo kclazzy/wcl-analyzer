@@ -37,7 +37,7 @@ def load_my_log(client: WCLClient, url: str, fight: str | int | None = None,
         actor_id = url_source
     actor, cls, spec = find_player(client, report, f, name=player, actor_id=actor_id)
     raw = fetch_raw(client, report, f, int(actor["id"]), with_damage_events=True)
-    return ensure_talents(client, build_player_log(report, f, actor, raw, spec=spec, cls=cls))
+    return ensure_talents(client, build_player_log(report, f, actor, raw, spec=spec, cls=cls), gear_names=True)
 
 
 def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str, difficulty: int,
@@ -143,14 +143,20 @@ def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str,
     return logs, label
 
 
-def ensure_talents(client, pl):
-    """Если в событиях боя талантов нет — берём их из сведений об игроках (запасной источник)."""
-    if pl.talent_tree or not hasattr(client, "player_details"):
+def ensure_talents(client, pl, gear_names: bool = False):
+    """Если в событиях боя талантов нет — берём их из сведений об игроках (запасной источник).
+    gear_names=True — ещё и названия предметов и зачарований (в событиях боя их нет)."""
+    need_gear = gear_names and pl.gear and not all(g.get("name") for g in pl.gear)
+    if (pl.talent_tree and not need_gear) or not hasattr(client, "player_details"):
         return pl
     try:
-        from .logs import talents_from_details
-        pl.talent_tree = talents_from_details(client.player_details(pl.report_code, pl.fight_id, combatant=True),
-                                              pl.actor_id)
+        from .logs import gear_from_details, mark_trinket_spells, talents_from_details
+        details = client.player_details(pl.report_code, pl.fight_id, combatant=True)
+        if not pl.talent_tree:
+            pl.talent_tree = talents_from_details(details, pl.actor_id)
+        if need_gear or not pl.gear:
+            gear_from_details(pl, details)
+            mark_trinket_spells(pl)
     except Exception:  # noqa: BLE001 — без талантов разбор всё равно работает (TypeError — у тестовых клиентов)
         pass
     return pl

@@ -163,6 +163,11 @@ tr.flag td{background:var(--bad-soft)}
 .tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12.5px;font-weight:600}
 .tag.HIGH{background:var(--good-soft);color:#17542B}.tag.MEDIUM{background:var(--warn-soft);color:#6B4A05}
 .tag.LOW{background:var(--bad-soft);color:#7A1F19}.tag.none{background:var(--soft);color:var(--muted)}
+.tag.k-trinket{background:#EDE4FA;color:#4B2A82}.tag.k-spell{background:var(--soft);color:var(--ink,inherit)}
+.tag.k-potion{background:var(--good-soft);color:#17542B}.tag.k-racial{background:var(--warn-soft);color:#6B4A05}
+.gsub{font-size:12.5px;color:var(--muted)}
+.tag{white-space:nowrap}.box td,.box th{overflow-wrap:normal}
+.gear td:first-child{min-width:120px}
 .empty{color:var(--muted);font-style:italic}
 
 dialog{border:0;border-radius:var(--r-lg);padding:26px;max-width:520px;width:calc(100% - 32px);color:var(--ink)}
@@ -741,7 +746,7 @@ function render(R){
   /* Два эталона: топ вашей сложности (основной) и эпохальный топ (R.alt). Переключатель перерисовывает разбор */
   const pair = R.alt ? {main:R, alt:{...R.alt, _main:R, _back:R._back}} : R._main ? {main:R._main, alt:R} : null;
   /* Только три вкладки: остальные подробности — в Excel */
-  const tabs = [["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["tal","Таланты"]];
+  const tabs = [["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["tal","Таланты"],["gear","Экипировка"]];
   const B = R.brief || {  // разборы, сохранённые до появления выжимки
     verdict: `${num(I.dps)} DPS против ${num(I.ref_dps)} у медианы топа`, reliability: R.reliability.overall, reliability_note: "",
     actions: (R.top5||[]).slice(0,3).map(f=>({do:f.focus||f.title, title:f.title, why:"", level:f.level,
@@ -782,7 +787,7 @@ function render(R){
       ${R.talents && (R.talents.summary||[]).length ? `<p class="hint" style="margin:10px 0 0">${R.talents.summary.map(esc).join(". ")}. Подробно — во вкладке «Таланты».</p>` : ""}
       ${B.noise_hidden?`<p class="hint" style="margin:10px 0 0">Скрыто отличий, которые так же часто встречаются у самих игроков топа: ${B.noise_hidden}. Они есть в подробностях.</p>`:""}
     </div>
-    <details class="more" id="more"><summary>Подробности: ротация, кулдауны и бурст, таланты</summary>
+    <details class="more" id="more"><summary>Подробности: ротация, кулдауны и бурст, таланты, экипировка</summary>
     <div class="legend"><span class="l-you">Вы</span><span class="l-top">Медиана топа</span><span class="l-bad">Отличие не в вашу пользу</span></div>
     <div class="tabs" role="tablist">${tabs.map(([k,t],i)=>`<button role="tab" aria-selected="${i==0}" aria-controls="p-${k}" id="t-${k}">${t}</button>`).join("")}</div>
     ${tabs.map(([k],i)=>`<div class="panel ${i==0?"on":""}" role="tabpanel" id="p-${k}" aria-labelledby="t-${k}"></div>`).join("")}
@@ -831,16 +836,55 @@ function render(R){
       `<div class="chart" style="height:${90+tm.length*28}px"><canvas id="cTiming"></canvas></div>`)}
     ${box("Окна бурста", `Окно отсчитывается от нажатия главного кулдауна (${esc(I.main_cd||"—")}). Смещения — в секундах от него.`,
       table(["Окно","Действие","Старт у топа","Старт у вас","Смещение у топа","Ваше смещение","Доля топа"],
-        R.burst.map(b=>[b.window, esc(b.name), mmss(b.ref_t0), mmss(b.my_t0), sgn(b.ref_offset,v=>num(v,1)+" с"), b.my_offset==null?"нет в окне":sgn(b.my_offset,v=>num(v,1)+" с"), pct(b.share,0)]),
+        R.burst.map(b=>[b.window, `${esc(b.name)}<div style="margin-top:3px">${kindTag(b.kind)}</div>`, mmss(b.ref_t0), mmss(b.my_t0), sgn(b.ref_offset,v=>num(v,1)+" с"), b.my_offset==null?"нет в окне":sgn(b.my_offset,v=>num(v,1)+" с"), pct(b.share,0)]),
         {num:[2,3,4,5,6], flag:i=>R.burst[i].my_offset==null||Math.abs(R.burst[i].my_offset-R.burst[i].ref_offset)>3}))}`;
   chart("cTiming", {type:"bar", data:{labels:tm.map(x=>`${x.name} №${x.k}`), datasets:[{data:tm.map(x=>x.diff), backgroundColor:tm.map(x=>Math.abs(x.diff)>5?C.bad:C.muted), borderRadius:3}]},
     options:{indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`вы ${mmss(tm[c.dataIndex].my)}, топ ${mmss(tm[c.dataIndex].ref)}`}}}, scales:{x:{title:{display:true,text:"секунд"}}}}});
 
   // Таланты
   renderTalents(R.talents, $("#p-tal"));
+  // Экипировка
+  renderGear(R.gear, $("#p-gear"), I.demo);
 
 
   el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+}
+
+const KIND_CLS = {"Тринкет":"k-trinket","Зелье":"k-potion","Расовая":"k-racial"};
+const kindTag = k => k ? `<span class="tag ${KIND_CLS[k]||"k-spell"}">${esc(k)}</span>` : "";
+
+function renderGear(G, el, demo){
+  if (!G || !G.rows || !G.rows.length) { el.innerHTML = box("Экипировка", "", '<p class="empty">Нет данных об экипировке. Разборы, сохранённые до этой версии, — без этой вкладки.</p>'); return; }
+  const link = x => {
+    const nm = esc(x.name || (x.id ? "Предмет " + x.id : "—"));
+    if (!x.id || demo) return nm;
+    const q = [x.bonus && x.bonus.length ? "bonus=" + x.bonus.join(":") : "", x.ilvl ? "ilvl=" + x.ilvl : ""].filter(Boolean).join("&");
+    return `<a href="https://www.wowhead.com/ru/item=${x.id}${q ? "?" + q : ""}" target="_blank" rel="noopener">${nm}</a>`;
+  };
+  const ench = x => {
+    if (!x.id) return "—";
+    let out = x.enchant ? `<span class="better">есть</span>${x.enchant_name ? `<div class="gsub">${esc(x.enchant_name)}</div>` : ""}`
+      : x.enchantable ? '<span class="worse">нет</span>' : '<span class="gsub">не нужно</span>';
+    if (x.temp != null) out += `<div class="gsub ${x.no_temp ? "worse" : ""}">Временное усиление: ${x.temp ? "есть" : "нет"}</div>`;
+    return out;
+  };
+  const top = x => {
+    const parts = [];
+    if (x.ref_enchant_share) parts.push(`у топа ${pct(x.ref_enchant_share,0)}`);
+    if (x.ref_temp_share) parts.push(`усиление у топа ${pct(x.ref_temp_share,0)}`);
+    return parts.length ? `<div class="gsub">${parts.join(", ")}</div>` : "";
+  };
+  const lvl = x => (x.ilvl == null ? "—" : `<span class="${x.ref_ilvl != null && x.ilvl <= x.ref_ilvl - 5 ? "worse" : ""}">${num(x.ilvl)}</span>`)
+    + (x.ref_ilvl != null ? `<div class="gsub">топ ${num(x.ref_ilvl)}</div>` : "");
+  const gems = x => x.gems == null ? "—" : `<span class="${x.few_gems ? "worse" : ""}">${num(x.gems)}</span>` + (x.ref_gems ? `<div class="gsub">топ ${num(x.ref_gems)}</div>` : "");
+  const miss = [...G.missing, ...G.missing_temp.map(s => s + " — временное усиление")];
+  el.innerHTML = `
+    ${box("Что поправить", "", miss.length ? `<p>Нет зачарования, которое есть у большинства топа: <b class="worse">${miss.map(esc).join(", ")}</b>.</p>`
+      : '<p class="empty">Все слоты, которые зачаровывает топ, у вас зачарованы.</p>')}
+    <div class="gear">${box("Экипировка по слотам", `Уровень предметов — ваш и медиана топа (${G.ref_n} ${plural(G.ref_n,"игрок","игрока","игроков")}). Слот считается зачаровываемым, если зачарование в нём есть у большинства топа. Красным — нет зачарования, меньше камней, чем у топа, или уровень на 5+ ниже.`,
+      table(["Предмет","Ур.","Зачарование","Камни"],
+        G.rows.map(x=>[`${link(x)}<div class="gsub">${esc(x.slot_name)}</div>`, lvl(x), ench(x) + top(x), gems(x)]),
+        {num:[1,3], flag:i=>G.rows[i].no_enchant||G.rows[i].no_temp}))}</div>`;
 }
 
 const TAL_KIND = {missing:"У топа почти у всех, у вас нет", choice:"Другой выбор в узле", extra:"У вас есть, у топа редко", rank:"Меньше рангов, чем у топа"};

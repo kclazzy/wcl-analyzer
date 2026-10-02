@@ -124,7 +124,35 @@ def main():
           f"надёжность {r.reliability['overall']}, отчёт {out}")
 
 
+def test_gear_and_trinkets():
+    from wcl_analyzer.demo import demo_logs
+    from wcl_analyzer.logs import gear_slots
+    tops, me = demo_logs()
+    ref = build_reference(tops)
+    r = compare(me, ref)
+    assert ref.spells[443124].category == "trinket", "тринкет не распознан по иконке аксессуара"
+    kinds = {b["name"]: b["kind"] for b in r.tables["burst"]}
+    assert kinds["Застывший осколок"] == "Тринкет" and kinds["Стылая кровь"] == "Способность"
+    assert kinds.get("Berserking") == "Расовая"
+    g = r.tables["gear"]
+    assert g["missing_enchants"] == ["Кольцо 2"] and g["missing_temp"] == ["Правая рука"], g["missing_enchants"]
+    neck = next(x for x in g["rows"] if x["slot"] == 1)
+    assert neck["few_gems"] and not neck["enchantable"]
+    assert any(f.key == "gear:enchant" for f in r.findings)
+    # Слоты рубашки и накидки и пустые слоты пропускаются; номер слота берётся из поля slot, если оно есть
+    sl = gear_slots([{"id": 5, "slot": 3}, {"id": 0}, {"id": 7, "slot": 15, "permanentEnchant": 1, "temporaryEnchant": 2,
+                                                       "gems": [{"id": 1}], "bonusIDs": [10, "11"]}])
+    assert sl == [{"slot": 15, "id": 7, "ilvl": None, "enchant": 1, "enchant_name": None, "temp": 2, "gems": 1,
+                   "name": None, "icon": None, "bonus": [10, 11]}], sl
+    with tempfile.TemporaryDirectory() as d:
+        from openpyxl import load_workbook
+        wb = load_workbook(write_compare_workbook(r, Path(d) / "x.xlsx"))
+        assert "Экипировка" in wb.sheetnames
+    print("OK экипировка: зачарования и камни против топа, тип действий в окне бурста (тринкет/способность)")
+
+
 if __name__ == "__main__":
+    test_gear_and_trinkets()
     main()
 
 

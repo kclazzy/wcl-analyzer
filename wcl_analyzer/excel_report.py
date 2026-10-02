@@ -139,6 +139,7 @@ def write_compare_workbook(r: CompareResult, path: str | Path) -> Path:
     _cooldown_sheet(wb, r, demo)
     _burst_sheet(wb, r, demo)
     _talents_sheet(wb, r, demo)
+    _gear_sheet(wb, r, demo)
     _defensive_sheet(wb, r, demo)
     _uptime_sheet(wb, r, demo)
     _resource_sheet(wb, r, demo)
@@ -182,6 +183,28 @@ def _talents_sheet(wb, r: CompareResult, demo: bool) -> None:
     s.table(["Ветка", "Талант", "Отличие", "У вас", "У топа", "Доля топа", "DPS топа: с ним", "DPS топа: без"],
             [[x.get("branch", ""), x["name"], TALENT_KIND[x["kind"]], x["my"], x["top"], x["share"], _v(x["dps_with"], 0),
               _v(x["dps_without"], 0)] for x in T["rows"]], [None, None, None, None, None, F_PCT, F_INT, F_INT])
+
+
+def _gear_sheet(wb, r: CompareResult, demo: bool) -> None:
+    G = r.tables.get("gear") or {}
+    if not G.get("rows"):
+        return
+    s = Sheet(wb, "Экипировка", demo, {"A": 16, "B": 30, "C": 10, "D": 12, "E": 26, "F": 18, "G": 20, "H": 10, "I": 12})
+    miss = G["missing_enchants"] + [f"{x} (временное усиление)" for x in G["missing_temp"]]
+    s.title("Экипировка против топа",
+            f"Медиана топа — по {G['ref_n']} игрокам. Слот считается зачаровываемым, если зачарование в нём есть "
+            "у большинства топа. " + (f"Нет зачарования: {', '.join(miss)}." if miss else "Все нужные слоты зачарованы."))
+    rows = [[x["slot_name"], x["name"] or (f"Предмет {x['id']}" if x["id"] else "—"), x["ilvl"], _v(x["ref_ilvl"], 0),
+             ("есть" + (f" — {x['enchant_name']}" if x["enchant_name"] else "")) if x["enchant"]
+             else ("НЕТ" if x["enchantable"] else "не нужно"),
+             "" if x["temp"] is None else ("есть" if x["temp"] else "нет"),
+             x["ref_enchant_share"], x["gems"], _v(x["ref_gems"], 0)] for x in G["rows"]]
+    first, last = s.table(["Слот", "Предмет", "Ур.", "Ур. топа", "Зачарование", "Временное усиление",
+                           "Зачарование у топа", "Камни", "Камни у топа"],
+                          rows, [None, None, F_INT, F_INT, None, None, F_PCT, F_INT, F_INT])
+    if rows:
+        s.ws.conditional_formatting.add(f"E{first}:E{last}", FormulaRule(
+            formula=[f'E{first}="НЕТ"'], fill=PatternFill("solid", fgColor="FFC7CE")))
 
 
 def write_reference_workbook(ref: Ref, path: str | Path) -> Path:
@@ -478,16 +501,16 @@ def _cooldown_sheet(wb, r: CompareResult, demo):
 
 # -------------------------------------------------------------- Бурст
 def _burst_sheet(wb, r: CompareResult, demo):
-    s = Sheet(wb, "Бурст", demo, {"A": 10, "B": 26, "C": 16, "D": 16, "E": 14, "F": 14, "G": 14, "H": 14})
+    s = Sheet(wb, "Бурст", demo, {"A": 10, "B": 26, "C": 16, "D": 16, "E": 14, "F": 14, "G": 14, "H": 14, "I": 14})
     main = r.ref.name_of(r.ref.main_cd) if r.ref.main_cd else "—"
     s.title("Окна бурста: мой лог против эталона",
             f"Окно строится от главного атакующего кулдауна ({main}); смещения — секунды относительно его нажатия.")
     rows = [[x["window"], x["name"], _v(x["ref_t0"], 1), _v(x["my_t0"], 1), _v(x["ref_offset"], 1),
-             _v(x["my_offset"], 1), '=IF(F{r}="","нет в окне",F{r}-E{r})', _v(x["share"], 3)]
+             _v(x["my_offset"], 1), '=IF(F{r}="","нет в окне",F{r}-E{r})', _v(x["share"], 3), x.get("kind", "")]
             for x in r.tables["burst"]]
     first, last = s.table(["Окно", "Действие", "Старт окна у эталона, с", "Старт окна у меня, с",
-                           "Смещение у эталона, с", "Моё смещение, с", "Разница, с", "Доля игроков"],
-                          rows, [F_INT, None, F_1, F_1, F_SIGNED1, F_SIGNED1, F_SIGNED1, F_PCT])
+                           "Смещение у эталона, с", "Моё смещение, с", "Разница, с", "Доля игроков", "Тип"],
+                          rows, [F_INT, None, F_1, F_1, F_SIGNED1, F_SIGNED1, F_SIGNED1, F_PCT, None])
     if rows:
         s.ws.conditional_formatting.add(f"G{first}:G{last}", FormulaRule(
             formula=[f'OR(G{first}="нет в окне",AND(ISNUMBER(G{first}),ABS(G{first})>3))'],

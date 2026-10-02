@@ -256,7 +256,7 @@ class WCLClient:
                    enemyNPCs { id gameID } phaseTransitions { id startTime } }
                  masterData {
                    actors { id name type subType server petOwner }
-                   abilities { gameID name type } } } } }"""
+                   abilities { gameID name type icon } } } } }"""
         rep = self.query(q, {"code": code})["reportData"]["report"]
         if rep is None:
             raise WCLError(f"Отчёт {code} не найден или закрыт")

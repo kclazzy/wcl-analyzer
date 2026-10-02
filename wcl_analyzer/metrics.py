@@ -98,8 +98,10 @@ def classify(logs: list[PlayerLog], overrides: dict | None = None) -> dict[int, 
     users: Counter = Counter()
     intervals: dict[int, list[float]] = defaultdict(list)
     first_use: dict[int, list[float]] = defaultdict(list)
+    trinket_users: Counter = Counter()
     for log in logs:
         names.update(log.names)
+        trinket_users.update(getattr(log, "trinket_spells", None) or ())
         seen = defaultdict(list)
         for c in log.casts:
             seen[c.id].append(c.t)
@@ -131,6 +133,8 @@ def classify(logs: list[PlayerLog], overrides: dict | None = None) -> dict[int, 
             cat, src = "healthstone", "имя"
         elif RACIAL_RE.match(name.strip()):
             cat, src = "racial", "имя"
+        elif trinket_users[ab] >= max(1, users[ab] / 2):
+            cat, src = "trinket", "экипировка"
         elif cd_est is not None and cd_est >= 25 and share >= 0.3:
             first = med(first_use[ab])
             if first is not None and first <= 20:

@@ -403,6 +403,14 @@ def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:
     log("Готово.")
 
 
+def _gear_json(g: dict) -> dict | None:
+    if not g.get("rows"):
+        return None
+    return {"my_ilvl": _num(g.get("my_ilvl"), 1), "ref_ilvl": _num(g.get("ref_ilvl"), 1), "ref_n": g.get("ref_n", 0),
+            "has_my": g.get("has_my", False), "missing": g.get("missing_enchants", []), "missing_temp": g.get("missing_temp", []),
+            "rows": [{k: _num(v, 2) if isinstance(v, float) else v for k, v in x.items()} for x in g["rows"]]}
+
+
 def _page() -> bytes:
     """Страница интерфейса с русскими названиями классов и спеков из names_ru.py (один словарь на всё)."""
     from .names_ru import CLASSES, SPECS
@@ -497,9 +505,10 @@ def to_json(r: CompareResult, job_id: str) -> dict:
                        "p25": _num(x["p25"], 1), "p75": _num(x["p75"], 1),
                        "diff": _num(x["my"] - x["ref"], 1) if x["my"] is not None and x["ref"] is not None else None,
                        "confidence": _num(x["confidence"])} for x in r.tables["cd_timing"]],
-        "burst": [{"window": x["window"], "name": x["name"], "ref_t0": _num(x["ref_t0"], 1),
+        "burst": [{"window": x["window"], "name": x["name"], "kind": x.get("kind", ""), "ref_t0": _num(x["ref_t0"], 1),
                    "my_t0": _num(x["my_t0"], 1), "ref_offset": _num(x["ref_offset"], 1),
                    "my_offset": _num(x["my_offset"], 1), "share": _num(x["share"])} for x in r.tables["burst"]],
+        "gear": _gear_json(r.tables.get("gear") or {}),
         "defensives": [{kk: _num(v, 1) if isinstance(v, float) else v for kk, v in x.items()}
                        for x in r.tables["defensives"]],
         "deaths": [{"t": _fmt_t(d["t"]), "sources": [[n, _num(v, 0)] for n, v in d["sources"]],

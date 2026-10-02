@@ -238,9 +238,10 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
     log("Считаю эталон и сравниваю…")
     ref = build_reference(tops, load_overrides(_spell_meta_path()), label=label, me=me)
     r = compare(me, ref)
-    from .talents import compare_talents, demo_tree_data
+    from .talents import compare_talents, demo_tree_data, load_tree_data
     try:  # по всем скачанным логам топа, а не только по отобранным с похожим билдом
-        r.talents = compare_talents(me, tops, data=demo_tree_data() if params.get("demo") else None, log=log)
+        data = demo_tree_data() if params.get("demo") else load_tree_data(log, save=not SERVER["public"])
+        r.talents = compare_talents(me, tops, data=data, log=log)
     except Exception as e:  # noqa: BLE001 — сравнение талантов не обязательно
         log(f"Сравнение талантов недоступно: {e}")
         r.talents = None

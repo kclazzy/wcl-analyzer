@@ -27,8 +27,9 @@ def _file() -> Path:
     return data_dir() / "talents.json"
 
 
-def load_tree_data(log=print) -> list | None:
-    """Справочник талантов Raidbots: из памяти, с диска (не старше недели) или из интернета."""
+def load_tree_data(log=print, save: bool = True) -> list | None:
+    """Справочник талантов Raidbots: из памяти, с диска (не старше недели) или из интернета.
+    save=False — публичный сервер: ничего не пишет на диск, справочник живёт только в памяти."""
     if "data" in _MEM:
         return _MEM["data"]
     f = _file()
@@ -44,11 +45,12 @@ def load_tree_data(log=print) -> list | None:
             r = requests.get(TALENTS_URL, timeout=30)
             r.raise_for_status()
             data = r.json()
-            try:
-                f.parent.mkdir(parents=True, exist_ok=True)
-                f.write_text(json.dumps(data), encoding="utf-8")
-            except OSError:
-                pass
+            if save:
+                try:
+                    f.parent.mkdir(parents=True, exist_ok=True)
+                    f.write_text(json.dumps(data), encoding="utf-8")
+                except OSError:
+                    pass
         except Exception as e:  # noqa: BLE001
             log(f"Справочник талантов недоступен ({e}): вместо названий будут номера узлов")
             try:  # хоть устаревший

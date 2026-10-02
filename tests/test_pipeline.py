@@ -384,7 +384,26 @@ def test_pick_by_percentile():
     print(f"OK отбор по процентилю: ≤50% — {len(keep)} из {len(dps)} DPS, вайп — все")
 
 
+def test_real_talent_data():
+    """Если есть интернет (на GitHub — есть): настоящий справочник Raidbots читается правильно."""
+    from wcl_analyzer import talents
+    talents._MEM.clear()
+    data = talents.load_tree_data(log=lambda m: None, save=False)
+    talents._MEM.clear()
+    if not data:
+        print("ПРОПУЩЕН справочник талантов: нет доступа к Raidbots")
+        return
+    for cls, spec in (("Mage", "Frost"), ("DeathKnight", "Unholy"), ("Hunter", "BeastMastery")):
+        t = talents.spec_tree(data, cls, spec)
+        assert t and len(t["nodes"]) > 40, (cls, spec)
+        assert any(n["choice"] for n in t["nodes"].values()), "нет узлов выбора"
+        assert any(n["part"] == "hero" and n["sub"] for n in t["nodes"].values()), "нет героических узлов"
+        assert t["subs"], "нет названий героических веток"
+    print(f"OK справочник талантов Raidbots: {len(data)} спеков, героические ветки, узлы выбора")
+
+
 if __name__ == "__main__":
     test_batched_fetch()
+    test_real_talent_data()
     test_pick_by_percentile()
     test_limit_no_hang()

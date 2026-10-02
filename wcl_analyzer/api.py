@@ -262,9 +262,10 @@ class WCLClient:
             raise WCLError(f"Отчёт {code} не найден или закрыт")
         return rep
 
-    def player_details(self, code: str, fight_id: int) -> dict:
+    def player_details(self, code: str, fight_id: int, combatant: bool = False) -> dict:
+        """Состав боя. combatant=True — ещё и CombatantInfo каждого игрока (таланты, экипировка)."""
         q = """query($code: String!, $fid: [Int]) { reportData { report(code: $code) {
-                 playerDetails(fightIDs: $fid) } } }"""
+                 playerDetails(fightIDs: $fid%s) } } }""" % (", includeCombatantInfo: true" if combatant else "")
         pd = self.query(q, {"code": code, "fid": [fight_id]})["reportData"]["report"]["playerDetails"]
         # Формат JSON: {"data": {"playerDetails": {...}}} или сразу {...}
         for _ in range(3):

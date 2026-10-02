@@ -320,12 +320,32 @@ def build_player_log(report: dict, fight: dict, actor: dict, raw: dict,
             log.ilvl = _ilvl_from_gear(gear)
             tree = ev.get("talentTree") or ev.get("talents") or []
             # (узел, талант, ранг); если узла нет в событии — 0, узел найдётся по таланту в справочнике
-            log.talent_tree = sorted({(int(x.get("nodeID") or 0), int(x.get("id") or 0), int(x.get("rank", 1) or 1))
-                                      for x in tree if isinstance(x, dict) and (x.get("nodeID") or x.get("id"))})
+            log.talent_tree = talent_tree_from(tree)
             if len(gear) > 13:
                 log.trinket_ids = [int(gear[12].get("id", 0)), int(gear[13].get("id", 0))]
             break
     return log
+
+
+def talent_tree_from(tree) -> list[tuple[int, int, int]]:
+    """Таланты из CombatantInfo: [(узел, талант, ранг)]."""
+    return sorted({(int(x.get("nodeID") or 0), int(x.get("id") or 0), int(x.get("rank", 1) or 1))
+                   for x in tree or [] if isinstance(x, dict) and (x.get("nodeID") or x.get("id"))})
+
+
+def talents_from_details(details: dict, actor_id: int) -> list[tuple[int, int, int]]:
+    """Таланты игрока из playerDetails(includeCombatantInfo: true) — запасной источник,
+    если в событиях боя CombatantInfo талантов нет."""
+    for role in ("dps", "healers", "tanks"):
+        for p in (details or {}).get(role) or []:
+            if int(p.get("id", -1)) != int(actor_id):
+                continue
+            ci = p.get("combatantInfo") or {}
+            if isinstance(ci, list):
+                ci = ci[0] if ci else {}
+            tree = ci.get("talentTree") or p.get("talentTree") or ci.get("talents") or []
+            return talent_tree_from(tree)
+    return []
 
 
 # ----------------------------------------------------------- API loading

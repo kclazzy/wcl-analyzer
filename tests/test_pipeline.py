@@ -714,8 +714,28 @@ def test_android_java_threads():
     print("OK Android: классы Java загружаются в главном потоке — сохранение файлов и ссылки работают из потоков")
 
 
+def test_talents_fallback():
+    """Если в событиях боя талантов нет — они берутся из playerDetails(includeCombatantInfo)."""
+    from wcl_analyzer.collect import ensure_talents
+    from wcl_analyzer.logs import talents_from_details
+
+    class _PL:
+        talent_tree, report_code, fight_id, actor_id = [], "R", 1, 7
+
+    class _C:
+        def player_details(self, code, fid, combatant=False):
+            assert combatant
+            return {"dps": [{"id": 7, "name": "Me", "combatantInfo": {"talentTree": [
+                {"id": 1003, "nodeID": 5003, "rank": 1}, {"id": 1004, "nodeID": 5004, "rank": 2}]}}]}
+    pl = ensure_talents(_C(), _PL())
+    assert pl.talent_tree == [(5003, 1003, 1), (5004, 1004, 2)], pl.talent_tree
+    assert talents_from_details({"dps": [{"id": 8}]}, 7) == []
+    print("OK таланты: запасной источник — сведения об игроках боя")
+
+
 if __name__ == "__main__":
     test_batched_fetch()
+    test_talents_fallback()
     test_android_java_threads()
     test_code_update()
     test_single_sources()

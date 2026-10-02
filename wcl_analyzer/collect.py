@@ -37,7 +37,7 @@ def load_my_log(client: WCLClient, url: str, fight: str | int | None = None,
         actor_id = url_source
     actor, cls, spec = find_player(client, report, f, name=player, actor_id=actor_id)
     raw = fetch_raw(client, report, f, int(actor["id"]), with_damage_events=True)
-    return build_player_log(report, f, actor, raw, spec=spec, cls=cls)
+    return ensure_talents(client, build_player_log(report, f, actor, raw, spec=spec, cls=cls))
 
 
 def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str, difficulty: int,
@@ -104,8 +104,8 @@ def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str,
             actor = next(a for a in report["masterData"]["actors"]
                          if a["name"] == rk.get("name") and a.get("type") not in ("NPC", "Pet"))
             raw = fetch_raw(client, report, fight, int(actor["id"]))
-            pl = build_player_log(report, fight, actor, raw, spec=spec, cls=cls,
-                                  dps=rk.get("amount"), rank=rk["_rank"])
+            pl = ensure_talents(client, build_player_log(report, fight, actor, raw, spec=spec, cls=cls,
+                                                         dps=rk.get("amount"), rank=rk["_rank"]))
             if not pl.ilvl and rk.get("bracketData"):
                 pl.ilvl = float(rk["bracketData"])
             return pl, None
@@ -141,6 +141,19 @@ def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str,
     if save and cache is not None and getattr(cache, "path", None):
         settings.save_ref(cache.path, uid=uid, **info)  # список эталонов для командной строки
     return logs, label
+
+
+def ensure_talents(client, pl):
+    """Если в событиях боя талантов нет — берём их из сведений об игроках (запасной источник)."""
+    if pl.talent_tree or not hasattr(client, "player_details"):
+        return pl
+    try:
+        from .logs import talents_from_details
+        pl.talent_tree = talents_from_details(client.player_details(pl.report_code, pl.fight_id, combatant=True),
+                                              pl.actor_id)
+    except Exception:  # noqa: BLE001 — без талантов разбор всё равно работает (TypeError — у тестовых клиентов)
+        pass
+    return pl
 
 
 def player_percentiles(r) -> dict:

@@ -273,6 +273,8 @@ def _player_result(job, params, client, me, tops, label, ref_meta, top_diff, log
     try:  # по всем скачанным логам топа, а не только по отобранным с похожим билдом
         data = demo_tree_data() if params.get("demo") else load_tree_data(log, save=not SERVER["public"])
         r.talents = compare_talents(me, tops, data=data, log=log)
+        if r.talents and r.talents.get("error"):
+            log("Таланты: " + r.talents["error"])
     except Exception as e:  # noqa: BLE001 — сравнение талантов не обязательно
         log(f"Сравнение талантов недоступно: {e}")
         r.talents = None

@@ -371,6 +371,16 @@ def test_pick_by_percentile():
     assert rp["extras"]["vs_top"] and rp["extras"]["vs_top"]["rows"], "нет сравнения с лучшими киллами"
     import json
     json.dumps(job["result"]["raid_peaks"])
+    # сравнение талантов с топом
+    T = job["result"]["talents"]
+    kinds = {r["kind"] for r in T["rows"]}
+    assert {"missing", "choice", "extra"} <= kinds, kinds
+    assert T["has_names"] and all(not r["name"].startswith("узел") for r in T["rows"])
+    json.dumps(T)
+    import openpyxl, io
+    wb = openpyxl.load_workbook(io.BytesIO(job["xlsx"]))
+    if wb is not None:
+        assert "Таланты" in wb.sheetnames
     print(f"OK отбор по процентилю: ≤50% — {len(keep)} из {len(dps)} DPS, вайп — все")
 
 

@@ -67,6 +67,7 @@ class PlayerLog:
     boss_debuff_src: dict[int, set] = field(default_factory=dict)  # кто их накладывал
     cast_targets: dict[int, int] = field(default_factory=dict)     # цель -> число кастов
     talents: list[int] = field(default_factory=list)
+    talent_tree: list[tuple[int, int, int]] = field(default_factory=list)  # (узел, выбранный талант, ранг)
     res_gain: float | None = None               # получено основного ресурса (события Resources)
     res_waste: float | None = None              # потеряно сверх максимума
     phases: list[tuple[float, int]] = field(default_factory=list)  # (начало, номер фазы)
@@ -321,6 +322,8 @@ def build_player_log(report: dict, fight: dict, actor: dict, raw: dict,
             tree = ev.get("talentTree") or ev.get("talents") or []
             log.talents = sorted({int(x.get("nodeID") or x.get("id") or 0) * 10 + int(x.get("rank", 1) or 1)
                                   for x in tree if isinstance(x, dict) and (x.get("nodeID") or x.get("id"))})
+            log.talent_tree = sorted({(int(x.get("nodeID") or 0), int(x.get("id") or 0), int(x.get("rank", 1) or 1))
+                                      for x in tree if isinstance(x, dict) and x.get("nodeID")})
             if len(gear) > 13:
                 log.trinket_ids = [int(gear[12].get("id", 0)), int(gear[13].get("id", 0))]
             break

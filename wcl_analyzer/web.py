@@ -238,6 +238,12 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
     log("Считаю эталон и сравниваю…")
     ref = build_reference(tops, load_overrides(_spell_meta_path()), label=label, me=me)
     r = compare(me, ref)
+    from .talents import compare_talents, demo_tree_data
+    try:  # по всем скачанным логам топа, а не только по отобранным с похожим билдом
+        r.talents = compare_talents(me, tops, data=demo_tree_data() if params.get("demo") else None, log=log)
+    except Exception as e:  # noqa: BLE001 — сравнение талантов не обязательно
+        log(f"Сравнение талантов недоступно: {e}")
+        r.talents = None
     _excel_bytes(job, f"{me.name}_{me.encounter_name}", write_compare_workbook, r)
     result = to_json(r, job["id"])
     if ref_meta:
@@ -245,6 +251,7 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
         result["info"]["ref_collected_at"] = ref_meta["collected_at"]
         result["info"]["ref_stale"] = time.time() - ref_meta["collected_at"] > _max_age_s(params)
     result["params"] = {k: params.get(k) for k in ("url", "fight", "actor", "ref")}
+    result["talents"] = r.talents
     result["raid_peaks"] = _raid_peaks(job, params, None if params.get("demo") else client, me, log)
     job["result"] = result
     log("Готово.")

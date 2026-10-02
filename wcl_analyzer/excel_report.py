@@ -138,6 +138,7 @@ def write_compare_workbook(r: CompareResult, path: str | Path) -> Path:
     _rotation_sheet(wb, r, demo)
     _cooldown_sheet(wb, r, demo)
     _burst_sheet(wb, r, demo)
+    _talents_sheet(wb, r, demo)
     _defensive_sheet(wb, r, demo)
     _uptime_sheet(wb, r, demo)
     _resource_sheet(wb, r, demo)
@@ -151,6 +152,32 @@ def write_compare_workbook(r: CompareResult, path: str | Path) -> Path:
     path = Path(path)
     wb.save(path)
     return path
+
+
+TALENT_KIND = {"missing": "У топа почти у всех, у вас нет", "choice": "Другой выбор в узле",
+               "extra": "У вас есть, у топа редко", "rank": "Меньше рангов, чем у топа"}
+
+
+def _talents_sheet(wb, r: CompareResult, demo: bool) -> None:
+    T = getattr(r, "talents", None)
+    if not T:
+        return
+    s = Sheet(wb, "Таланты", demo, {"A": 34, "B": 30, "C": 26, "D": 26, "E": 14, "F": 16, "G": 16})
+    s.title("Таланты против топа", f"Все скачанные логи топа ({T['n']}), без отбора по билду. "
+            + ("Названия — из справочника Raidbots." if T["has_names"] else "Справочник талантов недоступен: показаны номера узлов."))
+    for line in T["summary"]:
+        s.cell(s.row, 1, "• " + line)
+        s.row += 1
+    s.row += 1
+    if T.get("hero"):
+        s.section("Героическая ветка")
+        s.table(["Ветка", "Доля топа", "Медиана DPS топа"],
+                [[h["name"] + (" (у вас)" if h["name"] == T["hero"]["my"] else ""), h["share"], _v(h["dps"], 0)] for h in T["hero"]["top"]],
+                [None, F_PCT, F_INT])
+    s.section("Отличия от большинства топа")
+    s.table(["Талант", "Отличие", "У вас", "У топа", "Доля топа", "DPS топа: с ним", "DPS топа: без"],
+            [[x["name"], TALENT_KIND[x["kind"]], x["my"], x["top"], x["share"], _v(x["dps_with"], 0), _v(x["dps_without"], 0)]
+             for x in T["rows"]], [None, None, None, None, F_PCT, F_INT, F_INT])
 
 
 def write_reference_workbook(ref: Ref, path: str | Path) -> Path:

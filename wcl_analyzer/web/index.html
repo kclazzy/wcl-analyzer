@@ -660,7 +660,7 @@ function render(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, gap = R.info.ref_dps - R.info.dps;
   /* Только три вкладки: остальные подробности — в Excel */
-  const tabs = [["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["raidcd","Рейдовые кулдауны в пики урона"]];
+  const tabs = [["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["tal","Таланты"],["raidcd","Рейдовые кулдауны в пики урона"]];
   const B = R.brief || {  // разборы, сохранённые до появления выжимки
     verdict: `${num(I.dps)} DPS против ${num(I.ref_dps)} у медианы топа`, reliability: R.reliability.overall, reliability_note: "",
     actions: (R.top5||[]).slice(0,3).map(f=>({do:f.focus||f.title, title:f.title, why:"", level:f.level,
@@ -693,9 +693,10 @@ function render(R){
         <div>${B.good.length?`<h4>Уже на уровне топа</h4><ul>${B.good.map(g=>`<li>${esc(g)}</li>`).join("")}</ul>`:""}</div>
         <div>${B.context.length?`<h4>Не зависит от вас</h4><ul>${B.context.map(g=>`<li>${esc(g)}</li>`).join("")}</ul>`:""}</div>
       </div>
+      ${R.talents && R.talents.summary.length ? `<p class="hint" style="margin:10px 0 0">${R.talents.summary.map(esc).join(". ")}. Подробно — во вкладке «Таланты».</p>` : ""}
       ${B.noise_hidden?`<p class="hint" style="margin:10px 0 0">Скрыто отличий, которые так же часто встречаются у самих игроков топа: ${B.noise_hidden}. Они есть в подробностях.</p>`:""}
     </div>
-    <details class="more" id="more"><summary>Подробности: ротация, кулдауны и бурст, рейдовые кулдауны в пики урона</summary>
+    <details class="more" id="more"><summary>Подробности: ротация, кулдауны и бурст, таланты, рейдовые кулдауны в пики урона</summary>
     <div class="legend"><span class="l-you">Вы</span><span class="l-top">Медиана топа</span><span class="l-bad">Отличие не в вашу пользу</span></div>
     <div class="tabs" role="tablist">${tabs.map(([k,t],i)=>`<button role="tab" aria-selected="${i==0}" aria-controls="p-${k}" id="t-${k}">${t}</button>`).join("")}</div>
     ${tabs.map(([k],i)=>`<div class="panel ${i==0?"on":""}" role="tabpanel" id="p-${k}" aria-labelledby="t-${k}"></div>`).join("")}
@@ -748,10 +749,27 @@ function render(R){
   chart("cTiming", {type:"bar", data:{labels:tm.map(x=>`${x.name} №${x.k}`), datasets:[{data:tm.map(x=>x.diff), backgroundColor:tm.map(x=>Math.abs(x.diff)>5?C.bad:C.muted), borderRadius:3}]},
     options:{indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`вы ${mmss(tm[c.dataIndex].my)}, топ ${mmss(tm[c.dataIndex].ref)}`}}}, scales:{x:{title:{display:true,text:"секунд"}}}}});
 
+  // Таланты
+  renderTalents(R.talents, $("#p-tal"));
+
   // Рейдовые кулдауны в пики урона
   renderRaidPeaks(R.raid_peaks, $("#p-raidcd"));
 
   el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+}
+
+const TAL_KIND = {missing:"У топа почти у всех, у вас нет", choice:"Другой выбор в узле", extra:"У вас есть, у топа редко", rank:"Меньше рангов, чем у топа"};
+function renderTalents(T, el){
+  if (!T) { el.innerHTML = box("Таланты", "", '<p class="empty">Нет данных о талантах: в логе нет информации о билде или у топа меньше трёх логов с талантами. Разборы, сохранённые до этой версии, тоже без этой вкладки.</p>'); return; }
+  const dpsCell = (v, n) => v==null ? "—" : `${num(v)} <span style="color:var(--muted);font-size:12.5px">(${n})</span>`;
+  el.innerHTML = `
+    <div class="box brief"><ul class="lines">${T.summary.map(l=>`<li>${esc(l)}</li>`).join("")}
+      <li>С вашим билдом (таланты совпадают на 85%+) — ${T.same_build} из ${T.n} логов топа; самый похожий совпадает на ${pct(T.closest,0)}</li></ul></div>
+    ${T.hero ? box("Героическая ветка", "Какую героическую ветку берут игроки топа и их медианный DPS.",
+      table(["Ветка","Доля топа","Медиана DPS топа"], T.hero.top.map(h=>[esc(h.name) + (h.name===T.hero.my ? ' <span class="tag HIGH">у вас</span>' : ""), pct(h.share,0), num(h.dps)]), {num:[1,2]})) : ""}
+    ${box("Отличия от большинства топа", `Сравнение со всеми скачанными логами топа (${T.n}), без отбора по билду. «DPS топа с ним / без» — медианный DPS игроков топа с этим талантом и без него, в скобках — сколько игроков; при малом числе — прочерк. Разница в DPS не доказывает, что дело в таланте.` + (T.has_names ? "" : " Справочник талантов недоступен — вместо названий номера узлов."),
+      table(["Талант","Отличие","У вас","У топа","Доля топа","DPS топа: с ним","DPS топа: без"], T.rows.map(x=>[esc(x.name), esc(TAL_KIND[x.kind]), esc(x.my), esc(x.top), pct(x.share,0), dpsCell(x.dps_with, x.n_with), dpsCell(x.dps_without, x.n_without)]),
+        {num:[4,5,6], empty:"Билд совпадает с большинством топа.", flag:i=>T.rows[i].kind==="missing"||T.rows[i].kind==="choice"}))}`;
 }
 
 /* Вкладка разбора игрока: какие рейдовые защитные кулдауны были нажаты в самые тяжёлые моменты

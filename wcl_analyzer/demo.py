@@ -386,6 +386,14 @@ def demo_logs(n_top: int = 25, seed: int = 42):
     rep, fight, actor, raw = simulate(my_policy(rng), 305.0, 689.5, seed + 999, "Игрок",
                                       "DEMOMYLOGxx", base_ms, (219314, 212456), with_damage_events=True)
     me = build_player_log(rep, fight, actor, raw, spec="Frost", cls="Mage")
+    # Демо-отличия в талантах: в узле выбора 5010 — другой вариант, 5003 не взят, взят редкий 5045
+    tt = {nd: (e, r) for nd, e, r in me.talent_tree}
+    tt.pop(5003, None)
+    if 5010 in tt:
+        tt[5010] = (9010, 1)
+    tt[5045] = (1045, 1)
+    me.talent_tree = sorted((nd, e, r) for nd, (e, r) in tt.items())
+    me.talents = sorted(nd * 10 + r for nd, (e, r) in tt.items())
     return tops, me
 
 

@@ -70,8 +70,8 @@ def _players(details: dict) -> list[dict]:
     return out
 
 
-def _taken_spells(combatant: list, talent_data, players: list[dict]) -> dict[int, set] | None:
-    """{игрок: id способностей взятых талантов} по CombatantInfo и справочнику талантов."""
+def _taken_spells(combatant: list, talent_data, players: list[dict]) -> dict[int, tuple[set, set]] | None:
+    """{игрок: (id способностей взятых талантов, id всех способностей дерева спека)}."""
     if not combatant or not talent_data:
         return None
     from .talents import spec_tree
@@ -85,6 +85,7 @@ def _taken_spells(combatant: list, talent_data, players: list[dict]) -> dict[int
         st = spec_tree(talent_data, p["cls"], p["spec"])
         if not st:
             continue
+        in_tree = {int(e[1]) for n in st["nodes"].values() for e in n["entries"].values() if e[1]}
         spells = set()
         for x in tree:
             nd = st["nodes"].get(int(x.get("nodeID") or 0))
@@ -97,7 +98,7 @@ def _taken_spells(combatant: list, talent_data, players: list[dict]) -> dict[int
                 sid = next(iter(nd["entries"].values()))[1]
                 if sid:
                     spells.add(int(sid))
-        out[p["id"]] = spells
+        out[p["id"]] = (spells, in_tree)
     return out
 
 
@@ -122,10 +123,12 @@ def roster_cds(raw: dict, R: dict, talent_data=None) -> list[dict]:
             ts = sorted(pressed.get((p["id"], sid), []))
             if ts:
                 source = f"нажимал в бою: {len(ts)}"
-            elif tk is not None:
-                if sid not in tk:
-                    continue  # талант не взят
+            elif tk is not None and sid in tk[1]:
+                if sid not in tk[0]:
+                    continue  # это талант, и он не взят
                 source = "талант взят, в бою не нажимал"
+            elif tk is not None:
+                source = "базовая способность спека, в бою не нажимал"
             elif core:
                 if CHOICE_PAIRS.get(sid) and pressed.get((p["id"], CHOICE_PAIRS[sid])):
                     continue  # нажимал второй вариант узла выбора

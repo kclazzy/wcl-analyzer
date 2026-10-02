@@ -536,6 +536,12 @@ def test_talent_data_without_ids():
     roster = roster_cds(raw, R, data)
     names = {c["name"] for c in roster}
     assert "Божественный гимн" in names and "Апофеоз" not in names, names  # гимн взят, апофеоз — нет
+    # способность не из дерева талантов (базовая) с данными о талантах не выкидывается
+    raw["details"]["dps"] = [{"id": 6, "name": "Торвин", "type": "Warrior", "specs": [{"spec": "Fury"}]}]
+    raw["combatant"].append({"sourceID": 6, "talentTree": [{"id": 11, "nodeID": 1}]})
+    data.append({"className": "Warrior", "specName": "Fury", "classNodes": [], "heroNodes": [], "subTreeNodes": [],
+                 "specNodes": [{"id": 1, "entries": [{"id": 11, "spellId": 1}]}]})
+    assert any(c["name"] == "Ободряющий клич" for c in roster_cds(raw, R, data)), "базовый кулдаун пропал"
     print("OK справочник талантов без номеров у части узлов: без ошибки 'id', таланты состава учтены")
 
 

@@ -89,6 +89,28 @@ def cooldown(sid: int, default: float | None = None) -> float | None:
     return next((float(c["cd"]) for c in raid_cds() if int(c["id"]) == int(sid)), default)
 
 
+def scope(sid: int) -> str:
+    """raid — действует сразу на рейд; self — усиливает исцеление самого лекаря. Неизвестные — raid."""
+    for src in (raid_cds(), _bundled_cds()):  # в старой копии таблицы поля scope ещё нет — берём из сборки
+        for c in src:
+            if int(c["id"]) == int(sid) and c.get("scope"):
+                return str(c["scope"])
+    return "raid"
+
+
+_BUNDLED_CDS: list | None = None
+
+
+def _bundled_cds() -> list[dict]:
+    global _BUNDLED_CDS
+    if _BUNDLED_CDS is None:
+        try:
+            _BUNDLED_CDS = json.loads(BUNDLED.read_text(encoding="utf-8")).get("raid_cds") or []
+        except (OSError, ValueError):
+            _BUNDLED_CDS = []
+    return _BUNDLED_CDS
+
+
 def power(sid: int, default: int = 2) -> int:
     return next((int(c.get("power", default)) for c in raid_cds() if int(c["id"]) == int(sid)), default)
 

@@ -425,10 +425,22 @@ def _vs_top(wb, R, demo):
         s.section("Пики урона: ваш бой и лучшие киллы",
                   f"Закрыто кулдауном: у топа {V['top_cover']:.0%}, у вас {V['my_cover']:.0%}." if V["top_cover"] is not None
                   and V["my_cover"] is not None else None)
-        f, l = s.table(["Когда", "Пик", "Ваши кулдауны", "У топа закрыт", "Чем закрывает топ"],
-                       [[r["time"], r["mechanic"], "не дошли" if r["my"] is None else (", ".join(r["my"]) or "нет"),
-                         _v(r["top_share"], 3), ", ".join(r["top_cds"]) or "—"] for r in V["rows"]],
-                       [None, None, None, F_PCT, None])
+        def mine(r, k):
+            if r["my"] is None:
+                return "не дошли"
+            lst = r.get(k)
+            if lst is None:  # разбор старой версии — без деления
+                lst = r["my"] if k == "my_raid" else []
+            return ", ".join(lst) or ("нет" if k == "my_raid" else "—")
+
+        f, l = s.table(["Когда", "Пик", "Ваши: на рейд", "Ваши: на себя (усиление лекаря)", "У топа закрыт",
+                        "Топ: на рейд", "Топ: на себя"],
+                       [[r["time"], r["mechanic"], mine(r, "my_raid"), mine(r, "my_self"), _v(r["top_share"], 3),
+                         ", ".join(r.get("top_raid", r["top_cds"])) or "—", ", ".join(r.get("top_self") or []) or "—"]
+                        for r in V["rows"]],
+                       [None, None, None, None, F_PCT, None, None])
+        s.note("На рейд — действует сразу на всех (гимн, тотем, барьер). На себя — бафф лекаря, "
+               "усиливающий его исцеление (Апофеоз, Перерождение, Древо Жизни).")
         if V["rows"]:
             s.ws.conditional_formatting.add(f"C{f}:C{l}", CellIsRule(operator="equal", formula=['"нет"'], fill=RED))
         s.section("Лучшие киллы")

@@ -13,7 +13,8 @@
    "power": 3,
    "aliases": [
     "божественный гимн"
-   ]
+   ],
+   "scope": "raid"
   },
   {
    "class": "Priest",
@@ -23,7 +24,8 @@
    "en": "Holy Word: Salvation",
    "cd": 720,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "raid"
   },
   {
    "class": "Priest",
@@ -33,7 +35,8 @@
    "en": "Apotheosis",
    "cd": 120,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "self"
   },
   {
    "class": "Priest",
@@ -43,7 +46,8 @@
    "en": "Power Word: Barrier",
    "cd": 180,
    "core": true,
-   "power": 3
+   "power": 3,
+   "scope": "raid"
   },
   {
    "class": "Priest",
@@ -53,7 +57,8 @@
    "en": "Rapture",
    "cd": 90,
    "core": true,
-   "power": 2
+   "power": 2,
+   "scope": "self"
   },
   {
    "class": "Priest",
@@ -63,7 +68,8 @@
    "en": "Evangelism",
    "cd": 90,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "raid"
   },
   {
    "class": "Priest",
@@ -73,7 +79,8 @@
    "en": "Ultimate Penitence",
    "cd": 240,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "raid"
   },
   {
    "class": "Priest",
@@ -83,7 +90,8 @@
    "en": "Vampiric Embrace",
    "cd": 120,
    "core": true,
-   "power": 2
+   "power": 2,
+   "scope": "raid"
   },
   {
    "class": "Shaman",
@@ -93,7 +101,8 @@
    "en": "Spirit Link Totem",
    "cd": 180,
    "core": true,
-   "power": 3
+   "power": 3,
+   "scope": "raid"
   },
   {
    "class": "Shaman",
@@ -103,7 +112,8 @@
    "en": "Healing Tide Totem",
    "cd": 180,
    "core": true,
-   "power": 3
+   "power": 3,
+   "scope": "raid"
   },
   {
    "class": "Shaman",
@@ -113,7 +123,8 @@
    "en": "Ascendance",
    "cd": 180,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "self"
   },
   {
    "class": "Shaman",
@@ -123,7 +134,8 @@
    "en": "Ancestral Protection Totem",
    "cd": 300,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "raid"
   },
   {
    "class": "Shaman",
@@ -133,7 +145,8 @@
    "en": "Ancestral Guidance",
    "cd": 120,
    "core": false,
-   "power": 1
+   "power": 1,
+   "scope": "raid"
   },
   {
    "class": "Shaman",
@@ -143,7 +156,8 @@
    "en": "Ancestral Guidance",
    "cd": 120,
    "core": false,
-   "power": 1
+   "power": 1,
+   "scope": "raid"
   },
   {
    "class": "Druid",
@@ -153,7 +167,8 @@
    "en": "Tranquility",
    "cd": 180,
    "core": true,
-   "power": 3
+   "power": 3,
+   "scope": "raid"
   },
   {
    "class": "Druid",
@@ -163,7 +178,8 @@
    "en": "Incarnation: Tree of Life",
    "cd": 180,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "self"
   },
   {
    "class": "Druid",
@@ -173,7 +189,8 @@
    "en": "Flourish",
    "cd": 90,
    "core": false,
-   "power": 1
+   "power": 1,
+   "scope": "raid"
   },
   {
    "class": "Druid",
@@ -183,7 +200,8 @@
    "en": "Convoke the Spirits",
    "cd": 120,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "self"
   },
   {
    "class": "Paladin",
@@ -196,7 +214,8 @@
    "power": 3,
    "aliases": [
     "мастер аур"
-   ]
+   ],
+   "scope": "raid"
   },
   {
    "class": "Paladin",
@@ -206,7 +225,8 @@
    "en": "Avenging Crusader",
    "cd": 120,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "self"
   },
   {
    "class": "Paladin",
@@ -216,7 +236,8 @@
    "en": "Tyr's Deliverance",
    "cd": 90,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "raid"
   },
   {
    "class": "Monk",
@@ -227,7 +248,8 @@
    "cd": 180,
    "core": true,
    "power": 3,
-   "choice_with": 388615
+   "choice_with": 388615,
+   "scope": "raid"
   },
   {
    "class": "Monk",
@@ -238,7 +260,8 @@
    "cd": 180,
    "core": false,
    "power": 3,
-   "choice_with": 115310
+   "choice_with": 115310,
+   "scope": "raid"
   },
   {
    "class": "Monk",
@@ -248,7 +271,8 @@
    "en": "Invoke Yu'lon, the Jade Serpent",
    "cd": 120,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "self"
   },
   {
    "class": "Monk",
@@ -258,7 +282,8 @@
    "en": "Invoke Chi-Ji, the Red Crane",
    "cd": 120,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "self"
   },
   {
    "class": "Evoker",
@@ -271,7 +296,8 @@
    "power": 3,
    "aliases": [
     "перемотка"
-   ]
+   ],
+   "scope": "raid"
   },
   {
    "class": "Evoker",
@@ -281,7 +307,8 @@
    "en": "Dream Flight",
    "cd": 120,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "raid"
   },
   {
    "class": "Evoker",
@@ -291,7 +318,8 @@
    "en": "Emerald Communion",
    "cd": 180,
    "core": false,
-   "power": 2
+   "power": 2,
+   "scope": "raid"
   },
   {
    "class": "Evoker",
@@ -301,7 +329,8 @@
    "en": "Stasis",
    "cd": 90,
    "core": false,
-   "power": 1
+   "power": 1,
+   "scope": "self"
   },
   {
    "class": "Evoker",
@@ -311,7 +340,8 @@
    "en": "Zephyr",
    "cd": 120,
    "core": true,
-   "power": 1
+   "power": 1,
+   "scope": "raid"
   },
   {
    "class": "Warrior",
@@ -324,7 +354,8 @@
    "power": 2,
    "aliases": [
     "ободряющий клич"
-   ]
+   ],
+   "scope": "raid"
   },
   {
    "class": "DeathKnight",
@@ -334,7 +365,8 @@
    "en": "Anti-Magic Zone",
    "cd": 120,
    "core": true,
-   "power": 2
+   "power": 2,
+   "scope": "raid"
   },
   {
    "class": "DemonHunter",
@@ -344,7 +376,8 @@
    "en": "Darkness",
    "cd": 300,
    "core": true,
-   "power": 2
+   "power": 2,
+   "scope": "raid"
   }
  ],
  "lust_ids": [
@@ -355,5 +388,6 @@
   390386,
   381301,
   444257
- ]
+ ],
+ "_about_scope": "scope: raid — действует сразу на весь рейд; self — усиливает исцеление самого лекаря (бафф на себя)."
 }

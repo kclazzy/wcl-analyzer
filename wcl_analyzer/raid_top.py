@@ -118,6 +118,17 @@ def _aggregate(kills: list[dict]) -> dict:
     return {key: r for key, r in ref.items() if r["kills"] >= need}
 
 
+def _split_scope(row: dict, r: dict | None, names: dict) -> None:
+    from .game_data import scope
+    row["top_raid"], row["top_self"] = [], []
+    if not r:
+        return
+    for sid, _ in r["cds"].most_common():
+        lst = row["top_self"] if scope(sid) == "self" else row["top_raid"]
+        if len(lst) < 2:
+            lst.append(names.get(sid, f"#{sid}"))
+
+
 def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
     """Сравнение пиков и кулдаунов вашего боя с лучшими киллами + план на следующий пулл."""
     if not kills:
@@ -136,8 +147,11 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
         key = (sp.get("ability_id"), sp.get("k", 1))
         r = ref.get(key)
         matched.add(key)
+        own = set(sp.get("covered_self") or [])
         rows.append({"t": sp["t"], "time": sp["time"], "mechanic": f"«{sp['ability']}» №{sp.get('k', 1)}",
-                     "my": sp.get("covered_by") or [],
+                     "my": sp.get("covered_by") or [], "_k": key,
+                     "my_self": [x for x in sp.get("covered_by") or [] if x in own],
+                     "my_raid": [x for x in sp.get("covered_by") or [] if x not in own],
                      "top_share": (r["covered"] / r["kills"]) if r else None,
                      "top_cds": [names.get(i, f"#{i}") for i, _ in r["cds"].most_common(2)] if r else [],
                      "top_time": _fmt_t(median(r["times"])) if r else None})
@@ -151,8 +165,11 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
         late.append({"t": t, "peak_t": median(r["peaks"]), "time": _fmt_t(t), "mechanic": f"«{r['name']}» №{key[1]}", "my": None,
                      "top_share": r["covered"] / r["kills"],
                      "top_cds": [names.get(i, f"#{i}") for i, _ in r["cds"].most_common(2)],
-                     "top_time": _fmt_t(t), "_key": key})
+                     "top_time": _fmt_t(t), "_key": key, "_k": key, "my_self": None, "my_raid": None})
     rows += late
+    for row in rows:  # на рейд и на себя (усиление лекаря) — раздельно
+        r = ref.get(row.pop("_k", None)) if "_k" in row else None
+        _split_scope(row, r, names)
 
     my_cover = (sum(1 for s in X.get("spikes", []) if s.get("covered_by")) / len(X["spikes"])) if X.get("spikes") else None
     tot = sum(r["kills"] for r in ref.values())

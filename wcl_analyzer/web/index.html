@@ -29,7 +29,7 @@ html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 "Onest
 a{color:var(--top)}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:3px solid var(--you);outline-offset:2px}
-.wrap{max-width:1140px;margin:0 auto;padding:28px 20px 80px}
+.wrap{max-width:1400px;margin:0 auto;padding:28px 20px 80px}
 header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:28px}
 header h1{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:0}
 header h1 span{color:var(--muted);font-weight:500}
@@ -159,6 +159,7 @@ table{border-collapse:collapse;width:100%;font-size:14px}
 th{text-align:left;font-weight:600;color:var(--muted);font-size:13px;padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
 td{padding:8px 10px;border-bottom:1px solid var(--soft);vertical-align:top}
 td.num,th.num{text-align:right;white-space:nowrap}
+table.wide th{white-space:normal;vertical-align:bottom}table.wide th,table.wide td{padding-left:8px;padding-right:8px}
 tr.flag td{background:var(--bad-soft)}
 .tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12.5px;font-weight:600}
 .tag.HIGH{background:var(--good-soft);color:#17542B}.tag.MEDIUM{background:var(--warn-soft);color:#6B4A05}
@@ -316,7 +317,7 @@ dialog label.check input{width:auto;margin:0}
         </div></div>
       <div class="runrow">
         <button class="btn you" id="runBtn" type="button">Разобрать игрока</button>
-        <button class="btn" id="raidBtn" type="button">Весь рейд</button>
+        <button class="btn" id="raidBtn" type="button" title="Весь бой целиком: игроки, механики, смерти, пуллы, полученный урон и сейвы">Разобрать бой рейда</button>
         <button class="btn" id="raidRotBtn" type="button" title="Каждый DPS боя (или только отобранные) против топа своего спека">Ротация всего рейда</button>
         <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
@@ -717,7 +718,7 @@ function who(cls, spec){
 function table(headers, rows, opts={}){
   if (!rows.length) return `<p class="empty">${opts.empty||"Нет данных."}</p>`;
   const nums = opts.num || [];
-  return `<div class="tw"><table><thead><tr>${headers.map((h,i)=>`<th class="${nums.includes(i)?"num":""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${
+  return `<div class="tw"><table class="${opts.cls||""}"><thead><tr>${headers.map((h,i)=>`<th class="${nums.includes(i)?"num":""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${
     rows.map((r,ri)=>`<tr class="${opts.rowClass?opts.rowClass(ri):opts.flag&&opts.flag(ri)?"flag":""}">${r.map((c,i)=>`<td class="${nums.includes(i)?"num":""}">${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
 function chart(id, cfg){ const el = document.getElementById(id); if (!el || !window.Chart) return; charts.push(new Chart(el, cfg)); }
@@ -915,10 +916,13 @@ function renderRaidPeaks(P, el){
     ${V ? `<div class="box"><h3>Пики урона: что нажал ваш рейд и что жмёт топ</h3>
       <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы${V.difficulty?` той же сложности (${esc(V.difficulty)})`:""}: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${esc(k.duration)})`).join(", ")}.
       Кулдауном закрыто: у топа ${pct(V.top_cover,0)}, у вашего рейда ${pct(V.my_cover,0)}.</p>` +
-      table(["Когда","Пик","Нажато у вас","У топа закрыт","Чем закрывает топ"], V.rows.map(r=>[r.time, esc(r.mechanic),
-        r.my==null ? '<span style="color:var(--muted)">не дошли</span>' : r.my.length ? esc(r.my.join(", ")) : '<span class="worse">ничего</span>',
-        r.top_share==null ? "—" : pct(r.top_share,0), esc((r.top_cds||[]).join(", ")||"—")]),
-        {num:[3], flag:i=>{const r=V.rows[i]; return r.my!=null && !r.my.length && (r.top_share||0)>=0.5;}}) + "</div>" : ""}
+      `<p class="sub"><span class="tag k-spell">на рейд</span> — действует сразу на всех: гимн, тотем, барьер, ободряющий клич.
+        <span class="tag k-trinket">на себя</span> — бафф лекаря, который усиливает его исцеление: Апофеоз, Перерождение, Древо Жизни.</p>` +
+      table(["Когда","Пик","Ваш рейд нажал","У топа закрыт","Чем закрывает топ"], V.rows.map(r=>[r.time, esc(r.mechanic),
+        r.my==null ? '<span style="color:var(--muted)">не дошли</span>' : scopeCell(r.my_raid!==undefined ? r.my_raid : r.my, r.my_self||[], true),
+        r.top_share==null ? "—" : pct(r.top_share,0),
+        r.top_raid!==undefined ? scopeCell(r.top_raid, r.top_self||[], false) : esc((r.top_cds||[]).join(", ")||"—")]),
+        {num:[3], cls:"wide", flag:i=>{const r=V.rows[i]; return r.my!=null && !r.my.length && (r.top_share||0)>=0.5;}}) + "</div>" : ""}
     ${box("Самые тяжёлые моменты вашего боя", "5 секунд с наибольшим уроном по рейду. Кулдаун засчитан, если нажат за 8 с до момента или во время него.",
       table(["Когда","Урон за 5 с","Доля боя","Механики","Нажатые рейдовые кулдауны"], H.map(h=>[h.time, num(h.damage), pct(h.share,0), esc(h.abilities.join(", ")),
         h.cds.length?esc(h.cds.join(", ")):'<span class="worse">ничего</span>']), {num:[1,2], empty:"Нет данных об уроне.", flag:i=>!H[i].cds.length}))}
@@ -926,6 +930,14 @@ function renderRaidPeaks(P, el){
       table(["Игрок","Кулдаун","Откат","Нажато","Можно за бой","Откуда известно"], X.roster_cds.map(c=>[`${esc(c.player)} <span style="color:var(--muted);font-size:12.5px">${esc(who(c.cls, c.spec))}</span>`,
         esc(c.name), mmss(c.cd).replace(/,0$/,""), num(c.used), c.max_uses==null?"—":num(c.max_uses), esc(c.source)]), {num:[2,3,4], flag:i=>!X.roster_cds[i].used})) : ""}`;
   raidDamageChart(P);
+}
+
+/* Кулдауны на пик: сначала действующие на весь рейд, ниже — баффы лекаря на себя */
+function scopeCell(raid, self, mine){
+  const line = (tag, cls, lst) => lst.length ? `<div style="margin:2px 0"><span class="tag ${cls}">${tag}</span> ${esc(lst.join(", "))}</div>` : "";
+  if (!raid.length && !self.length) return mine ? '<span class="worse">ничего</span>' : "—";
+  return line("на рейд", "k-spell", raid) + line("на себя", "k-trinket", self)
+    + (mine && !raid.length ? '<div class="worse" style="font-size:12.5px">на весь рейд — ничего</div>' : "");
 }
 
 /* План сейвов: на пик — один или два кулдауна; у каждого — откат и когда он снова готов */
@@ -947,12 +959,12 @@ function renderRaidCd(R){
   charts.splice(0).forEach(c => c.destroy());
   const el = $("#result"), I = R.info || {};
   el.innerHTML = `<div class="box"><h3>Полученный урон и сейвы: ${esc(I.boss||"")}, ${esc(I.difficulty||"")}</h3>
-    <p class="sub">Разбор из прежней версии. Теперь это вкладка «Полученный урон и сейвы» в разборе «Весь рейд».</p></div><div id="rcdBody"></div>`;
+    <p class="sub">Разбор из прежней версии. Теперь это вкладка «Полученный урон и сейвы» в разборе «Разобрать бой рейда».</p></div><div id="rcdBody"></div>`;
   el.hidden = false;
   renderRaidPeaks(R, $("#rcdBody"));
 }
 
-/* ---------- режим «Весь рейд» ---------- */
+/* ---------- режим «Разобрать бой рейда» ---------- */
 const ROLE_C = {tank:"#4F7CC0", healer:"#2F8F4E", dps:"#E39B2F"};
 const ratio = v => v==null ? "—" : v.toFixed(1).replace(".",",")+"×";
 
@@ -1024,7 +1036,7 @@ function renderRaidRot(R){
         `<span class="tag ${p.reliability}">${esc(REL_RU[p.reliability]||p.reliability)}</span>`,
         esc(p.actions[0] ? p.actions[0].do : "существенных отличий нет"),
         p.actions[0] ? `<span class="imp ${p.actions[0].level}">${esc(p.actions[0].gain)}</span>` : "",
-        `<button class="mini" type="button" data-i="${i}">Подробно</button>`]), {num:[1,4,5,6]}))}
+        `<button class="mini" type="button" data-i="${i}">Подробно</button>`]), {num:[1,4,5,6], cls:"wide"}))}
     <details class="more"><summary>Все действия по каждому игроку</summary>
       ${P.map(p=>box(`${p.name} — ${who(p.cls, p.spec)}`, `${num(p.dps)} DPS, ${sgn(p.gap, v=>pct(v))} к медиане топа`,
         p.actions.length ? p.actions.map((a,i)=>`<div class="act"><div class="n">${i+1}</div><div><div class="do">${esc(a.do)}</div><div class="why">${esc(a.title)}</div></div><span class="imp ${a.level}">${esc(a.gain)}</span></div>`).join("")

@@ -256,6 +256,10 @@ def test_analysis_quality():
     assert len(X["damage_timeline"]) >= 60
     V = X["vs_top"]
     assert V and V["n"] == 5 and V["top_cover"] == 1.0 and abs(V["my_cover"] - 2 / 3) < 0.01, V and V["my_cover"]
+    first = V["rows"][0]  # на рейд и на себя (бафф лекаря) — раздельно
+    assert first["my_self"] == ["Апофеоз (Элария)"] and first["my_raid"] == ["Божественный гимн (Элария)"], first
+    second = V["rows"][1]
+    assert second["top_self"] == ["Перерождение"] and "Перерождение" not in second["top_raid"], second
     third = [r for r in V["plan"] if r["mechanic"].endswith("№3")][0]
     assert third["cd"] == "Божественный гимн" and third["like_top"], third
     assert X["pull_trend"]["rows"][0]["name"] == "Ледяная волна", X["pull_trend"]

@@ -677,6 +677,7 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
         cov = [c for c in raid_cds if sp["t"] - lo <= c["t"] <= sp["t"] + 5 + hi]
         sp["covered_by"] = [f"{c['name']} ({c['player']})" for c in cov]
         sp["covered_ids"] = sorted({c["id"] for c in cov})
+        sp["covered_self"] = [f"{c['name']} ({c['player']})" for c in cov if _gd.scope(c["id"]) == "self"]
         sp["k"] = 1 + sum(1 for o in spikes if o is not sp and o["t"] < sp["t"] and o.get("ability_id") == sp.get("ability_id"))
         sp["time"] = _fmt_t(sp["t"])
         sp["damage"] = round(sp["damage"])

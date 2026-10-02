@@ -72,7 +72,10 @@ def light_raid(client, code: str, fid: int, report: dict | None = None, difficul
     R = analyze_raid(raw)
     if with_roster:
         from .raid_cds import roster_cds
-        R["extras"]["roster_cds"] = roster_cds(raw, R, talent_data)
+        try:
+            R["extras"]["roster_cds"] = roster_cds(raw, R, talent_data)
+        except Exception:  # noqa: BLE001 — без состава план строится по нажатым кулдаунам
+            R["extras"]["roster_cds"] = []
     return R
 
 
@@ -111,7 +114,7 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
 
 def raid_cd_peaks(client, code: str, fid: int, log=print, progress=lambda x: None,
                   top_difficulty: int | None = None, talent_data=None, compare_top: bool = True) -> dict | None:
-    """Урон и сейвы рейда: пики урона по рейду, какие рейдовые кулдауны были нажаты в эти моменты,
+    """Полученный урон и сейвы рейда: пики урона по рейду, какие рейдовые кулдауны были нажаты в эти моменты,
     что в те же моменты жмут лучшие киллы босса, кулдауны состава и план на следующий пулл."""
     from .config import DIFFICULTY_NAMES
     report = client.report(code)

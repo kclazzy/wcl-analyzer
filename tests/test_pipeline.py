@@ -367,8 +367,8 @@ def test_pick_by_percentile():
     job = {"id": "t", "progress": 0.0, "log": []}
     web._run_player(job, {"demo": True}, None, lambda m: None)
     import json
-    assert "raid_peaks" not in job["result"], "урон и сейвы рейда теперь — отдельный режим"
-    # отдельный режим «Урон и сейвы рейда»: состав, план с перезарядкой, сравнение с топом
+    assert "raid_peaks" not in job["result"], "полученный урон и сейвы рейда теперь — отдельный режим"
+    # отдельный режим «Полученный урон и сейвы рейда»: состав, план с перезарядкой, сравнение с топом
     jc = {"id": "cd", "progress": 0.0, "log": []}
     web._run_raid_cd(jc, {"mode": "raidcd", "demo": True}, None, lambda m: None)
     rc = jc["result"]
@@ -413,12 +413,24 @@ def test_real_talent_data():
         print("ПРОПУЩЕН справочник талантов: нет доступа к Raidbots")
         print("::notice title=Справочник талантов::пропущен — нет доступа к Raidbots")
         return
-    for cls, spec in (("Mage", "Frost"), ("DeathKnight", "Unholy"), ("Hunter", "BeastMastery")):
+    # каждый спек справочника разбирается без ошибок, а у лекарей находятся их рейдовые кулдауны
+    from wcl_analyzer.raid_cds import candidates
+    n_specs, found_cd = 0, 0
+    for spec_data in data:
+        cls, spec = spec_data.get("className"), spec_data.get("specName")
         t = talents.spec_tree(data, cls, spec)
-        assert t and len(t["nodes"]) > 40, (cls, spec)
+        assert t and len(t["nodes"]) > 30, (cls, spec)
+        n_specs += 1
+        spells = {e[1] for n in t["nodes"].values() for e in n["entries"].values() if e[1]}
+        for sid, name, _cd, core in candidates(cls, spec):
+            if sid in spells:
+                found_cd += 1
+    for cls, spec in (("Mage", "Frost"), ("Priest", "Holy"), ("Evoker", "Preservation")):
+        t = talents.spec_tree(data, cls, spec)
         assert any(n["choice"] for n in t["nodes"].values()), "нет узлов выбора"
         assert any(n["part"] == "hero" and n["sub"] for n in t["nodes"].values()), "нет героических узлов"
         assert t["subs"], "нет названий героических веток"
+    print(f"::notice title=Рейдовые кулдауны::в справочнике талантов найдено {found_cd} кулдаунов из таблицы сейвов, спеков {n_specs}")
     print(f"OK справочник талантов Raidbots: {len(data)} спеков, героические ветки, узлы выбора")
     print(f"::notice title=Справочник талантов::прочитан, {len(data)} спеков")
 
@@ -503,8 +515,33 @@ def test_two_references():
     print("OK два эталона: героический топ и эпохальный топ, у каждого свой Excel")
 
 
+def test_talent_data_without_ids():
+    """Справочник талантов, где у части узлов и талантов нет номера (как в реальном Raidbots), — без ошибки 'id'."""
+    from wcl_analyzer import talents
+    from wcl_analyzer.raid_cds import roster_cds
+    data = [{"className": "Priest", "specName": "Holy",
+             "classNodes": [{"name": "без номера", "entries": [{"name": "x"}]}],
+             "specNodes": [{"id": 1, "name": "Божественный гимн", "type": "single",
+                            "entries": [{"id": 11, "name": "Божественный гимн", "spellId": 64843}, {"name": "без номера"}]},
+                           {"id": 2, "name": "Апофеоз", "type": "single", "entries": [{"id": 21, "spellId": 200183}]}],
+             "heroNodes": [{"id": 3, "subTreeId": 7, "entries": [{"id": 31, "name": "Герой"}]}],
+             "subTreeNodes": [{"id": 4, "entries": [{"traitSubTreeId": 7, "name": "Ветка"}, {"name": "без номера"}]}, {}]},
+            "мусор"]
+    t = talents.spec_tree(data, "Priest", "Holy")
+    assert set(t["nodes"]) == {1, 2, 3} and t["subs"] == {7: "Ветка"}
+    raw = {"details": {"healers": [{"id": 5, "name": "Элария", "type": "Priest", "specs": [{"spec": "Holy"}]}, {"name": "без id"}]},
+           "combatant": [{"sourceID": 5, "talentTree": [{"id": 11, "nodeID": 1, "rank": 1}, {"nodeID": 99}]}],
+           "report": {"masterData": {"abilities": [{"gameID": 64843, "name": "Божественный гимн"}, {"name": "без номера"}]}}}
+    R = {"info": {"duration_s": 300}, "extras": {"raid_cds": []}}
+    roster = roster_cds(raw, R, data)
+    names = {c["name"] for c in roster}
+    assert "Божественный гимн" in names and "Апофеоз" not in names, names  # гимн взят, апофеоз — нет
+    print("OK справочник талантов без номеров у части узлов: без ошибки 'id', таланты состава учтены")
+
+
 if __name__ == "__main__":
     test_batched_fetch()
+    test_talent_data_without_ids()
     test_two_references()
     test_same_difficulty()
     test_real_talent_data()

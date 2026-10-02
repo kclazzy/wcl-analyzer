@@ -296,7 +296,7 @@ def _player_result(job, params, client, me, tops, label, ref_meta, top_diff, log
 
 
 def _run_raid_cd(job: dict, params: dict, creds, log) -> None:
-    """Урон и сейвы рейда: пики урона, нажатые рейдовые кулдауны, сравнение с лучшими киллами
+    """Полученный урон и сейвы рейда: пики урона, нажатые рейдовые кулдауны, сравнение с лучшими киллами
     (той же сложности и эпохальными), кулдауны состава и план сейвов на следующий пулл."""
     from .config import DIFFICULTY_NAMES
     from .excel_raid import write_raid_cd_workbook
@@ -336,7 +336,7 @@ def _run_raid_cd(job: dict, params: dict, creds, log) -> None:
     R["info"].update({"code": code, "fight_id": fid, "demo": bool(params.get("demo")),
                       "url": f"https://www.warcraftlogs.com/reports/{code}#fight={fid}",
                       "difficulty": I.get("difficulty") or DIFFICULTY_NAMES.get(fd, "")})
-    _excel_bytes(job, f"Сейвы_рейда_{I.get('boss', '')}", write_raid_cd_workbook, R)
+    _excel_bytes(job, f"Полученный_урон_и_сейвы_{I.get('boss', '')}", write_raid_cd_workbook, R)
     job["result"] = {**R, "mode": "raidcd", "excel": f"/api/report/{job['id']}", "source_url": params.get("url")}
     log("Готово.")
 
@@ -452,6 +452,13 @@ def _friendly(e: Exception) -> str:
     msg = str(e)
     if "ConnectionError" in type(e).__name__ or "Max retries" in msg:
         return "Нет связи с Warcraft Logs. Проверьте интернет и попробуйте ещё раз."
+    if isinstance(e, (KeyError, IndexError, TypeError)):
+        # Не голое «'id'», а понятное сообщение: в данных Warcraft Logs нет ожидаемого поля
+        import traceback
+        tb = traceback.extract_tb(e.__traceback__)
+        where = f"{Path(tb[-1].filename).stem}:{tb[-1].lineno}" if tb else "?"
+        return (f"Неожиданный формат данных ({type(e).__name__}: {msg}, место: {where}). "
+                "Пришлите это сообщение разработчику — по нему видно, что поправить.")
     return msg or type(e).__name__
 
 

@@ -61,6 +61,8 @@ def _players(details: dict) -> list[dict]:
     out = []
     for role in ("tanks", "healers", "dps"):
         for p in (details or {}).get(role) or []:
+            if not isinstance(p, dict) or p.get("id") is None:
+                continue
             specs = p.get("specs") or []
             spec = specs[0].get("spec") if specs and isinstance(specs[0], dict) else (specs[0] if specs else "")
             out.append({"id": int(p["id"]), "name": p.get("name", ""), "cls": p.get("type", ""), "spec": spec,
@@ -102,12 +104,16 @@ def _taken_spells(combatant: list, talent_data, players: list[dict]) -> dict[int
 def roster_cds(raw: dict, R: dict, talent_data=None) -> list[dict]:
     """Все рейдовые кулдауны состава с перезарядкой и источником (почему считаем, что он есть)."""
     players = _players(raw.get("details") or {})
-    names = {int(a["gameID"]): a.get("name") for a in ((raw.get("report") or {}).get("masterData") or {}).get("abilities") or []}
+    names = {int(a["gameID"]): a.get("name") for a in ((raw.get("report") or {}).get("masterData") or {}).get("abilities") or []
+             if a.get("gameID") is not None}
     pressed = defaultdict(list)
     for c in (R.get("extras") or {}).get("raid_cds") or []:
         if c.get("pid") is not None and c.get("id") is not None:
             pressed[(int(c["pid"]), int(c["id"]))].append(float(c["t"]))
-    taken = _taken_spells(raw.get("combatant") or [], talent_data, players)
+    try:
+        taken = _taken_spells(raw.get("combatant") or [], talent_data, players)
+    except Exception:  # noqa: BLE001 — без талантов план строится по основным кулдаунам спеков
+        taken = None
     dur = float((R.get("info") or {}).get("duration_s") or 0)
     out = []
     for p in players:

@@ -404,7 +404,7 @@ def _plan_text(r: dict) -> str:
 
 
 def write_raid_cd_workbook(R: dict, path: str | Path) -> Path:
-    """Урон и сейвы рейда: план на следующий пулл, пики урона против топа, тяжёлые моменты, кулдауны состава."""
+    """Полученный урон и сейвы рейда: план на следующий пулл, пики урона против топа, тяжёлые моменты, кулдауны состава."""
     wb = Workbook()
     wb.remove(wb.active)
     demo = bool((R.get("info") or {}).get("demo"))
@@ -414,7 +414,7 @@ def write_raid_cd_workbook(R: dict, path: str | Path) -> Path:
         X, I = variant.get("extras") or {}, R.get("info") or {}
         V = X.get("vs_top")
         s = Sheet(wb, title, demo, {"A": 12, "B": 30, "C": 70, "D": 4, "E": 30})
-        s.title(f"Урон и сейвы рейда: {I.get('boss', '')}, {I.get('difficulty', '')}",
+        s.title(f"Полученный урон и сейвы рейда: {I.get('boss', '')}, {I.get('difficulty', '')}",
                 ("Лучшие киллы: " + (V.get("difficulty") or "") + ". " if V else "") +
                 "План построен по составу: кулдауны классов и спеков, взятые таланты, перезарядка.")
         for line in variant.get("brief") or []:

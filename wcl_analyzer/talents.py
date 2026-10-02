@@ -70,19 +70,23 @@ def spec_tree(data: list | None, cls: str, spec: str) -> dict | None:
     if not data:
         return None
     c, s = _norm(cls), _norm(spec)
-    t = next((x for x in data if _norm(x.get("className")) == c and _norm(x.get("specName")) == s), None)
+    t = next((x for x in data if isinstance(x, dict) and _norm(x.get("className")) == c
+              and _norm(x.get("specName")) == s), None)
     if not t:
         return None
     nodes: dict = {}
     for part, kind in (("classNodes", "class"), ("specNodes", "spec"), ("heroNodes", "hero")):
         for n in t.get(part) or []:
+            if not isinstance(n, dict) or n.get("id") is None:
+                continue  # в справочнике бывают узлы без номера — пропускаем, а не падаем
             nodes[int(n["id"])] = {
                 "name": n.get("name") or "", "part": kind, "choice": n.get("type") == "choice",
                 "max": int(n.get("maxRanks") or 1), "sub": n.get("subTreeId"),
-                "entries": {int(e["id"]): (e.get("name") or "", e.get("spellId")) for e in n.get("entries") or []}}
+                "entries": {int(e["id"]): (e.get("name") or "", e.get("spellId"))
+                            for e in n.get("entries") or [] if isinstance(e, dict) and e.get("id") is not None}}
     subs = {}
     for n in t.get("subTreeNodes") or []:
-        for e in n.get("entries") or []:
+        for e in (n.get("entries") or []) if isinstance(n, dict) else []:
             if e.get("traitSubTreeId") is not None:
                 subs[int(e["traitSubTreeId"])] = e.get("name") or ""
     return {"nodes": nodes, "subs": subs}

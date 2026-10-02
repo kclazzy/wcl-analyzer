@@ -51,10 +51,12 @@ header h1 span{color:var(--muted);font-weight:500}
 .btn.you{background:var(--you);color:#221503}
 .linkbtn{background:none;border:0;padding:0;color:var(--top);text-decoration:underline;cursor:pointer}
 .hint{color:var(--muted);font-size:14px;margin-top:12px}
-.picks{display:grid;grid-template-columns:1.2fr 1.2fr 1fr 1.15fr;gap:12px;align-items:end;margin-top:22px;
+.picks{display:grid;grid-template-columns:1.1fr 1.1fr .9fr 1.5fr;gap:12px;align-items:end;margin-top:22px;
   padding-top:22px;border-top:1px solid var(--line)}
 .picks .runrow{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.picks .pickrow{display:flex;gap:6px}.picks .pickrow select{flex:1}
+.picks .pickrow{display:flex;gap:6px;align-items:flex-end}.picks .pickrow select{flex:1}
+.picks .pickrow .thr{display:flex;flex-direction:column;gap:2px;margin:0;font-size:12px;color:var(--muted);white-space:nowrap}
+.picks .pickrow .thr:has(input:disabled){opacity:.55}
 .picks .pickrow input{width:76px;border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 8px;background:#fff}
 .picks .pickinfo{font-size:13.5px;color:var(--muted)}
 /* Цвета процентилей как на Warcraft Logs */
@@ -259,6 +261,7 @@ dialog label.check input{width:auto;margin:0}
   .tabs button{padding:9px 10px;font-size:14px;white-space:normal;text-align:left}
   .diffsw{max-width:100%}.diffsw button{padding:6px 10px}
   .picks .pickrow{flex-wrap:wrap}.picks .pickrow select{flex:1 1 100%}
+  .picks .pickrow .thr{flex-direction:row;align-items:center;gap:8px;font-size:14px}
 }
 /* Колонки и блоки не шире экрана: таблицы внутри прокручиваются сами, текст переносится */
 .grid2>*,.picks>*,.hero>*{min-width:0}
@@ -302,7 +305,8 @@ dialog label.check input{width:auto;margin:0}
             <option value="">Всех DPS</option>
             <option value="ilvl">Рейтинг с учётом экипировки ≤</option>
           </select>
-          <input id="pickMax" type="number" min="1" max="99" step="1" value="50" list="pickPresets" aria-label="Порог процентиля, %" disabled>
+          <label class="thr" for="pickMax"><span>Порог, %</span>
+            <input id="pickMax" type="number" min="1" max="99" step="1" value="50" list="pickPresets" disabled></label>
           <datalist id="pickPresets"><option value="25"><option value="50"><option value="75"><option value="90"></datalist>
         </div></div>
       <div class="runrow">

@@ -395,7 +395,6 @@ def demo_logs(n_top: int = 25, seed: int = 42):
     if 5010 in tt:
         tt[5010] = (9010, 1)
     me.talent_tree = sorted((nd, e, r) for nd, (e, r) in tt.items())
-    me.talents = sorted(nd * 10 + r for nd, (e, r) in tt.items())
     return tops, me
 
 

@@ -96,14 +96,16 @@ def common_downtime(ms: list[dict], n: int, share: float = 0.6) -> list[tuple[fl
 
 def filter_by_build(logs: list[PlayerLog], me: PlayerLog, min_keep: int = 8) -> tuple[list[PlayerLog], str]:
     """Оставляет игроков топа с похожими талантами (п. 9). Если данных о талантах нет — всех."""
-    if not me.talents or sum(1 for log in logs if log.talents) < min_keep:
+    def build(log):  # тот же формат талантов, что и во вкладке «Таланты»: (узел или талант, выбор)
+        return {(n or e, e) for n, e, _r in (log.talent_tree or [])}
+    if not me.talent_tree or sum(1 for log in logs if log.talent_tree) < min_keep:
         return logs, ""
-    mine = set(me.talents)
+    mine = build(me)
     sim = []
     for log in logs:
-        if not log.talents:
+        if not log.talent_tree:
             continue
-        other = set(log.talents)
+        other = build(log)
         sim.append((len(mine & other) / max(1, len(mine | other)), log))
     sim.sort(key=lambda x: -x[0])
     close = [log for sc, log in sim if sc >= 0.85]

@@ -147,8 +147,6 @@ def _run_job(job: dict, params: dict, creds) -> None:
             _run_raid(job, params, creds, log)
         elif mode == "raidrot":
             _run_raid_rotation(job, params, creds, log)
-        elif mode == "raidcd":
-            _run_raid_cd(job, params, creds, log)
         elif mode == "refresh":
             _run_refresh(job, params, creds, log)
         else:
@@ -295,52 +293,6 @@ def _player_result(job, params, client, me, tops, label, ref_meta, top_diff, log
     return result
 
 
-def _run_raid_cd(job: dict, params: dict, creds, log) -> None:
-    """Полученный урон и сейвы рейда: пики урона, нажатые рейдовые кулдауны, сравнение с лучшими киллами
-    (той же сложности и эпохальными), кулдауны состава и план сейвов на следующий пулл."""
-    from .config import DIFFICULTY_NAMES
-    from .excel_raid import write_raid_cd_workbook
-    from .collect import _pick_fight
-    from .logs import parse_report_url
-    from .raid_top import raid_cd_peaks
-    from .talents import load_tree_data
-
-    def progress(x: float) -> None:
-        job["progress"] = max(job["progress"], min(0.95, x))
-
-    if params.get("demo"):
-        from .raid_demo import CODE, FakeRaidClient
-        client, code = FakeRaidClient(), CODE
-        fid = next(int(f["id"]) for f in client.report(CODE)["fights"] if f.get("kill"))
-        talents = []
-    else:
-        client = _client(creds, job, log)
-        code, url_fight, _ = parse_report_url(params["url"])
-        f = _pick_fight(client.report(code), params.get("fight") if params.get("fight") not in (None, "") else url_fight)
-        fid = int(f["id"])
-        talents = load_tree_data(log, save=not SERVER["public"])
-    log("Урон по рейду, рейдовые кулдауны и состав — одним запросом…")
-    progress(0.1)
-    R = raid_cd_peaks(client, code, fid, log=log, talent_data=talents, progress=lambda x: progress(0.15 + 0.4 * x))
-    if R is None:
-        raise LookupError("В этом бою нет данных об уроне по рейду")
-    fd = int(next(x for x in client.report(code)["fights"] if int(x["id"]) == fid).get("difficulty") or 0)
-    want_mythic = params.get("mythic") is not False
-    if want_mythic and fd and fd != MYTHIC and not params.get("demo"):
-        log("Лучшие киллы на эпохальной сложности…")
-        alt = raid_cd_peaks(client, code, fid, log=log, top_difficulty=MYTHIC, talent_data=talents,
-                            progress=lambda x: progress(0.6 + 0.3 * x))
-        if alt and alt["extras"].get("vs_top"):
-            R["alt"] = alt
-    I = R["info"]
-    R["info"].update({"code": code, "fight_id": fid, "demo": bool(params.get("demo")),
-                      "url": f"https://www.warcraftlogs.com/reports/{code}#fight={fid}",
-                      "difficulty": I.get("difficulty") or DIFFICULTY_NAMES.get(fd, "")})
-    _excel_bytes(job, f"Полученный_урон_и_сейвы_{I.get('boss', '')}", write_raid_cd_workbook, R)
-    job["result"] = {**R, "mode": "raidcd", "excel": f"/api/report/{job['id']}", "source_url": params.get("url")}
-    log("Готово.")
-
-
 def _avoidable_list() -> list[str]:
     """Список избегаемых механик из spell_meta.json: "_avoidable": [id или название, ...]."""
     import json
@@ -447,6 +399,15 @@ def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:
                      "pick": R.get("pick"),
                      "excel": f"/api/report/{job['id']}", "source_url": params.get("url")}
     log("Готово.")
+
+
+def _page() -> bytes:
+    """Страница интерфейса с русскими названиями классов и спеков из names_ru.py (один словарь на всё)."""
+    from .names_ru import CLASSES, SPECS
+    html = STATIC.read_text(encoding="utf-8")
+    html = html.replace("/*CLASS_RU*/{}", json.dumps(CLASSES, ensure_ascii=False))
+    html = html.replace("/*SPEC_RU*/{}", json.dumps({f"{c}|{s}": v for (c, s), v in SPECS.items()}, ensure_ascii=False))
+    return html.encode("utf-8")
 
 
 def _friendly(e: Exception) -> str:
@@ -679,12 +640,26 @@ class Handler(BaseHTTPRequestHandler):
             return
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
-            self._file(STATIC.read_bytes(), "text/html; charset=utf-8")
+            self._file(_page(), "text/html; charset=utf-8")
         elif path in STATIC_FILES:
             name, ctype = STATIC_FILES[path]
             self._file((WEB / name).read_bytes(), ctype, "max-age=86400")
         elif path == "/manifest.webmanifest":
             self._file(json.dumps(MANIFEST, ensure_ascii=False).encode("utf-8"), "application/manifest+json")
+        elif path == "/api/limit":
+            # Часовой лимит Warcraft Logs для ключа из заголовков: сколько очков потрачено и когда сброс.
+            # Запрос rateLimitData лёгкий; страница спрашивает раз в минуту и после каждого разбора.
+            try:
+                client = CLIENT_FACTORY(self._creds())
+                if not hasattr(client, "rate_limit"):
+                    return self._json({"available": False})
+                info = client.rate_limit()
+                self._json({"available": True, "limit": info.get("limitPerHour"),
+                            "spent": info.get("pointsSpentThisHour"), "reset_in": info.get("pointsResetIn")})
+            except SystemExit:
+                self._json({"available": False, "need_key": True})
+            except Exception as e:  # noqa: BLE001
+                self._json({"available": False, "error": _friendly(e)})
         elif path == "/api/status":
             from .platform_support import app_mode
             self._json({"has_key": bool(self._creds() or env_key()), "server_key": bool(env_key()),
@@ -734,7 +709,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against",
                                                    "refresh", "max_age_days", "pick", "mythic")}
-                if params["mode"] not in (None, "raid", "raidrot", "raidcd"):
+                if params["mode"] not in (None, "raid", "raidrot"):
                     params["mode"] = None
                 return self._json({"job": start_job(creds, params)})
             if path == "/api/refs/refresh":
@@ -800,6 +775,9 @@ def _free_port(preferred: int, host: str) -> int:
 
 def serve(port: int = 8765, open_browser: bool = True, local_only: bool = False, public: bool = False) -> None:
     public = public or os.environ.get("WCL_PUBLIC") == "1"
+    if public:  # публичный сервер ничего не пишет на диск — и игровые данные держит только в памяти
+        from . import game_data
+        game_data.SAVE["enabled"] = False
     if public:
         host, port = "0.0.0.0", int(os.environ.get("PORT", port))
         open_browser = False

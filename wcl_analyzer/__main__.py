@@ -20,46 +20,68 @@ def _client():
     return WCLClient(cid, secret, Cache(cache_path()))
 
 
+def _run_job(runner, params: dict, creds) -> dict:
+    """Командная строка запускает те же задачи, что и приложение (web.py), — один код на всё."""
+    job = {"id": "cli", "progress": 0.0, "log": [], "state": "running"}
+    runner(job, params, creds, lambda m: print(m, flush=True))
+    return job
+
+
+def _save_excel(job: dict, out: str | None, key: str = "xlsx") -> Path | None:
+    if not job.get(key):
+        return None
+    path = Path(out or job.get(key + "_name") or f"{key}.xlsx")
+    path.write_bytes(job[key])
+    return path.resolve()
+
+
+def _creds():
+    from .config import credentials
+    return credentials()
+
+
+def _print_brief(R: dict) -> None:
+    B = R.get("brief") or {}
+    print()
+    if isinstance(B, dict):
+        print(f"Надёжность сравнения: {B.get('reliability')}")
+        print("Что сделать в следующем бою:")
+        for i, act in enumerate(B.get("actions") or [], 1):
+            print(f"  {i}. {act['do']} — {act['gain']}")
+    else:
+        for line in B:
+            print(f"  • {line}")
+    T = R.get("talents") or {}
+    for line in T.get("summary") or ([T["error"]] if T.get("error") else []):
+        print(f"  • {line}")
+
+
 def cmd_demo(a):
-    from .compare import compare
-    from .demo import demo_logs
-    from .excel_report import write_compare_workbook
-    from .metrics import load_overrides
-    from .reference import build_reference
-    tops, me = demo_logs(n_top=a.top)
-    ref = build_reference(tops, load_overrides(a.meta), label=f"топ-{a.top}", me=me)
-    r = compare(me, ref)
-    out = write_compare_workbook(r, a.out)
-    _print_result(r, out)
+    from . import web
+    job = _run_job(web._run_player, {"demo": True}, None)
+    _print_brief(job["result"])
+    print(f"\nОтчёт Excel: {_save_excel(job, a.out)}")
 
 
 def cmd_compare(a):
-    from .collect import collect_reference, load_my_log
-    from .compare import compare
-    from .excel_report import write_compare_workbook
-    from .logs import PlayerLog  # noqa: F401
-    from .metrics import load_overrides
-    from .reference import build_reference
-    client = _client()
-    print("Загружаю ваш лог…")
-    me = load_my_log(client, a.url, a.fight, a.player)
-    print(f"  {me.name}: {me.cls} {me.spec}, {me.encounter_name} ({me.difficulty_name}), "
-          f"{me.duration:.0f} с, {me.dps:,.0f} DPS")
-    if a.against:
-        print("Загружаю лог для сравнения…")
-        other = load_my_log(client, a.against, a.against_fight, a.against_player)
-        tops, label = [other], f"Игрок {other.name}"
-    else:
-        n = REF_MODES[a.ref]
-        print(f"Собираю эталон {a.ref} ({me.cls} {me.spec}, {me.encounter_name})…")
-        tops, label = collect_reference(client, me.encounter_id, me.cls, me.spec, me.difficulty,
-                                        top_n=n, duration=me.duration, force=a.refresh)
-    ref = build_reference(tops, load_overrides(a.meta), label=label, me=me)
-    r = compare(me, ref)
-    out = a.out or f"compare_{_safe(me.name)}_{_safe(me.encounter_name)}.xlsx"
-    out = write_compare_workbook(r, out)
-    print(f"Запросов к API: {client.requests_made}, из кэша: {client.cache_hits}")
-    _print_result(r, out)
+    from . import web
+    from .collect import inspect_report
+    creds = _creds()
+    actor = None
+    if a.player:  # имя персонажа → номер игрока в отчёте
+        insp = inspect_report(web.CLIENT_FACTORY(creds), a.url, a.fight)
+        actor = next((p["id"] for p in insp["players"] if p["name"].lower() == a.player.lower()), None)
+        if actor is None:
+            raise ValueError(f"В бою нет игрока {a.player}")
+    job = _run_job(web._run_player, {"url": a.url, "fight": a.fight, "actor": actor, "ref": a.ref,
+                                     "refresh": a.refresh, "against": a.against, "mythic": not a.no_mythic}, creds)
+    R = job["result"]
+    _print_brief(R)
+    print(f"\nОтчёт Excel: {_save_excel(job, a.out)}")
+    if R.get("alt"):
+        print("Эпохальный топ:")
+        _print_brief(R["alt"])
+        print(f"Отчёт Excel (эпохальный топ): {_save_excel(job, None, 'xlsx_alt')}")
 
 
 def cmd_guide(a):
@@ -86,26 +108,33 @@ def cmd_bosses(a):
 
 
 def cmd_raid(a):
-    from .excel_raid import write_raid_workbook
-    from .raid import run_raid
-    if a.demo:
-        from .raid_demo import DEMO_URL, FakeRaidClient
-        client, url = FakeRaidClient(), DEMO_URL
-    else:
-        if not a.url:
-            raise ValueError("Укажите ссылку на отчёт или --demo")
-        client, url = _client(), a.url
-    R = run_raid(client, url, a.fight)
-    out = a.out or f"raid_{_safe(R['info']['boss'])}_pull{R['summary']['pull_n']}.xlsx"
-    write_raid_workbook(R, out)
+    from . import web
+    if not a.demo and not a.url:
+        raise ValueError("Укажите ссылку на отчёт или --demo")
+    job = _run_job(web._run_raid, {"mode": "raid", "demo": a.demo, "url": a.url, "fight": a.fight,
+                                   "mythic": not a.no_mythic}, None if a.demo else _creds())
+    R = job["result"]
     print()
-    dps = f"{R['summary']['raid_dps']:,}".replace(",", " ")
-    print(f"{R['info']['boss']} ({R['info']['difficulty']}), {'килл' if R['info']['kill'] else 'вайп'} за "
-          f"{R['info']['duration']}: {R['info']['size']} игроков, DPS рейда {dps}")
-    print("Что проверить:")
-    for i in R["issues"][:10]:
-        print(f"  {i['player']}: {i['text']}")
-    print(f"\nОтчёт Excel: {Path(out).resolve()}")
+    for line in R.get("brief") or []:
+        print(f"  • {line}")
+    print("План сейвов на следующий пулл:")
+    for r in (R.get("extras") or {}).get("plan") or []:
+        picks = "; ".join(f"{p['cd']} — {p['player']}" for p in r.get("picks") or []) or "нет свободного кулдауна"
+        print(f"  {r['time']} {r['mechanic']}: {picks}")
+    print(f"\nОтчёт Excel: {_save_excel(job, a.out)}")
+
+
+def cmd_raidrot(a):
+    from . import web
+    if not a.demo and not a.url:
+        raise ValueError("Укажите ссылку на отчёт или --demo")
+    job = _run_job(web._run_raid_rotation, {"mode": "raidrot", "demo": a.demo, "url": a.url, "fight": a.fight,
+                                            "ref": a.ref, "pick": a.pick, "mythic": not a.no_mythic},
+                   None if a.demo else _creds())
+    print()
+    for line in job["result"].get("brief") or []:
+        print(f"  • {line}")
+    print(f"\nОтчёт Excel: {_save_excel(job, a.out)}")
 
 
 def cmd_refresh(a):
@@ -135,16 +164,6 @@ def cmd_limit(a):
           f"сброс через {info['pointsResetIn']} с")
 
 
-def _print_result(r, out):
-    print()
-    print(f"Надёжность сравнения: {r.reliability['overall']}")
-    print("Топ-5 отличий:")
-    for i, f in enumerate(r.top5, 1):
-        imp = f"{f.impact:.1%} DPS" if f.impact else "влияние не оценено"
-        print(f"  {i}. [{f.section}] {f.title} — {imp}")
-    print(f"\nОтчёт Excel: {Path(out).resolve()}")
-
-
 def main(argv=None):
     p = argparse.ArgumentParser(prog="wcl_analyzer", description="Анализ ротации по Warcraft Logs")
     sub = p.add_subparsers(dest="cmd")
@@ -159,8 +178,6 @@ def main(argv=None):
 
     d = sub.add_parser("demo", help="прогон на синтетических данных, без ключа API")
     d.add_argument("--out", default="demo_report.xlsx")
-    d.add_argument("--top", type=int, default=25)
-    d.add_argument("--meta", default="spell_meta.json")
     d.set_defaults(func=cmd_demo)
 
     c = sub.add_parser("compare", help="сравнить ваш лог с топом спека")
@@ -169,10 +186,8 @@ def main(argv=None):
     c.add_argument("--player", help="имя персонажа (если в ссылке нет source=)")
     c.add_argument("--ref", choices=list(REF_MODES), default="top10", help="эталонная группа")
     c.add_argument("--against", help="сравнить с конкретным логом (ссылка) вместо топа")
-    c.add_argument("--against-fight")
-    c.add_argument("--against-player")
-    c.add_argument("--meta", default="spell_meta.json", help="переопределения категорий способностей")
     c.add_argument("--refresh", action="store_true", help="заново скачать рейтинг лучших логов")
+    c.add_argument("--no-mythic", action="store_true", help="не сравнивать дополнительно с эпохальным топом")
     c.add_argument("--out")
     c.set_defaults(func=cmd_compare)
 
@@ -194,8 +209,19 @@ def main(argv=None):
     rd.add_argument("url", nargs="?", help="ссылка на отчёт WCL")
     rd.add_argument("--fight", help="номер боя (по умолчанию — последний килл)")
     rd.add_argument("--demo", action="store_true", help="на демо-данных")
+    rd.add_argument("--no-mythic", action="store_true", help="без лучших эпохальных киллов")
     rd.add_argument("--out")
     rd.set_defaults(func=cmd_raid)
+
+    rr = sub.add_parser("raidrot", help="ротация всего рейда: каждый DPS против топа своего спека")
+    rr.add_argument("url", nargs="?", help="ссылка на отчёт WCL")
+    rr.add_argument("--fight")
+    rr.add_argument("--demo", action="store_true")
+    rr.add_argument("--ref", choices=list(REF_MODES), default="top10")
+    rr.add_argument("--pick", help="отбор: rank:50 или ilvl:75 — только игроки с процентилем не выше")
+    rr.add_argument("--no-mythic", action="store_true")
+    rr.add_argument("--out")
+    rr.set_defaults(func=cmd_raidrot)
 
     rf = sub.add_parser("refresh", help="обновить сохранённые эталоны (лучшие логи)")
     rf.add_argument("--all", action="store_true", help="все, а не только устаревшие")

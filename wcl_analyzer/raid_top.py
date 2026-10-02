@@ -18,26 +18,16 @@ MIN_SHARE = 0.4          # пик учитывается, если он есть
 PRESS_LEAD_S = 2.0       # время нажатия по умолчанию — за 2 с до начала пика
 PRESS_WINDOW_S = (1, 5)  # в плане кулдаун жмётся за 1–5 с до пика
 
-# Перезарядка рейдовых кулдаунов, с (приблизительно; если в логе видно чаще — берём из лога)
-RAID_CD_COOLDOWN = {
-    62618: 180, 64843: 180, 47536: 90, 246287: 90, 15286: 120, 265202: 720, 200183: 120, 421453: 240,
-    98008: 180, 108280: 180, 108281: 120, 114052: 180, 207399: 180,
-    740: 180, 33891: 180, 197721: 90, 391528: 120,
-    31821: 180, 216331: 120, 200652: 90, 498: 60,
-    115310: 180, 388615: 180, 322118: 120, 325197: 120,
-    363534: 240, 359816: 120, 374227: 120, 370960: 180, 370537: 90,
-    97462: 180, 51052: 120, 196718: 300, 64382: 180,
-}
 DEFAULT_CD_S = 180
 
 
 def light_raid(client, code: str, fid: int, report: dict | None = None, difficulty: int | None = None,
-               encounter_id: int | None = None, with_roster: bool = False, talent_data=None) -> dict:
-    """Облегчённый разбор боя: только урон по рейду и рейдовые кулдауны (один пакетный запрос).
-    Возвращает результат analyze_raid: пики урона, тяжёлые моменты, нажатия рейдовых кулдаунов."""
+               encounter_id: int | None = None) -> dict:
+    """Облегчённый разбор боя (лучшие киллы): только урон по рейду и рейдовые кулдауны, один пакетный запрос."""
     from .api import WCLError
-    from .raid import RAID_CD_IDS, analyze_raid
-    ids = ", ".join(str(x) for x in sorted(RAID_CD_IDS))
+    from . import game_data
+    from .raid import analyze_raid
+    ids = ", ".join(str(x) for x in sorted(game_data.cd_ids()))
     report = report or client.report(code)
     f = next(x for x in report["fights"] if int(x["id"]) == int(fid))
     if difficulty and int(f.get("difficulty") or 0) and int(f["difficulty"]) != int(difficulty):
@@ -48,11 +38,9 @@ def light_raid(client, code: str, fid: int, report: dict | None = None, difficul
     got = None
     if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
         try:  # урон по рейду и рейдовые кулдауны — одним запросом
-            specs = {"taken": {"data_type": "DamageTaken"},
-                     "casts": {"data_type": "Casts", "filter_expression": f"ability.id in ({ids})"}}
-            if with_roster:
-                specs["combatant"] = {"data_type": "CombatantInfo", "end": s + 1000}
-            got = client.events_multi(code, fid, s, e, specs)
+            got = client.events_multi(code, fid, s, e, {
+                "taken": {"data_type": "DamageTaken"},
+                "casts": {"data_type": "Casts", "filter_expression": f"ability.id in ({ids})"}})
         except WCLError:
             got = None
     if got is None:
@@ -61,22 +49,9 @@ def light_raid(client, code: str, fid: int, report: dict | None = None, difficul
         except (WCLError, TypeError):
             casts = client.events(code, fid, s, e, "Casts")
         got = {"taken": client.events(code, fid, s, e, "DamageTaken"), "casts": casts}
-        if with_roster:
-            try:
-                got["combatant"] = client.events(code, fid, s, s + 1000, "CombatantInfo")
-            except (WCLError, TypeError):
-                got["combatant"] = []
     raw = {"report": report, "fight": f, "details": client.player_details(code, fid),
-           "taken": got["taken"], "casts": got["casts"], "deaths": [], "pulls": [],
-           "combatant": got.get("combatant") or []}
-    R = analyze_raid(raw)
-    if with_roster:
-        from .raid_cds import roster_cds
-        try:
-            R["extras"]["roster_cds"] = roster_cds(raw, R, talent_data)
-        except Exception:  # noqa: BLE001 — без состава план строится по нажатым кулдаунам
-            R["extras"]["roster_cds"] = []
-    return R
+           "taken": got["taken"], "casts": got["casts"], "deaths": [], "pulls": []}
+    return analyze_raid(raw)
 
 
 def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KILLS, log=print,
@@ -110,36 +85,6 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
                 out.append(k)
                 log(f"  Килл {len(out)} из {n}: {k['guild']}, {_fmt_t(k['duration'])}")
     return out
-
-
-def raid_cd_peaks(client, code: str, fid: int, log=print, progress=lambda x: None,
-                  top_difficulty: int | None = None, talent_data=None, compare_top: bool = True) -> dict | None:
-    """Полученный урон и сейвы рейда: пики урона по рейду, какие рейдовые кулдауны были нажаты в эти моменты,
-    что в те же моменты жмут лучшие киллы босса, кулдауны состава и план на следующий пулл."""
-    from .config import DIFFICULTY_NAMES
-    report = client.report(code)
-    R = light_raid(client, code, fid, report, with_roster=True, talent_data=talent_data)
-    X = R["extras"]
-    if not X.get("damage_timeline"):
-        return None
-    vs = None
-    f = next(x for x in report["fights"] if int(x["id"]) == int(fid))
-    diff = int(top_difficulty or f.get("difficulty") or 0)  # по умолчанию — сложность вашего боя
-    if compare_top and hasattr(client, "fight_rankings") and f.get("encounterID"):
-        try:
-            kills = fetch_top_kills(client, int(f["encounterID"]), diff, log=log, progress=progress)
-            vs = compare_with_top(R, kills)
-            if vs:
-                vs["difficulty"] = DIFFICULTY_NAMES.get(diff, "")
-        except Exception as e:  # noqa: BLE001 — сравнение с топом не обязательно
-            log(f"Сравнение с лучшими киллами недоступно: {e}")
-    plan = vs["plan"] if vs else make_plan(X, {}, [], {})
-    I = R["info"]
-    return {"info": {**I, "duration_s": I["duration_s"]},
-            "extras": {"damage_timeline": X.get("damage_timeline"), "heaviest": X.get("heaviest") or [],
-                       "raid_cds": X.get("raid_cds") or [], "vs_top": vs, "roster_cds": X.get("roster_cds") or [],
-                       "plan": plan},
-            "brief": brief_lines(vs) + _roster_lines(X.get("roster_cds") or [], plan)}
 
 
 def _roster_lines(roster: list[dict], plan: list[dict]) -> list[str]:
@@ -223,7 +168,7 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
             "marks": sorted(marks, key=lambda m: m["t"])}
 
 
-from .raid_cds import POWER  # noqa: E402
+from . import game_data  # noqa: E402
 
 HEAVY_PEAK = 1.25    # пик тяжелее медианы пиков в 1,25 раза — на него два кулдауна
 DANGER_PEAK = 1.6    # в 1,6 раза — три
@@ -252,7 +197,7 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
         for key, ts in uses.items():
             ts.sort()
             gaps = [b - a for a, b in zip(ts, ts[1:])]
-            known = RAID_CD_COOLDOWN.get(key[1])
+            known = game_data.cooldown(key[1])
             seen = min(gaps) if gaps else None
             cds[key]["cd"] = min(v for v in (known, seen) if v) if (known or seen) else DEFAULT_CD_S
     events = [{"t": s.get("peak_t", s["t"]), "mechanic": f"«{s['ability']}» №{s.get('k', 1)}", "key": (s.get("ability_id"), s.get("k", 1)),
@@ -277,7 +222,7 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
             best = None
             # Сначала кулдаун, который здесь жмёт топ; затем — реже назначенный и более сильный
             order = sorted(cds, key=lambda k: (pref.index(k[1]) if k[1] in pref else 99, len(assigned[k]),
-                                               -POWER.get(k[1], 2), cds[k]["cd"]))
+                                               -game_data.power(k[1]), cds[k]["cd"]))
             for k in order:
                 if any(k == p[0] for p in picks) or cds[k]["player"] in players:
                     continue
@@ -316,7 +261,7 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
         spare = [k for k in cds if k not in row["_keys"]
                  and all(abs(at - t) >= cds[k]["cd"] for t in assigned[k])]
         busy = {cds[k]["player"] for k in row["_keys"]}  # сначала — другие игроки, не те, кто уже жмёт
-        spare.sort(key=lambda k: (cds[k]["player"] in busy, -POWER.get(k[1], 2), cds[k]["cd"]))
+        spare.sort(key=lambda k: (cds[k]["player"] in busy, -game_data.power(k[1]), cds[k]["cd"]))
         seen, out = set(), []
         for k in spare:
             if (cds[k]["player"], cds[k]["name"]) in seen:

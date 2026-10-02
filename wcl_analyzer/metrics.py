@@ -12,7 +12,9 @@ import numpy as np
 
 from .logs import PlayerLog, merge_intervals
 
-LUST_IDS = {2825, 32182, 80353, 264667, 390386, 381301, 444257}
+from . import game_data as _gd  # noqa: E402
+
+LUST_IDS = _gd.LazyIds(_gd.lust_ids)  # способности жажды крови — из таблицы игровых данных
 LUST_RE = re.compile(r"bloodlust|heroism|time warp|primal rage|fury of the aspects|drums|"
                      r"жажда крови|героизм|искажение времени", re.I)
 POTION_RE = re.compile(r"potion|зелье", re.I)

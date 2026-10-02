@@ -381,29 +381,7 @@ def test_pick_by_percentile():
     job = {"id": "t", "progress": 0.0, "log": []}
     web._run_player(job, {"demo": True}, None, lambda m: None)
     import json
-    assert "raid_peaks" not in job["result"], "полученный урон и сейвы рейда теперь — отдельный режим"
-    # отдельный режим «Полученный урон и сейвы рейда»: состав, план с перезарядкой, сравнение с топом
-    jc = {"id": "cd", "progress": 0.0, "log": []}
-    web._run_raid_cd(jc, {"mode": "raidcd", "demo": True}, None, lambda m: None)
-    rc = jc["result"]
-    X = rc["extras"]
-    assert rc["mode"] == "raidcd" and X["damage_timeline"] and X["heaviest"] and X["vs_top"]["rows"]
-    roster = X["roster_cds"]
-    assert any(c["used"] for c in roster) and any(not c["used"] for c in roster), "в составе нет ненажатых кулдаунов"
-    plan = X["plan"]
-    assert plan and all(r["picks"] for r in plan), "пик без кулдауна, хотя в составе их хватает"
-    # перезарядка: один и тот же кулдаун игрока не назначается чаще, чем он откатывается
-    by = {}
-    for r in plan:
-        for p in r["picks"]:
-            by.setdefault((p["player"], p["cd"]), []).append(r["t"])
-    cdmap = {(c["player"], c["name"]): c["cd"] for c in roster}
-    for k, ts in by.items():
-        ts.sort()
-        assert all(b - a >= cdmap[k] - 0.01 for a, b in zip(ts, ts[1:])), (k, ts)
-    assert plan[0]["picks"][0]["like_top"], "на пик, где топ жмёт гимн, план должен ставить гимн"
-    assert jc.get("xlsx")
-    json.dumps(rc)
+    assert "raid_peaks" not in job["result"], "полученный урон и сейвы — вкладка разбора рейда, не разбора игрока"
     # сравнение талантов с топом
     T = job["result"]["talents"]
     kinds = {r["kind"] for r in T["rows"]}
@@ -569,8 +547,31 @@ def test_talent_data_without_ids():
     print("OK справочник талантов без номеров у части узлов: без ошибки 'id', таланты состава учтены")
 
 
+def test_single_sources():
+    """Одна таблица игровых данных и один словарь названий — без копий в разных местах."""
+    import json as _json
+    from wcl_analyzer import game_data, web
+    from wcl_analyzer.names_ru import CLASSES
+    d = _json.loads(game_data.BUNDLED.read_text(encoding="utf-8"))
+    assert game_data._valid(d)
+    seen = set()
+    for c in d["raid_cds"]:
+        assert c["class"] in CLASSES and c["cd"] > 0 and 1 <= c["power"] <= 3 and c["name"] and c["en"], c
+        key = (c["class"], c.get("spec"), c["id"])
+        assert key not in seen, key
+        seen.add(key)
+        if c.get("choice_with"):
+            assert any(x["id"] == c["choice_with"] for x in d["raid_cds"]), c
+    assert 64843 in game_data.cd_ids() and game_data.cooldown(64843) == 180 and 2825 in game_data.lust_ids()
+    assert game_data.cd_name_re().search("Healing Tide Totem") and not game_data.cd_name_re().search("Shadow Word: Pain")
+    page = web._page().decode("utf-8")
+    assert "/*CLASS_RU*/" not in page and "рыцарь смерти" in page and '"Mage|Frost": "Лёд"' in page
+    print("OK один источник: таблица игровых данных и словарь названий")
+
+
 if __name__ == "__main__":
     test_batched_fetch()
+    test_single_sources()
     test_talent_data_without_ids()
     test_two_references()
     test_same_difficulty()

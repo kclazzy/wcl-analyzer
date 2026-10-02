@@ -8,6 +8,7 @@ a = Analysis(
     pathex=[ROOT],
     datas=[
         (os.path.join(ROOT, "wcl_analyzer", "web"), os.path.join("wcl_analyzer", "web")),
+        (os.path.join(ROOT, "wcl_analyzer", "data"), os.path.join("wcl_analyzer", "data")),
         (os.path.join(ROOT, "spell_meta.example.json"), "."),
     ],
     hiddenimports=["segno", "openpyxl", "numpy"],

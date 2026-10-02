@@ -196,6 +196,9 @@ dialog .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
 
 .pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .pill.plain{font-weight:500}
+.pill.limit{cursor:default;font-variant-numeric:tabular-nums;white-space:nowrap}
+header h1{white-space:nowrap}.pill{white-space:nowrap}.pill.limit i{background:var(--good)}
+.pill.limit.mid i{background:var(--warn)}.pill.limit.high i{background:var(--bad)}
 .refs{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:22px 28px;margin-top:18px}
 .refs h2{font-size:18px;margin:0 0 4px}
 .refs .sub{color:var(--muted);font-size:14px;margin:0;max-width:70ch}
@@ -250,6 +253,7 @@ dialog label.check input{width:auto;margin:0}
     <h1>Разбор лога <span>Warcraft Logs</span></h1>
     <div class="pills">
       <button class="pill plain" id="phonePill" type="button" hidden>На другом устройстве</button>
+      <span class="pill plain limit" id="limitPill" hidden title="Часовой лимит запросов Warcraft Logs для вашего ключа: сколько очков потрачено в этом часе и когда счётчик обнулится"><i></i><span></span></span>
       <button class="pill" id="keyPill" type="button"><i></i><span>Проверяю ключ API…</span></button>
     </div>
   </header>
@@ -467,8 +471,38 @@ async function refreshKey(){
   $("#keyForget").hidden = !KEY;
   const p = $("#keyPill"); p.classList.toggle("ok", has_key);
   p.querySelector("span").textContent = has_key ? "Ключ API подключён" : "Подключить ключ API";
+  refreshLimit();
   return has_key;
 }
+/* Лимит Warcraft Logs в правом углу: потрачено из разрешённого в час и таймер сброса.
+   Сервер спрашивается раз в минуту (и чаще во время разбора); между запросами таймер тикает сам. */
+let LIMIT = null, limitTimer = null;
+async function refreshLimit(){
+  const pill = $("#limitPill");
+  if (!STATUS || !STATUS.has_key) { pill.hidden = true; return; }
+  try {
+    const r = await api("/api/limit", null, 20);
+    if (!r.available) { pill.hidden = true; return; }
+    LIMIT = {limit: r.limit, spent: r.spent, resetAt: Date.now() + (r.reset_in || 0) * 1000};
+    drawLimit();
+  } catch(e) { /* лимит — подсказка, ошибка не мешает работе */ }
+}
+function drawLimit(){
+  const pill = $("#limitPill");
+  if (!LIMIT || !LIMIT.limit) { pill.hidden = true; return; }
+  const left = Math.max(0, (LIMIT.resetAt - Date.now()) / 1000);
+  const share = LIMIT.spent / LIMIT.limit;
+  pill.hidden = false;
+  pill.classList.toggle("mid", share >= 0.6 && share < 0.9);
+  pill.classList.toggle("high", share >= 0.9);
+  const reset = left < 60 ? "< 1 мин" : `${Math.ceil(left / 60)} мин`;
+  pill.querySelector("span").textContent = `Лимит WCL ${num(LIMIT.spent)} / ${num(LIMIT.limit)} · сброс ${reset}`;
+  if (left <= 0) refreshLimit();
+}
+setInterval(drawLimit, 15000);
+setInterval(() => { if (!document.hidden) refreshLimit(); }, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshLimit(); });
+
 $("#keyPill").onclick = () => { if (KEY) $("#cid").value = KEY.id; $("#keyDlg").showModal(); };
 $("#keyForget").onclick = async () => { KEY = null; store.del("wclKey"); $("#cid").value = ""; $("#keyDlg").close(); await refreshKey(); };
 $("#keySave").onclick = async () => {
@@ -566,7 +600,7 @@ async function run(params, path="/api/analyze"){
   params = {...params, max_age_days: prefs().max_age_days};
   try {
     const {job} = await api(path, params);
-    let since = 0;
+    let since = 0, limitTick = 0;
     while (true){
       await new Promise(r => setTimeout(r, 700));
       const r = await fetch("/api/job/"+job, {headers:{"X-Log-Since":since}}); const s = await r.json();
@@ -575,7 +609,8 @@ async function run(params, path="/api/analyze"){
       if (s.log.length){ $("#log").textContent += s.log.join("\n")+"\n"; $("#log").scrollTop = 1e9; }
       $("#barFill").style.width = Math.round(s.progress*100)+"%";
       updateEta(s);
-      if (s.state === "done"){ await onDone(job, s.result); break; }
+      if (++limitTick % 28 === 0) refreshLimit();  // во время разбора — примерно раз в 20 с
+      if (s.state === "done"){ refreshLimit(); await onDone(job, s.result); break; }
       if (s.state === "error"){ showErr(s.error); if (s.need_key) $("#keyDlg").showModal(); break; }
     }
   } catch(e){ showErr(e.message); }
@@ -636,8 +671,8 @@ async function trimHistory(){
 
 const REL_RU = {HIGH:"высокая", MEDIUM:"средняя", LOW:"низкая"};
 const IMP_RU = {HIGH:"высокое", MEDIUM:"среднее", LOW:"низкое", Unknown:"не оценено"};
-const CLASS_RU = {"DeathKnight": "рыцарь смерти", "DemonHunter": "охотник на демонов", "Druid": "друид", "Evoker": "пробудитель", "Hunter": "охотник", "Mage": "маг", "Monk": "монах", "Paladin": "паладин", "Priest": "жрец", "Rogue": "разбойник", "Shaman": "шаман", "Warlock": "чернокнижник", "Warrior": "воин"};
-const SPEC_RU = {"DeathKnight|Blood": "Кровь", "DeathKnight|Frost": "Лёд", "DeathKnight|Unholy": "Нечестивость", "DemonHunter|Havoc": "Истребление", "DemonHunter|Vengeance": "Месть", "Druid|Balance": "Баланс", "Druid|Feral": "Сила зверя", "Druid|Guardian": "Страж", "Druid|Restoration": "Исцеление", "Evoker|Devastation": "Опустошение", "Evoker|Preservation": "Сохранение", "Evoker|Augmentation": "Насыщение", "Hunter|BeastMastery": "Повелитель зверей", "Hunter|Marksmanship": "Стрельба", "Hunter|Survival": "Выживание", "Mage|Arcane": "Тайная магия", "Mage|Fire": "Огонь", "Mage|Frost": "Лёд", "Monk|Brewmaster": "Хмелевар", "Monk|Mistweaver": "Ткач туманов", "Monk|Windwalker": "Танцующий с ветром", "Paladin|Holy": "Свет", "Paladin|Protection": "Защита", "Paladin|Retribution": "Воздаяние", "Priest|Discipline": "Послушание", "Priest|Holy": "Свет", "Priest|Shadow": "Тьма", "Rogue|Assassination": "Ликвидация", "Rogue|Outlaw": "Головорез", "Rogue|Subtlety": "Скрытность", "Shaman|Elemental": "Стихии", "Shaman|Enhancement": "Совершенствование", "Shaman|Restoration": "Исцеление", "Warlock|Affliction": "Колдовство", "Warlock|Demonology": "Демонология", "Warlock|Destruction": "Разрушение", "Warrior|Arms": "Оружие", "Warrior|Fury": "Неистовство", "Warrior|Protection": "Защита"};
+const CLASS_RU = /*CLASS_RU*/{};
+const SPEC_RU = /*SPEC_RU*/{};  /* оба словаря подставляет сервер из names_ru.py — один источник */
 /* «Лёд (маг)» — для показа; в запросах к WCL остаются английские названия */
 function who(cls, spec){
   const k = s => String(s||"").replace(/[ -]/g, "");
@@ -834,33 +869,14 @@ function planTable(plan){
   }));
 }
 
-/* ---------- «Полученный урон и сейвы рейда» отдельным разбором (кнопки больше нет; для разборов из истории) ---------- */
+/* Разборы «Полученный урон и сейвы» из старых версий (отдельного режима больше нет) — открываются упрощённо */
 function renderRaidCd(R){
   charts.splice(0).forEach(c => c.destroy());
-  const pair = R.alt ? {main:R, alt:{...R.alt, info:{...R.info, ...R.alt.info}, excel:R.excel, _main:R, mode:"raidcd"}} : R._main ? {main:R._main, alt:R} : null;
-  const I = R.info, el = $("#result");
-  const V = (R.extras||{}).vs_top;
-  el.innerHTML = `
-    ${I.demo?'<div class="demo-flag">Демо: синтетический рейд</div>':""}
-    <div class="hero">
-      <div>
-        ${pair ? `<div class="diffsw" role="group" aria-label="С какими лучшими киллами сравнивать">
-          <button type="button" data-sw="main" aria-pressed="${R===pair.main}">Топ: ${esc(((pair.main.extras||{}).vs_top||{}).difficulty || pair.main.info.difficulty)}</button>
-          <button type="button" data-sw="alt" aria-pressed="${R===pair.alt}">Топ: эпохальный</button></div>` : ""}
-        <div class="who"><strong>Полученный урон и сейвы рейда: ${esc(I.boss||"")}, ${esc(I.difficulty||"")}</strong>
-          ${I.kill?"Килл":"Вайп"} за ${esc(I.duration||"")}. ${V ? `Сравнение с лучшими киллами ${esc(V.difficulty?"(" + V.difficulty + ")":"")}: ${V.n}.` : "Лучшие киллы для сравнения не найдены."}</div>
-        <div class="dps">${num(((R.extras||{}).roster_cds||[]).length)} <small>рейдовых кулдаунов в составе</small></div>
-      </div>
-      <div class="side">
-        <a class="btn you" href="${R.excel}" download>Скачать Excel</a>
-        ${I.url?`<a href="${esc(I.url)}" target="_blank" rel="noopener" style="color:#B8C2D9;font-size:14px">Открыть бой на WCL</a>`:""}
-      </div>
-    </div>
-    <div id="rcdBody"></div>`;
+  const el = $("#result"), I = R.info || {};
+  el.innerHTML = `<div class="box"><h3>Полученный урон и сейвы: ${esc(I.boss||"")}, ${esc(I.difficulty||"")}</h3>
+    <p class="sub">Разбор из прежней версии. Теперь это вкладка «Полученный урон и сейвы» в разборе «Весь рейд».</p></div><div id="rcdBody"></div>`;
   el.hidden = false;
-  el.querySelectorAll(".diffsw button").forEach(b => b.onclick = () => renderRaidCd(b.dataset.sw === "alt" ? pair.alt : pair.main));
   renderRaidPeaks(R, $("#rcdBody"));
-  el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
 }
 
 /* ---------- режим «Весь рейд» ---------- */

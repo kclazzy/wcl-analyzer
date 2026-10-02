@@ -84,6 +84,15 @@ def main():
     assert anna.req("POST", "/api/key", {"client_id": "good-anna", "client_secret": "s1"})[0] == 200
     anna.key, boris.key = ("good-anna", "s1"), ("good-boris", "s2")
 
+    # Счётчик лимита в шапке: без rate_limit у клиента — «нет данных», с ним — потрачено, лимит, сброс
+    st, s = anna.req("GET", "/api/limit")
+    assert st == 200 and s["available"] is False, s
+    from test_pipeline import FakeClient as _FC
+    _FC.rate_limit = lambda self: {"limitPerHour": 3600, "pointsSpentThisHour": 120.5, "pointsResetIn": 900}
+    st, s = anna.req("GET", "/api/limit")
+    assert st == 200 and s["available"] and s["limit"] == 3600 and s["spent"] == 120.5 and s["reset_in"] == 900, s
+    del _FC.rate_limit
+
     # Анна сравнивает лог; Борис параллельно разбирает рейд
     st, s = anna.req("POST", "/api/analyze", {"url": url, "fight": "1", "actor": "7", "ref": "top10",
                                               "max_age_days": 7})

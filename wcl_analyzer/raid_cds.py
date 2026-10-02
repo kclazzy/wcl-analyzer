@@ -10,38 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-# (класс, спек или None — любой спек): [(id способности, название, перезарядка с, основной)]
-SPEC_CDS = {
-    ("Priest", "Holy"): [(64843, "Божественный гимн", 180, True), (265202, "Слово Света: Спасение", 720, False),
-                         (200183, "Апофеоз", 120, False)],
-    ("Priest", "Discipline"): [(62618, "Слово силы: Барьер", 180, True), (47536, "Вознесение", 90, True),
-                               (246287, "Евангелизм", 90, False), (421453, "Окончательное покаяние", 240, False)],
-    ("Priest", "Shadow"): [(15286, "Вампирские объятия", 120, True)],
-    ("Shaman", "Restoration"): [(98008, "Тотем духовной связи", 180, True), (108280, "Тотем целительного потока", 180, True),
-                                (114052, "Перерождение", 180, False), (207399, "Тотем защиты предков", 300, False)],
-    ("Shaman", "Elemental"): [(108281, "Наставления предков", 120, False)],
-    ("Shaman", "Enhancement"): [(108281, "Наставления предков", 120, False)],
-    ("Druid", "Restoration"): [(740, "Спокойствие", 180, True), (33891, "Воплощение: Древо Жизни", 180, False),
-                               (197721, "Расцвет", 90, False), (391528, "Природная мощь", 120, False)],
-    ("Paladin", "Holy"): [(31821, "Владение аурами", 180, True), (216331, "Воин Света", 120, False),
-                          (200652, "Избавление Тира", 90, False)],
-    ("Monk", "Mistweaver"): [(115310, "Восстановление сил", 180, True), (388615, "Возрождение", 180, False),
-                             (322118, "Призыв Юй-лун", 120, False), (325197, "Призыв Цзи-Жэнь", 120, False)],
-    ("Evoker", "Preservation"): [(363534, "Перемотка", 240, True), (359816, "Полёт мечты", 120, False),
-                                 (370960, "Изумрудное единение", 180, False), (370537, "Стазис", 90, False)],
-    ("Evoker", None): [(374227, "Зефир", 120, True)],
-    ("Warrior", None): [(97462, "Ободряющий клич", 180, True)],
-    ("DeathKnight", None): [(51052, "Зона антимагии", 120, True)],
-    ("DemonHunter", None): [(196718, "Мрак", 300, True)],
-}
-# Сила кулдауна для плана: 3 — большой лечебный/защитный кулдаун на весь рейд,
-# 2 — средний, 1 — небольшой. На пик ставится самый сильный свободный.
-POWER = {64843: 3, 62618: 3, 98008: 3, 108280: 3, 740: 3, 31821: 3, 115310: 3, 388615: 3, 363534: 3,
-         97462: 2, 51052: 2, 196718: 2, 15286: 2, 47536: 2, 246287: 2, 114052: 2, 33891: 2, 391528: 2,
-         359816: 2, 370960: 2, 322118: 2, 325197: 2, 216331: 2, 200652: 2, 265202: 2, 200183: 2, 421453: 2,
-         207399: 2, 374227: 1, 108281: 1, 197721: 1, 370537: 1}
-# Узлы выбора: если взят второй вариант, первого нет
-CHOICE_PAIRS = {115310: 388615, 388615: 115310}
+from . import game_data
 
 
 def _norm(s) -> str:
@@ -49,12 +18,11 @@ def _norm(s) -> str:
 
 
 def candidates(cls: str, spec: str) -> list[tuple]:
+    """Рейдовые кулдауны спека из таблицы игровых данных: [(id, название, откат, основной)]."""
     c, s = _norm(cls), _norm(spec)
-    out = []
-    for (k_cls, k_spec), items in SPEC_CDS.items():
-        if _norm(k_cls) == c and (k_spec is None or _norm(k_spec) == s):
-            out += items
-    return out
+    return [(int(x["id"]), x["name"], float(x["cd"]), bool(x.get("core")))
+            for x in game_data.raid_cds()
+            if _norm(x.get("class")) == c and (not x.get("spec") or _norm(x["spec"]) == s)]
 
 
 def _players(details: dict) -> list[dict]:
@@ -130,7 +98,8 @@ def roster_cds(raw: dict, R: dict, talent_data=None) -> list[dict]:
             elif tk is not None:
                 source = "базовая способность спека, в бою не нажимал"
             elif core:
-                if CHOICE_PAIRS.get(sid) and pressed.get((p["id"], CHOICE_PAIRS[sid])):
+                other = next((x.get("choice_with") for x in game_data.raid_cds() if int(x["id"]) == sid), None)
+                if other and pressed.get((p["id"], int(other))):
                     continue  # нажимал второй вариант узла выбора
                 source = "обычно есть у спека, в бою не нажимал"
             else:

@@ -27,23 +27,11 @@ ADDS_LOW = 0.4               # доля кастов по аддам ниже 40
 
 # Рейдовые кулдауны (лечение и снижение урона по рейду), актуальные для Midnight/The War Within.
 # Список можно дополнить: всё, что лекарь жмёт редко (раз в 1,5+ минуты), тоже определяется по логу.
-RAID_CD_IDS = {
-    62618, 64843, 47536, 246287, 15286, 265202, 200183, 421453,           # жрец
-    98008, 108280, 108281, 114052, 207399,                                  # шаман
-    740, 33891, 197721, 391528,                                             # друид
-    31821, 216331, 200652, 498,                                             # паладин (Aura Mastery и др.)
-    115310, 388615, 322118, 325197,                                         # монах
-    363534, 359816, 374227, 370960, 370537,                                 # пробудитель
-    97462, 51052, 196718, 64382,                                            # воин, ДК, ДХ
-}
-RAID_CD_RE = re.compile(
-    r"power word: barrier|divine hymn|rapture|evangelism|vampiric embrace|holy word: salvation|"
-    r"spirit link totem|healing tide totem|ancestral guidance|tranquility|aura mastery|revival|restoral|"
-    r"invoke yu'lon|invoke chi-ji|rewind|dream flight|zephyr|emerald communion|rallying cry|"
-    r"anti-magic zone|darkness|"
-    r"слово силы: барьер|божественный гимн|вознесение|вампирские объятия|тотем духовной связи|"
-    r"тотем целительного потока|спокойствие|мастер аур|возрождение|перемотка|ободряющий клич|"
-    r"зона антимагии|тьма$", re.I)
+# Рейдовые кулдауны — из единой таблицы игровых данных (wcl_analyzer/data/game_data.json)
+from . import game_data as _gd  # noqa: E402
+
+RAID_CD_IDS = _gd.LazyIds(_gd.cd_ids)
+RAID_CD_RE = _gd.LazyRe(_gd.cd_name_re)
 
 ROLE_RU = {"tank": "Танк", "healer": "Лекарь", "dps": "DPS"}
 ROLE_ORDER = {"tank": 0, "healer": 1, "dps": 2}
@@ -151,22 +139,9 @@ def _ilvl(p: dict) -> float | None:
 
 
 def _parse_ranks(r) -> dict:
-    out: dict = {}
-    if not r:
-        return out
-    data = r.get("data", r) if isinstance(r, dict) else r
-    if isinstance(data, dict):
-        data = [data]
-    for fight in data or []:
-        for role in (fight.get("roles") or {}).values():
-            for c in (role or {}).get("characters") or []:
-                if c.get("rankPercent") is None:
-                    continue
-                if c.get("name"):  # id в рейтингах — номер персонажа на сайте, а не в отчёте
-                    out[c["name"]] = float(c["rankPercent"])
-                if c.get("id") is not None:
-                    out.setdefault(int(c["id"]), float(c["rankPercent"]))
-    return out
+    """Процентиль игроков боя по имени (и запасной ключ — номер). Разбор — общий с поиском боя."""
+    from .collect import player_percentiles
+    return {k: v["rank"] for k, v in player_percentiles(r).items()}
 
 
 def _occurrences(times: list[float], gap: float = 3.0) -> list[float]:

@@ -235,14 +235,6 @@ def compare_talents(me, tops: list, data: list | None = None, log=print) -> dict
             "hero_same_n": len(same_hero)}
 
 
-def _w(k: int, one: str, few: str, many: str) -> str:
-    k = abs(k) % 100
-    if 10 < k < 20:
-        return many
-    k %= 10
-    return one if k == 1 else few if 1 < k < 5 else many
-
-
 def demo_tree_data() -> list:
     """Справочник для демо: узлы 5000–5047 демо-логов — дерево класса, спека и две героические ветки."""
     names = ["Ледяные копья", "Ледяной покров", "Замораживание", "Холодная кровь", "Ледяная буря",

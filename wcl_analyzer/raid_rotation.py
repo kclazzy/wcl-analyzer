@@ -65,6 +65,7 @@ def analyze_players(players: list, refs_for, overrides: dict | None = None, log=
         visible = [f for f in r.findings if not f.noise and not f.context
                    and (f.impact is None or f.impact >= 0.01)]
         rows.append({**row, "dps": me.dps, "ref_dps": ref.agg["dps"]["median"], "gap": b["gap"],
+                     "item_level": me.ilvl, "ref_item_level": (ref.agg.get("ilvl") or {}).get("median"),
                      "ref_label": ref.label, "ref_n": ref.n, "reliability": b["reliability"],
                      "actions": b["actions"], "context": b["context"], "deaths": b["deaths"],
                      "explained": b["explained"],

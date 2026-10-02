@@ -940,6 +940,13 @@ function raidDamageChart(R){
               y:{beginAtZero:true, max:maxD*(((X.vs_top||{}).marks||[]).length ? 1.42 : 1.22), ticks:{callback:v=>v>=1e6?(v/1e6).toFixed(0)+" млн":num(v)}, title:{display:true,text:"урон за 5 с"}}}}});
 }
 
+/* Уровень предметов игрока и медиана у топа его спека; красным — ниже топа на 5+ */
+function ilvlCell(p){
+  if (p.item_level == null) return "—";
+  const d = p.ref_item_level != null ? p.item_level - p.ref_item_level : null;
+  return `<span class="${d!=null && d <= -5 ? "worse" : ""}">${num(p.item_level,1)}</span>`
+    + (p.ref_item_level != null ? `<div style="font-size:12.5px;color:var(--muted)">топ ${num(p.ref_item_level,1)}</div>` : "");
+}
 function renderRaidRot(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, P = R.players.filter(p=>!p.error).sort((a,b)=>a.gap-b.gap), E = R.players.filter(p=>p.error);
@@ -966,14 +973,14 @@ function renderRaidRot(R){
       <div class="chart" style="height:${70+P.length*30}px"><canvas id="cRot"></canvas></div>
     </div>
     ${box("Каждый игрок", "Главное действие — первое из трёх в его выжимке. «Подробно» открывает полный разбор игрока: выжимку, графики и все отличия.",
-      table(["Игрок","Проц.","С учётом экип.","DPS","К топу","К эпох. топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
+      table(["Игрок","Ур. предметов","Проц.","С учётом экип.","DPS","К топу","К эпох. топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
         `<b>${esc(p.name)}</b><div style="font-size:12.5px;color:var(--muted)">${esc(who(p.cls, p.spec))}</div>`,
-        pctChip(p.rank), pctChip(p.ilvl), num(p.dps), `<span class="${p.gap<-0.1?"worse":p.gap>=0?"better":""}">${sgn(p.gap, v=>pct(v))}</span>`,
+        ilvlCell(p), pctChip(p.rank), pctChip(p.ilvl), num(p.dps), `<span class="${p.gap<-0.1?"worse":p.gap>=0?"better":""}">${sgn(p.gap, v=>pct(v))}</span>`,
         p.mythic_gap==null ? "—" : `<span title="Эпохальный топ: ${num(p.mythic_dps)} DPS (медиана по рейтингу)">${sgn(p.mythic_gap, v=>pct(v))}</span>`,
         `<span class="tag ${p.reliability}">${esc(REL_RU[p.reliability]||p.reliability)}</span>`,
         esc(p.actions[0] ? p.actions[0].do : "существенных отличий нет"),
         p.actions[0] ? `<span class="imp ${p.actions[0].level}">${esc(p.actions[0].gain)}</span>` : "",
-        `<button class="mini" type="button" data-i="${i}">Подробно</button>`]), {num:[3,4,5]}))}
+        `<button class="mini" type="button" data-i="${i}">Подробно</button>`]), {num:[1,4,5,6]}))}
     <details class="more"><summary>Все действия по каждому игроку</summary>
       ${P.map(p=>box(`${p.name} — ${who(p.cls, p.spec)}`, `${num(p.dps)} DPS, ${sgn(p.gap, v=>pct(v))} к медиане топа`,
         p.actions.length ? p.actions.map((a,i)=>`<div class="act"><div class="n">${i+1}</div><div><div class="do">${esc(a.do)}</div><div class="why">${esc(a.title)}</div></div><span class="imp ${a.level}">${esc(a.gain)}</span></div>`).join("")
@@ -985,10 +992,12 @@ function renderRaidRot(R){
     const p = P[+b.dataset.i];
     render({...p.detail, excel: R.excel, _back: R});
   });
-  chart("cRot", {type:"bar", data:{labels:P.map(p=>p.name), datasets:[{data:P.map(p=>p.gap),
+  chart("cRot", {type:"bar", data:{labels:P.map(p=>p.item_level!=null ? `${p.name} · ${Math.round(p.item_level)}` : p.name), datasets:[{data:P.map(p=>p.gap),
       backgroundColor:P.map(p=>p.gap<-0.1?C.bad:p.gap>=0?C.top:C.muted), borderRadius:3}]},
     options:{indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false},
-      tooltip:{callbacks:{label:c=>{const p=P[c.dataIndex]; return [`${sgn(p.gap, v=>pct(v))} к медиане топа (${num(p.dps)} против ${num(p.ref_dps)})`, p.actions[0]?"Главное: "+p.actions[0].do:""];}}}},
+      tooltip:{callbacks:{label:c=>{const p=P[c.dataIndex]; return [`${sgn(p.gap, v=>pct(v))} к медиане топа (${num(p.dps)} против ${num(p.ref_dps)})`,
+          p.item_level!=null ? `Уровень предметов: ${num(p.item_level,1)}${p.ref_item_level!=null?` (топ ${num(p.ref_item_level,1)})`:""}` : "",
+          p.actions[0]?"Главное: "+p.actions[0].do:""].filter(Boolean);}}}},
       scales:{x:{suggestedMax:0.05, ticks:{callback:v=>Math.round(v*100)+"%"}}}}});
   el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
 }

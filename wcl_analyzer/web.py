@@ -337,7 +337,7 @@ def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:
     else:
         R = run_raid_rotation(_client(creds, job, log), params["url"], params.get("fight"), top_n=n, log=log,
                               progress=progress, overrides=load_overrides(_spell_meta_path()),
-                              max_age_s=_max_age_s(params), save=not SERVER["public"])
+                              max_age_s=_max_age_s(params), save=not SERVER["public"], pick=params.get("pick"))
     I = R["info"]
     _excel_bytes(job, f"Ротация_рейда_{I['boss']}", write_raid_rotation_workbook, R)
     players = []
@@ -348,7 +348,8 @@ def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:
             row["detail"] = to_json(r["result"], job["id"])
         players.append(row)
     job["result"] = {"mode": "raidrot", "info": I, "brief": R["brief"], "players": players,
-                     "skipped": [p.get("name") for p in R["skipped"]],
+                     "skipped": [p.get("name") for p in R["skipped"]], "not_picked": R.get("not_picked", []),
+                     "pick": R.get("pick"),
                      "excel": f"/api/report/{job['id']}", "source_url": params.get("url")}
     log("Готово.")
 
@@ -627,7 +628,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against",
-                                                   "refresh", "max_age_days")}
+                                                   "refresh", "max_age_days", "pick")}
                 if params["mode"] not in (None, "raid", "raidrot"):
                     params["mode"] = None
                 return self._json({"job": start_job(creds, params)})

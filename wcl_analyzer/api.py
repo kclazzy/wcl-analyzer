@@ -319,7 +319,7 @@ class WCLClient:
         return t["reportData"]["report"]["table"] or {}
 
     def report_rankings(self, code: str, fight_id: int) -> dict:
-        """Parse игроков в бою (rankPercent) — только для киллов."""
+        """Рейтинги игроков в бою (rankPercent — процентиль, bracketPercent — ilvl%). Только для киллов."""
         q = """query($code: String!, $fid: [Int]) { reportData {
                  report(code: $code) { rankings(fightIDs: $fid) } } }"""
         r = self.query(q, {"code": code, "fid": [fight_id]})

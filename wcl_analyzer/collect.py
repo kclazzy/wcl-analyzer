@@ -132,6 +132,21 @@ def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str,
     return logs, label
 
 
+def player_percentiles(r) -> dict:
+    """Рейтинги боя WCL → {id игрока: {"rank": процентиль, "ilvl": процентиль по уровню предметов}}."""
+    out: dict = {}
+    data = r.get("data", r) if isinstance(r, dict) else r
+    if isinstance(data, dict):
+        data = [data]
+    for fight in data or []:
+        for role in ((fight or {}).get("roles") or {}).values():
+            for c in (role or {}).get("characters") or []:
+                if c.get("id") is not None and c.get("rankPercent") is not None:
+                    out[int(c["id"])] = {"rank": float(c["rankPercent"]),
+                                         "ilvl": float(c["bracketPercent"]) if c.get("bracketPercent") is not None else None}
+    return out
+
+
 def inspect_report(client: WCLClient, url: str, fight: str | int | None = None) -> dict:
     """Бои и игроки отчёта — для выбора в интерфейсе до запуска анализа."""
     from .config import DIFFICULTY_NAMES
@@ -146,6 +161,15 @@ def inspect_report(client: WCLClient, url: str, fight: str | int | None = None) 
             spec = specs[0].get("spec") if specs and isinstance(specs[0], dict) else (specs[0] if specs else "")
             players.append({"id": int(p["id"]), "name": p["name"], "cls": p.get("type", ""),
                             "spec": spec, "role": role_ru})
+    ranks = {}
+    if f.get("kill") and hasattr(client, "report_rankings"):  # у вайпов рейтингов нет
+        try:
+            ranks = player_percentiles(client.report_rankings(code, int(f["id"])))
+        except Exception:  # noqa: BLE001 — без процентилей выбор боя всё равно работает
+            ranks = {}
+    for p in players:
+        r = ranks.get(p["id"]) or {}
+        p["rank"], p["ilvl"] = r.get("rank"), r.get("ilvl")
     fights = [{"id": int(x["id"]), "name": x["name"], "kill": bool(x.get("kill")),
                "difficulty": DIFFICULTY_NAMES.get(int(x.get("difficulty") or 0), str(x.get("difficulty"))),
                "duration": (float(x["endTime"]) - float(x["startTime"])) / 1000,

@@ -51,8 +51,15 @@ header h1 span{color:var(--muted);font-weight:500}
 .btn.you{background:var(--you);color:#221503}
 .linkbtn{background:none;border:0;padding:0;color:var(--top);text-decoration:underline;cursor:pointer}
 .hint{color:var(--muted);font-size:14px;margin-top:12px}
-.picks{display:grid;grid-template-columns:1.3fr 1.2fr 1fr auto auto;gap:12px;align-items:end;margin-top:22px;
+.picks{display:grid;grid-template-columns:1.2fr 1.2fr 1fr 1.15fr;gap:12px;align-items:end;margin-top:22px;
   padding-top:22px;border-top:1px solid var(--line)}
+.picks .runrow{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.picks .pickrow{display:flex;gap:6px}.picks .pickrow select{flex:1}
+.picks .pickrow input{width:76px;border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 8px;background:#fff}
+.picks .pickinfo{font-size:13.5px;color:var(--muted)}
+/* Цвета процентилей как на Warcraft Logs */
+.pc{display:inline-block;min-width:34px;text-align:center;font-weight:700;font-size:13px;border-radius:6px;padding:1px 6px;background:var(--soft)}
+.pc.p0{color:#6B6B6B}.pc.p25{color:#1E8F2E}.pc.p50{color:#0A6FD6}.pc.p75{color:#8A2BD2}.pc.p95{color:#D46A00}.pc.p99{color:#C2397F}.pc.p100{color:#A88300}
 .picks label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px}
 .picks select{width:100%;border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 10px;background:#fff}
 .okmsg{margin-top:16px;border-radius:var(--r-sm);background:var(--good-soft);color:#17542B;padding:12px 14px}
@@ -262,9 +269,22 @@ dialog label.check input{width:auto;margin:0}
           <option value="top1">Топ-1</option>
           <option value="median25">Медиана топ-25</option>
         </select></div>
-      <button class="btn you" id="runBtn" type="button">Разобрать игрока</button>
-      <button class="btn" id="raidBtn" type="button">Весь рейд</button>
-      <button class="btn" id="raidRotBtn" type="button" title="Каждый DPS боя против топа своего спека">Ротация всего рейда</button>
+      <div><label for="pickBy">Кого брать в ротацию рейда</label>
+        <div class="pickrow">
+          <select id="pickBy" title="Процентиль и ilvl% — из рейтингов Warcraft Logs за этот бой">
+            <option value="">Всех DPS</option>
+            <option value="rank">Процентиль ≤</option>
+            <option value="ilvl">ilvl% ≤</option>
+          </select>
+          <input id="pickMax" type="number" min="1" max="99" step="1" value="50" list="pickPresets" aria-label="Порог процентиля, %" disabled>
+          <datalist id="pickPresets"><option value="25"><option value="50"><option value="75"><option value="90"></datalist>
+        </div></div>
+      <div class="runrow">
+        <button class="btn you" id="runBtn" type="button">Разобрать игрока</button>
+        <button class="btn" id="raidBtn" type="button">Весь рейд</button>
+        <button class="btn" id="raidRotBtn" type="button" title="Каждый DPS боя (или только отобранные) против топа своего спека">Ротация всего рейда</button>
+        <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
+      </div>
     </div>
     <div class="error" id="err" role="alert" hidden></div>
     <div class="okmsg" id="okmsg" role="status" hidden></div>
@@ -474,7 +494,8 @@ async function inspect(fight){
     fs.innerHTML = inspected.fights.map(f => `<option value="${f.id}" ${f.id==inspected.fight?"selected":""}>${esc(f.name)}, ${esc(f.difficulty)} — ${f.kill?"килл":"вайп"}, ${mmss(f.duration)}</option>`).join("");
     const ps = $("#player");
     const dps = inspected.players;
-    ps.innerHTML = dps.map(p => `<option value="${p.id}" ${p.id==inspected.source?"selected":""}>${esc(p.name)} — ${esc(who(p.cls, p.spec))}, ${esc(p.role)}</option>`).join("");
+    ps.innerHTML = dps.map(p => `<option value="${p.id}" ${p.id==inspected.source?"selected":""}>${esc(p.name)} — ${esc(who(p.cls, p.spec))}, ${esc(p.role)}${p.rank!=null?` · ${Math.floor(p.rank)}%`:""}${p.ilvl!=null?` · ilvl ${Math.floor(p.ilvl)}%`:""}</option>`).join("");
+    updatePickInfo();
     $("#picks").hidden = false;
   } catch(e){ showErr(e.message); if (e.needKey) $("#keyDlg").showModal(); }
   finally { b.disabled = false; b.textContent = "Найти бой"; inspecting = false; }
@@ -491,7 +512,27 @@ $("#demoRaidBtn").onclick = () => run({mode:"raid", demo:true});
    если игрок сам выбрал другой эталон в списке — берём его */
 let refTouched = false;
 $("#ref").addEventListener("change", () => { refTouched = true; });
-$("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: refTouched ? $("#ref").value : "top10"});
+/* Отбор игроков по процентилю WCL: rank% — среди всех игроков спека, ilvl% — среди игроков с тем же уровнем предметов */
+function pickValue(){
+  const by = $("#pickBy").value, n = parseInt($("#pickMax").value, 10);
+  return by && n > 0 && n < 100 ? `${by}:${n}` : "";
+}
+function pctCls(v){ return v>=100?"p100":v>=99?"p99":v>=95?"p95":v>=75?"p75":v>=50?"p50":v>=25?"p25":"p0"; }
+function pctChip(v){ return v==null ? '<span class="pc p0" title="Нет рейтинга">—</span>' : `<span class="pc ${pctCls(v)}">${Math.floor(v)}</span>`; }
+function updatePickInfo(){
+  const info = $("#pickInfo"), v = pickValue();
+  $("#pickMax").disabled = !$("#pickBy").value;
+  if (!inspected) { info.textContent = ""; return; }
+  const dps = inspected.players.filter(p => p.role === "DPS");
+  if (!v) { info.textContent = `В ротацию рейда пойдут все DPS: ${dps.length}`; return; }
+  const [by, lim] = v.split(":"), known = dps.filter(p => p[by] != null);
+  if (!known.length) { info.textContent = "У этого боя нет рейтингов WCL (их нет у вайпов) — будут разобраны все DPS"; return; }
+  const keep = known.filter(p => p[by] <= +lim);
+  info.textContent = `Подходит ${keep.length} из ${dps.length} DPS` + (keep.length ? ": " + keep.slice(0, 6).map(p => p.name).join(", ") + (keep.length > 6 ? "…" : "") : " — выберите порог выше");
+}
+$("#pickBy").addEventListener("change", updatePickInfo);
+$("#pickMax").addEventListener("input", updatePickInfo);
+$("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: refTouched ? $("#ref").value : "top10", pick: pickValue() || null});
 $("#demoRaidRotBtn").onclick = () => run({mode:"raidrot", demo:true});
 const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn"];
 
@@ -850,6 +891,7 @@ function renderRaidRot(R){
           Бой ${esc(I.duration)}. Каждый DPS сравнён с топ-${I.top_n} своего спека.</div>
         <div class="dps">${P.length} <small>${plural(P.length,"игрок разобран","игрока разобрано","игроков разобрано")}</small></div>
         ${R.skipped.length?`<div class="gapline">Танки и лекари пропущены: ${R.skipped.length}</div>`:""}
+        ${(R.not_picked||[]).length?`<div class="gapline">Не прошли отбор (${esc(R.pick.startsWith("ilvl")?"ilvl%":"процентиль")} ≤ ${esc(R.pick.split(":")[1])}%): ${R.not_picked.length}</div>`:""}
       </div>
       <div class="side">
         <a class="btn you" href="${R.excel}" download>Скачать Excel</a>
@@ -863,13 +905,13 @@ function renderRaidRot(R){
       <div class="chart" style="height:${70+P.length*30}px"><canvas id="cRot"></canvas></div>
     </div>
     ${box("Каждый игрок", "Главное действие — первое из трёх в его выжимке. «Подробно» открывает полный разбор игрока: выжимку, графики и все отличия.",
-      table(["Игрок","DPS","К топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
+      table(["Игрок","Проц.","ilvl%","DPS","К топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
         `<b>${esc(p.name)}</b><div style="font-size:12.5px;color:var(--muted)">${esc(who(p.cls, p.spec))}</div>`,
-        num(p.dps), `<span class="${p.gap<-0.1?"worse":p.gap>=0?"better":""}">${sgn(p.gap, v=>pct(v))}</span>`,
+        pctChip(p.rank), pctChip(p.ilvl), num(p.dps), `<span class="${p.gap<-0.1?"worse":p.gap>=0?"better":""}">${sgn(p.gap, v=>pct(v))}</span>`,
         `<span class="tag ${p.reliability}">${esc(REL_RU[p.reliability]||p.reliability)}</span>`,
         esc(p.actions[0] ? p.actions[0].do : "существенных отличий нет"),
         p.actions[0] ? `<span class="imp ${p.actions[0].level}">${esc(p.actions[0].gain)}</span>` : "",
-        `<button class="mini" type="button" data-i="${i}">Подробно</button>`]), {num:[1,2]}))}
+        `<button class="mini" type="button" data-i="${i}">Подробно</button>`]), {num:[3,4]}))}
     <details class="more"><summary>Все действия по каждому игроку</summary>
       ${P.map(p=>box(`${p.name} — ${who(p.cls, p.spec)}`, `${num(p.dps)} DPS, ${sgn(p.gap, v=>pct(v))} к медиане топа`,
         p.actions.length ? p.actions.map((a,i)=>`<div class="act"><div class="n">${i+1}</div><div><div class="do">${esc(a.do)}</div><div class="why">${esc(a.title)}</div></div><span class="imp ${a.level}">${esc(a.gain)}</span></div>`).join("")

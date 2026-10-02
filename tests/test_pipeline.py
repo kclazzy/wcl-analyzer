@@ -131,7 +131,7 @@ if __name__ == "__main__":
 def test_raid():
     from wcl_analyzer.excel_raid import write_raid_workbook
     from wcl_analyzer.raid import run_raid
-    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    from wcl_analyzer.raid_demo import CODE, DEMO_URL, FakeRaidClient
 
     R = run_raid(FakeRaidClient(), DEMO_URL, log=lambda *_: None)
     assert R["info"]["size"] == 20 and R["info"]["kill"]
@@ -333,6 +333,39 @@ def test_limit_no_hang():
     print("OK лимит: поиск боя сразу сообщает о лимите, без зависания")
 
 
+def test_pick_by_percentile():
+    """Отбор игроков для ротации рейда по процентилю и ilvl% из рейтингов WCL."""
+    from wcl_analyzer.collect import inspect_report
+    from wcl_analyzer.raid_demo import CODE, DEMO_URL, FakeRaidClient
+    from wcl_analyzer.raid_rotation import parse_pick, pick_players
+    c = FakeRaidClient()
+    kill = next(f for f in c.report(CODE)["fights"] if f.get("kill"))
+    wipe = next(f for f in c.report(CODE)["fights"] if not f.get("kill"))
+    insp = inspect_report(c, DEMO_URL, kill["id"])
+    dps = [p for p in insp["players"] if p["role"] == "DPS"]
+    assert all(p["rank"] is not None and p["ilvl"] is not None for p in insp["players"])
+    assert parse_pick("rank:50") == ("rank", 50.0) and parse_pick("x:50") is None and parse_pick("rank:100") is None
+    keep, out = pick_players(dps, "rank:50", log=lambda m: None)
+    assert keep and all(p["rank"] <= 50 for p in keep) and all(p["rank"] > 50 for p in out)
+    assert len(keep) + len(out) == len(dps)
+    k2, _ = pick_players(dps, "ilvl:75", log=lambda m: None)
+    assert all(p["ilvl"] <= 75 for p in k2)
+    all_, none_ = pick_players(dps, None)
+    assert all_ == dps and not none_
+    # у вайпа рейтингов нет — разбираются все
+    wd = [p for p in inspect_report(c, DEMO_URL, wipe["id"])["players"] if p["role"] == "DPS"]
+    msgs = []
+    k3, _ = pick_players(wd, "rank:25", log=msgs.append)
+    assert k3 == wd and "нет рейтингов" in msgs[0]
+    try:
+        pick_players([{**p, "rank": 80.0} for p in dps], "rank:50", log=lambda m: None)
+        raise AssertionError("должна быть ошибка: никто не прошёл отбор")
+    except LookupError as e:
+        assert "порог выше" in str(e)
+    print(f"OK отбор по процентилю: ≤50% — {len(keep)} из {len(dps)} DPS, вайп — все")
+
+
 if __name__ == "__main__":
     test_batched_fetch()
+    test_pick_by_percentile()
     test_limit_no_hang()

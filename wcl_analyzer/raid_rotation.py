@@ -48,7 +48,8 @@ def analyze_players(players: list, refs_for, overrides: dict | None = None, log=
     for i, p in enumerate(players):
         progress(0.8 + 0.17 * i / max(1, n))
         me = p.get("log")
-        row = {"name": p["name"], "cls": p["cls"], "spec": p["spec"], "id": p.get("id")}
+        row = {"name": p["name"], "cls": p["cls"], "spec": p["spec"], "id": p.get("id"),
+               "rank": p.get("rank"), "ilvl": p.get("ilvl")}
         if me is None:
             rows.append({**row, "error": p.get("error") or "Лог не загружен"})
             continue
@@ -112,14 +113,51 @@ def report_points(client, log) -> None:
             + (f"; очков API осталось в этом часе: {left:,.0f}".replace(",", " ") if left is not None else ""))
 
 
+PICK_LABEL = {"rank": "процентиль", "ilvl": "процентиль по уровню предметов (ilvl%)"}
+
+
+def parse_pick(pick) -> tuple[str, float] | None:
+    """«rank:50» → ("rank", 50): разбирать только игроков с процентилем не выше 50%."""
+    if not pick or not isinstance(pick, str) or ":" not in pick:
+        return None
+    by, _, lim = pick.partition(":")
+    try:
+        v = float(lim)
+    except ValueError:
+        return None
+    return (by, v) if by in PICK_LABEL and 0 < v < 100 else None
+
+
+def pick_players(dps: list[dict], pick, log=print) -> tuple[list[dict], list[dict]]:
+    """Отбор DPS по процентилю WCL. Возвращает (кого разбирать, кто не прошёл отбор)."""
+    rule = parse_pick(pick)
+    if not rule:
+        return dps, []
+    by, lim = rule
+    known = [p for p in dps if p.get(by) is not None]
+    if not known:
+        log(f"Отбор по {PICK_LABEL[by]} невозможен: у этого боя нет рейтингов WCL (их нет у вайпов). Разбираю всех DPS.")
+        return dps, []
+    keep = [p for p in known if p[by] <= lim]
+    out = [p for p in dps if p not in keep]
+    log(f"Отбор: {PICK_LABEL[by]} ≤ {lim:g}% — {len(keep)} из {len(dps)} DPS"
+        + (f"; без рейтинга пропущены: {', '.join(p['name'] for p in dps if p.get(by) is None)}"
+           if len(known) < len(dps) else ""))
+    if not keep:
+        raise LookupError(f"Нет DPS с {PICK_LABEL[by]} ≤ {lim:g}% в этом бою — выберите порог выше")
+    return keep, out
+
+
 def run_raid_rotation(client, url: str, fight=None, top_n: int = 10, log=print, progress=lambda x: None,
-                      overrides: dict | None = None, max_age_s: float | None = None, save: bool = False) -> dict:
+                      overrides: dict | None = None, max_age_s: float | None = None, save: bool = False,
+                      pick: str | None = None) -> dict:
     from .collect import collect_reference, inspect_report, load_my_log
     insp = inspect_report(client, url, fight)
     dps = [p for p in insp["players"] if p["role"] == "DPS"]
     skipped = [p for p in insp["players"] if p["role"] != "DPS"]
     if not dps:
         raise LookupError("В этом бою не найдено DPS-игроков")
+    dps, not_picked = pick_players(dps, pick, log)
     log(f"Бой {insp['fight']}: {len(dps)} DPS. Загружаю их логи…")
     from concurrent.futures import ThreadPoolExecutor
 
@@ -178,8 +216,12 @@ def run_raid_rotation(client, url: str, fight=None, top_n: int = 10, log=print, 
     report_points(client, log)
     rows, results = analyze_players(players, refs_for, overrides, log, progress)
     m = first
-    return {"rows": rows, "results": results, "skipped": skipped,
-            "brief": summarize(rows, skipped),
+    brief = summarize(rows, skipped)
+    rule = parse_pick(pick)
+    if rule and not_picked:
+        brief.insert(0, f"Разобраны только DPS с {PICK_LABEL[rule[0]]} ≤ {rule[1]:g}%: {len(dps)} из {len(dps) + len(not_picked)}")
+    return {"rows": rows, "results": results, "skipped": skipped, "not_picked": [p["name"] for p in not_picked],
+            "brief": brief, "pick": pick if rule else None,
             "info": {"boss": m.encounter_name if m else "", "difficulty": m.difficulty_name if m else "",
                      "duration": _fmt_t(m.duration) if m else "", "kill": m.kill if m else None,
                      "fight_id": insp["fight"], "code": insp["code"], "top_n": top_n,
@@ -190,6 +232,9 @@ def run_raid_rotation(client, url: str, fight=None, top_n: int = 10, log=print, 
 def run_demo(top_n: int = 25, log=print, progress=lambda x: None) -> dict:
     from .demo import demo_raid_players
     tops, players = demo_raid_players(top_n)
+    for i, p in enumerate(players):  # демо-процентили, чтобы было видно, как они выглядят
+        p.setdefault("rank", float((17 + 23 * i) % 97))
+        p.setdefault("ilvl", float((29 + 31 * i) % 97))
     log(f"Демо: {len(players)} DPS, эталон топ-{top_n}.")
     rows, results = analyze_players(players, lambda me: (tops, f"топ-{top_n}"), None, log, progress)
     m = players[0]["log"]

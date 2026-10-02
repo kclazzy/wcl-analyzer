@@ -814,7 +814,8 @@ def write_raid_rotation_workbook(R: dict, path: str | Path) -> Path:
     wb.remove(wb.active)
     demo = R["info"]["demo"]
     I = R["info"]
-    s = Sheet(wb, "Ротация рейда", demo, {"A": 18, "B": 28, "C": 12, "D": 14, "E": 12, "F": 13, "G": 60, "H": 18})
+    s = Sheet(wb, "Ротация рейда", demo, {"A": 18, "B": 28, "C": 12, "D": 14, "E": 12, "F": 13, "G": 60, "H": 18,
+                                                      "I": 14, "J": 10})
     s.title(f"Сравнение ротации рейда: {I['boss']}, {I['difficulty']}",
             f"Каждый DPS против топ-{I['top_n']} своего спека на этом боссе. Бой {I['duration']}.")
     for line in R["brief"]:
@@ -824,9 +825,11 @@ def write_raid_rotation_workbook(R: dict, path: str | Path) -> Path:
     ok = sorted([r for r in R["rows"] if "error" not in r], key=lambda r: r["gap"])
     rows = [[r["name"], spec_ru(r["cls"], r["spec"]), _v(r["dps"], 0), _v(r["ref_dps"], 0), "=C{r}/D{r}-1",
              REL_RU.get(r["reliability"], r["reliability"]), (r["actions"][0]["do"] if r["actions"] else "существенных отличий нет"),
-             (r["actions"][0]["gain"] if r["actions"] else "")] for r in ok]
+             (r["actions"][0]["gain"] if r["actions"] else ""),
+             _v(r.get("rank"), 0), _v(r.get("ilvl"), 0)] for r in ok]
     first, last = s.table(["Игрок", "Спек", "DPS", "Медиана топа", "К топу", "Надёжность", "Главное действие",
-                           "Эффект"], rows, [None, None, F_INT, F_INT, F_SIGNED_PCT, None, None, None])
+                           "Эффект", "Процентиль, %", "ilvl%"], rows,
+                          [None, None, F_INT, F_INT, F_SIGNED_PCT, None, None, None, F_INT, F_INT])
     if rows:
         for i in range(len(rows)):
             s.ws.cell(row=first + i, column=7).alignment = Alignment(wrap_text=True, vertical="top")

@@ -254,6 +254,7 @@ dialog label.check input{width:auto;margin:0}
   .tabs{flex-wrap:wrap;overflow-x:visible;gap:2px 0}
   .tabs button{padding:9px 10px;font-size:14px;white-space:normal;text-align:left}
   .diffsw{max-width:100%}.diffsw button{padding:6px 10px}
+  .picks .pickrow{flex-wrap:wrap}.picks .pickrow select{flex:1 1 100%}
 }
 /* Колонки и блоки не шире экрана: таблицы внутри прокручиваются сами, текст переносится */
 .grid2>*,.picks>*,.hero>*{min-width:0}
@@ -293,10 +294,9 @@ dialog label.check input{width:auto;margin:0}
         </select></div>
       <div><label for="pickBy">Кого брать в ротацию рейда</label>
         <div class="pickrow">
-          <select id="pickBy" title="Процентиль и ilvl% — из рейтингов Warcraft Logs за этот бой">
+          <select id="pickBy" title="Рейтинг с учётом экипировки — место игрока среди игроков его спека с таким же уровнем предметов (из рейтингов Warcraft Logs за этот бой)">
             <option value="">Всех DPS</option>
-            <option value="rank">Процентиль ≤</option>
-            <option value="ilvl">ilvl% ≤</option>
+            <option value="ilvl">Рейтинг с учётом экипировки ≤</option>
           </select>
           <input id="pickMax" type="number" min="1" max="99" step="1" value="50" list="pickPresets" aria-label="Порог процентиля, %" disabled>
           <datalist id="pickPresets"><option value="25"><option value="50"><option value="75"><option value="90"></datalist>
@@ -553,7 +553,7 @@ async function inspect(fight){
     fs.innerHTML = inspected.fights.map(f => `<option value="${f.id}" ${f.id==inspected.fight?"selected":""}>${esc(f.name)}, ${esc(f.difficulty)} — ${f.kill?"килл":"вайп"}, ${mmss(f.duration)}</option>`).join("");
     const ps = $("#player");
     const dps = inspected.players;
-    ps.innerHTML = dps.map(p => `<option value="${p.id}" ${p.id==inspected.source?"selected":""}>${esc(p.name)} — ${esc(who(p.cls, p.spec))}, ${esc(p.role)}${p.rank!=null?` · ${Math.floor(p.rank)}%`:""}${p.ilvl!=null?` · ilvl ${Math.floor(p.ilvl)}%`:""}</option>`).join("");
+    ps.innerHTML = dps.map(p => `<option value="${p.id}" ${p.id==inspected.source?"selected":""}>${esc(p.name)} — ${esc(who(p.cls, p.spec))}, ${esc(p.role)}${p.rank!=null?` · проц. ${Math.floor(p.rank)}%`:""}${p.ilvl!=null?` · с учётом экип. ${Math.floor(p.ilvl)}%`:""}</option>`).join("");
     updatePickInfo();
     $("#picks").hidden = false;
   } catch(e){ showErr(e.message); if (e.needKey) $("#keyDlg").showModal(); }
@@ -569,7 +569,7 @@ $("#runBtn").onclick = () => run({url:$("#url").value.trim(), fight:$("#fight").
 $("#demoBtn").onclick = () => run({demo:true});
 $("#raidBtn").onclick = () => run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value, mythic: $("#mythicToo").checked});
 $("#demoRaidBtn").onclick = () => run({mode:"raid", demo:true});
-/* Отбор игроков по процентилю WCL: rank% — среди всех игроков спека, ilvl% — среди игроков с тем же уровнем предметов */
+/* Отбор игроков по рейтингу с учётом экипировки (WCL bracketPercent): место среди игроков спека с тем же уровнем предметов */
 function pickValue(){
   const by = $("#pickBy").value, n = parseInt($("#pickMax").value, 10);
   return by && n > 0 && n < 100 ? `${by}:${n}` : "";
@@ -944,7 +944,7 @@ function renderRaidRot(R){
           Бой ${esc(I.duration)}. Каждый DPS сравнён с топ-${I.top_n} своего спека.</div>
         <div class="dps">${P.length} <small>${plural(P.length,"игрок разобран","игрока разобрано","игроков разобрано")}</small></div>
         ${R.skipped.length?`<div class="gapline">Танки и лекари пропущены: ${R.skipped.length}</div>`:""}
-        ${(R.not_picked||[]).length?`<div class="gapline">Не прошли отбор (${esc(R.pick.startsWith("ilvl")?"ilvl%":"процентиль")} ≤ ${esc(R.pick.split(":")[1])}%): ${R.not_picked.length}</div>`:""}
+        ${(R.not_picked||[]).length?`<div class="gapline">Не прошли отбор (${esc(R.pick.startsWith("ilvl")?"рейтинг с учётом экипировки":"процентиль")} ≤ ${esc(R.pick.split(":")[1])}%): ${R.not_picked.length}</div>`:""}
       </div>
       <div class="side">
         <a class="btn you" href="${R.excel}" download>Скачать Excel</a>
@@ -958,7 +958,7 @@ function renderRaidRot(R){
       <div class="chart" style="height:${70+P.length*30}px"><canvas id="cRot"></canvas></div>
     </div>
     ${box("Каждый игрок", "Главное действие — первое из трёх в его выжимке. «Подробно» открывает полный разбор игрока: выжимку, графики и все отличия.",
-      table(["Игрок","Проц.","ilvl%","DPS","К топу","К эпох. топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
+      table(["Игрок","Проц.","С учётом экип.","DPS","К топу","К эпох. топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
         `<b>${esc(p.name)}</b><div style="font-size:12.5px;color:var(--muted)">${esc(who(p.cls, p.spec))}</div>`,
         pctChip(p.rank), pctChip(p.ilvl), num(p.dps), `<span class="${p.gap<-0.1?"worse":p.gap>=0?"better":""}">${sgn(p.gap, v=>pct(v))}</span>`,
         p.mythic_gap==null ? "—" : `<span title="Эпохальный топ: ${num(p.mythic_dps)} DPS (медиана по рейтингу)">${sgn(p.mythic_gap, v=>pct(v))}</span>`,

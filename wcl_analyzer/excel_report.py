@@ -846,7 +846,7 @@ def write_raid_rotation_workbook(R: dict, path: str | Path) -> Path:
     demo = R["info"]["demo"]
     I = R["info"]
     s = Sheet(wb, "Ротация рейда", demo, {"A": 18, "B": 28, "C": 12, "D": 14, "E": 12, "F": 13, "G": 60, "H": 18,
-                                                      "I": 14, "J": 10, "K": 16, "L": 13})
+                                                      "I": 14, "J": 22, "K": 16, "L": 13})
     s.title(f"Сравнение ротации рейда: {I['boss']}, {I['difficulty']}",
             f"Каждый DPS против топ-{I['top_n']} своего спека на этом боссе. Бой {I['duration']}.")
     for line in R["brief"]:
@@ -859,7 +859,7 @@ def write_raid_rotation_workbook(R: dict, path: str | Path) -> Path:
              (r["actions"][0]["gain"] if r["actions"] else ""),
              _v(r.get("rank"), 0), _v(r.get("ilvl"), 0), _v(r.get("mythic_dps"), 0), _v(r.get("mythic_gap"), 4)] for r in ok]
     first, last = s.table(["Игрок", "Спек", "DPS", "Медиана топа", "К топу", "Надёжность", "Главное действие",
-                           "Эффект", "Процентиль, %", "ilvl%", "Эпох. топ (рейтинг)", "К эпох. топу"], rows,
+                           "Эффект", "Процентиль, %", "С учётом экипировки, %", "Эпох. топ (рейтинг)", "К эпох. топу"], rows,
                           [None, None, F_INT, F_INT, F_SIGNED_PCT, None, None, None, F_INT, F_INT, F_INT, F_SIGNED_PCT])
     if rows:
         for i in range(len(rows)):

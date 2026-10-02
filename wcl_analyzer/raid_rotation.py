@@ -139,7 +139,7 @@ def report_points(client, log) -> None:
             + (f"; очков API осталось в этом часе: {left:,.0f}".replace(",", " ") if left is not None else ""))
 
 
-PICK_LABEL = {"rank": "процентиль", "ilvl": "процентиль по уровню предметов (ilvl%)"}
+PICK_LABEL = {"rank": "процентиль", "ilvl": "рейтинг с учётом экипировки"}
 
 
 def parse_pick(pick) -> tuple[str, float] | None:

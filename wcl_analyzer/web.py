@@ -245,8 +245,28 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
         result["info"]["ref_collected_at"] = ref_meta["collected_at"]
         result["info"]["ref_stale"] = time.time() - ref_meta["collected_at"] > _max_age_s(params)
     result["params"] = {k: params.get(k) for k in ("url", "fight", "actor", "ref")}
+    result["raid_peaks"] = _raid_peaks(job, params, None if params.get("demo") else client, me, log)
     job["result"] = result
     log("Готово.")
+
+
+def _raid_peaks(job: dict, params: dict, client, me, log):
+    """Вкладка «Рейдовые кулдауны в пики урона»: что рейд нажимал в самые тяжёлые моменты
+    и что в те же моменты жмут лучшие гильдии. Не обязательна: при ошибке разбор игрока не ломается."""
+    from .raid_top import raid_cd_peaks
+    job["progress"] = max(job["progress"], 0.85)
+    try:
+        if params.get("demo"):
+            from .raid_demo import CODE, FakeRaidClient
+            c = FakeRaidClient()
+            fid = next(int(f["id"]) for f in c.report(CODE)["fights"] if f.get("kill"))
+            return raid_cd_peaks(c, CODE, fid, log=lambda m: None)
+        log("Пики урона по рейду и рейдовые кулдауны — ваш бой и лучшие киллы босса…")
+        return raid_cd_peaks(client, me.report_code, me.fight_id, log=log,
+                             progress=lambda x: job.__setitem__("progress", max(job["progress"], 0.85 + 0.1 * x)))
+    except Exception as e:  # noqa: BLE001
+        log(f"Пики урона по рейду недоступны: {e}")
+        return None
 
 
 def _avoidable_list() -> list[str]:

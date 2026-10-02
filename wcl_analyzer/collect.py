@@ -133,7 +133,7 @@ def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str,
 
 
 def player_percentiles(r) -> dict:
-    """Рейтинги боя WCL → {id игрока: {"rank": процентиль, "ilvl": процентиль по уровню предметов}}."""
+    """Рейтинги боя WCL → {имя игрока: {"rank": процентиль, "ilvl": процентиль по уровню предметов}}."""
     out: dict = {}
     data = r.get("data", r) if isinstance(r, dict) else r
     if isinstance(data, dict):
@@ -141,9 +141,16 @@ def player_percentiles(r) -> dict:
     for fight in data or []:
         for role in ((fight or {}).get("roles") or {}).values():
             for c in (role or {}).get("characters") or []:
-                if c.get("id") is not None and c.get("rankPercent") is not None:
-                    out[int(c["id"])] = {"rank": float(c["rankPercent"]),
-                                         "ilvl": float(c["bracketPercent"]) if c.get("bracketPercent") is not None else None}
+                if c.get("rankPercent") is None:
+                    continue
+                v = {"rank": float(c["rankPercent"]),
+                     "ilvl": float(c["bracketPercent"]) if c.get("bracketPercent") is not None else None}
+                # В рейтингах id — номер персонажа на сайте, а не номер игрока в отчёте:
+                # сопоставляем по имени, id — только запасной вариант
+                if c.get("name"):
+                    out[str(c["name"])] = v
+                if c.get("id") is not None:
+                    out.setdefault(int(c["id"]), v)
     return out
 
 
@@ -168,7 +175,7 @@ def inspect_report(client: WCLClient, url: str, fight: str | int | None = None) 
         except Exception:  # noqa: BLE001 — без процентилей выбор боя всё равно работает
             ranks = {}
     for p in players:
-        r = ranks.get(p["id"]) or {}
+        r = ranks.get(p["name"]) or ranks.get(p["id"]) or {}
         p["rank"], p["ilvl"] = r.get("rank"), r.get("ilvl")
     fights = [{"id": int(x["id"]), "name": x["name"], "kill": bool(x.get("kill")),
                "difficulty": DIFFICULTY_NAMES.get(int(x.get("difficulty") or 0), str(x.get("difficulty"))),

@@ -162,10 +162,10 @@ def _parse_ranks(r) -> dict:
             for c in (role or {}).get("characters") or []:
                 if c.get("rankPercent") is None:
                     continue
-                if c.get("id") is not None:
-                    out[int(c["id"])] = float(c["rankPercent"])
-                if c.get("name"):
+                if c.get("name"):  # id в рейтингах — номер персонажа на сайте, а не в отчёте
                     out[c["name"]] = float(c["rankPercent"])
+                if c.get("id") is not None:
+                    out.setdefault(int(c["id"]), float(c["rankPercent"]))
     return out
 
 
@@ -358,7 +358,7 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
             **p, "damage": round(float(de.get("total", 0))), "dps": float(de.get("total", 0)) / dur,
             "healing": round(float(he.get("total", 0))), "hps": float(he.get("total", 0)) / dur,
             "active": min(1.0, active) if active is not None else None,
-            "parse": ranks.get(pid, ranks.get(p["name"])),
+            "parse": ranks.get(p["name"], ranks.get(pid)),
             "deaths": sum(1 for d in deaths if d["id"] == pid),
             "first_death": _r(first_death.get(pid)),
             "potions": p["potions"] if pot_from_details else pot_cast.get(pid, 0),

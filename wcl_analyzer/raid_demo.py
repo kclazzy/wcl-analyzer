@@ -354,7 +354,8 @@ class FakeRaidClient:
                     pct = 30.0
                 amount = (self.heal_rate if r == "healer" else self.rate)[name]
                 roles[{"tank": "tanks", "healer": "healers", "dps": "dps"}[r]]["characters"].append(
-                    {"id": PID[name], "name": name, "class": cls, "spec": spec, "amount": round(amount, 1),
+                    # как у WCL: id в рейтингах — номер персонажа на сайте, не номер игрока в отчёте
+                    {"id": 90_000_000 + PID[name], "name": name, "class": cls, "spec": spec, "amount": round(amount, 1),
                      "rankPercent": round(pct, 1),
                      "bracketPercent": round(min(99.0, max(1.0, pct + rng.uniform(-15, 15))), 1)})
             rankings = {"data": [{"fightID": fid, "encounter": {"id": ENCOUNTER, "name": "Демо-босс"},

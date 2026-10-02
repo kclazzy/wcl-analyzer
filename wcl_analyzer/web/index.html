@@ -659,7 +659,8 @@ function dumbbells(summary){
 function render(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, gap = R.info.ref_dps - R.info.dps;
-  const tabs = [["main","Сводка"],["rot","Ротация"],["cd","Кулдауны и бурст"],["def","Защита"],["up","Эффекты, дебаффы, ресурс"],["gcd","Простой"],["tl","Таймлайн"],["guide","Гайд эталона"],["all","Все отличия"]];
+  /* Только три вкладки: остальные подробности — в Excel */
+  const tabs = [["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["raidcd","Рейдовые кулдауны в пики урона"]];
   const B = R.brief || {  // разборы, сохранённые до появления выжимки
     verdict: `${num(I.dps)} DPS против ${num(I.ref_dps)} у медианы топа`, reliability: R.reliability.overall, reliability_note: "",
     actions: (R.top5||[]).slice(0,3).map(f=>({do:f.focus||f.title, title:f.title, why:"", level:f.level,
@@ -694,7 +695,7 @@ function render(R){
       </div>
       ${B.noise_hidden?`<p class="hint" style="margin:10px 0 0">Скрыто отличий, которые так же часто встречаются у самих игроков топа: ${B.noise_hidden}. Они есть в подробностях.</p>`:""}
     </div>
-    <details class="more" id="more"><summary>Подробности: графики, таблицы, все отличия</summary>
+    <details class="more" id="more"><summary>Подробности: ротация, кулдауны и бурст, рейдовые кулдауны в пики урона</summary>
     <div class="legend"><span class="l-you">Вы</span><span class="l-top">Медиана топа</span><span class="l-bad">Отличие не в вашу пользу</span></div>
     <div class="tabs" role="tablist">${tabs.map(([k,t],i)=>`<button role="tab" aria-selected="${i==0}" aria-controls="p-${k}" id="t-${k}">${t}</button>`).join("")}</div>
     ${tabs.map(([k],i)=>`<div class="panel ${i==0?"on":""}" role="tabpanel" id="p-${k}" aria-labelledby="t-${k}"></div>`).join("")}
@@ -709,21 +710,6 @@ function render(R){
   });
   if ($("#refAgain")) $("#refAgain").onclick = () => { window.scrollTo({top:0, behavior:"smooth"}); run({...R.params, refresh:true}); };
 
-  // Главное
-  $("#p-main").innerHTML = `
-    ${box("Вы против медианы топа", "Янтарная точка — вы, бирюзовая — медиана эталона. Красный отрезок — разница не в вашу пользу.", dumbbells(R.summary))}
-    <div class="grid2">
-      ${box("План тренировок", "Одна сессия — один фокус. После сессии разберите новый лог и сравните показатель.",
-        `<ol class="plan">${R.plan.map(p=>`<li><div>${esc(p.focus)}<div class="ps">${esc(p.section)}</div></div></li>`).join("")}</ol>`)}
-      ${box("Надёжность сравнения", "Итог — минимальный уровень среди проверенных критериев.",
-        table(["Критерий","Уровень","Основание"], R.reliability.criteria.map(c=>[esc(c.criterion), `<span class="tag ${["HIGH","MEDIUM","LOW"].includes(c.level)?c.level:"none"}">${esc(REL_RU[c.level]||c.level)}</span>`, esc(c.reason)])))}
-    </div>
-    ${box("Из чего складывается разрыв DPS", "Оценки факторов пересекаются. «Возможная причина» — вклад не доказан; остаток показан отдельно.",
-      `<div class="chart" style="height:${80+R.gap.length*42}px"><canvas id="cGap"></canvas></div>`+
-      table(["Фактор","DPS","Доля разрыва","Статус"], R.gap.map(g=>[esc(g.factor), num(g.dps), R.gap_total?pct(g.dps/R.gap_total):"—", esc(g.status)]), {num:[1,2]}))}`;
-  chart("cGap", {type:"bar", data:{labels:R.gap.map(g=>g.factor), datasets:[{data:R.gap.map(g=>g.dps), backgroundColor:R.gap.map(g=>g.status.startsWith("Возможная")?C.muted:g.factor.startsWith("Не объяснено")?C.line:C.bad), borderRadius:4}]},
-    options:{indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{callback:v=>num(v)}}}}});
-
   // Ротация
   const casts = R.casts;
   $("#p-rot").innerHTML = `
@@ -736,6 +722,9 @@ function render(R){
     ${(R.priority||[]).length ? box("Приоритеты в типичных состояниях", "Что топ нажимает, когда активен прок или ресурс у предела. Красным — заметно реже топа.",
       table(["Состояние","Топ жмёт","Топ","Вы","Раз у вас"], R.priority.map(x=>[esc(x.state), esc(x.name), pct(x.ref,0), x.my==null?"—":pct(x.my,0), num(x.n)]),
         {num:[2,3,4], flag:i=>R.priority[i].my!=null && R.priority[i].my < (R.priority[i].p25||0)-0.1})) : ""}
+    ${box("Простой между действиями", "Время от конца глобального кулдауна или каста до следующего действия. Не считаются смерть, общие для топа паузы и каналы.",
+      table(["Показатель","Вы","Топ"], [["Глобальный кулдаун", num(R.gcd.my.gcd,2)+" с", num(R.gcd.ref.gcd,2)+" с"], ["Простой на действие", num(R.gcd.my.idle,2)+" с", num(R.gcd.ref.idle,2)+" с"],
+        ["Доля времени в простое", pct(R.gcd.my.share), pct(R.gcd.ref.share)], ["Простой за бой", num(R.gcd.my.total,1)+" с", num(R.gcd.ref.total,1)+" с"]], {num:[1,2]}))}
     ${box("Последовательности из трёх способностей", "Отличие от частой связки не обязательно ошибка: проверьте проки, ресурс и механику в этот момент.",
       table(["Связка у топа","Доля у топа","Игроков топа","Доля у вас"], R.ngrams.map(n=>[esc(n.seq), pct(n.share), pct(n.players,0), pct(n.my)]), {num:[1,2,3]}))}`;
   chart("cCasts", {type:"bar", data:{labels:casts.map(c=>c.name), datasets:[
@@ -759,92 +748,36 @@ function render(R){
   chart("cTiming", {type:"bar", data:{labels:tm.map(x=>`${x.name} №${x.k}`), datasets:[{data:tm.map(x=>x.diff), backgroundColor:tm.map(x=>Math.abs(x.diff)>5?C.bad:C.muted), borderRadius:3}]},
     options:{indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`вы ${mmss(tm[c.dataIndex].my)}, топ ${mmss(tm[c.dataIndex].ref)}`}}}, scales:{x:{title:{display:true,text:"секунд"}}}}});
 
-  // Дефенсивы
-  $("#p-def").innerHTML = `
-    ${box("Защита от механик", "Упреждение — за сколько секунд до удара нажата защитная способность. Отрицательное — после удара.",
-      table(["Защитная способность","Механика","Удар","Ваша защита","Ваше упреждение","Упреждение топа","Здоровье после удара"],
-        R.defensives.map(d=>[esc(d.name), `${esc(d.mechanic)} №${d.k}`, mmss(d.t_hit), mmss(d.my_def_t), d.my_lead==null?"нет защиты":num(d.my_lead,1)+" с", num(d.ref_lead,1)+" с", d.hp_after==null?"—":num(d.hp_after)+"%"]),
-        {num:[2,3,4,5,6], flag:i=>R.defensives[i].my_lead==null||R.defensives[i].my_lead<0, empty:"Топ не привязывает защитные способности к механикам."}))}
-    ${box("Смерти", "", R.deaths.length ? table(["Время","Урон за 5 с до смерти","Ваша защита за 15 с","Топ нажимал защиту"],
-        R.deaths.map(d=>[d.t, d.sources.map(s=>`${esc(s[0])}: ${num(s[1])}`).join(", "), esc(d.defensives.join(", ")||"нет"), pct(d.ref_share,0)])) : '<p class="empty">Смертей в этом бою нет.</p>')}`;
-
-  // Uptime и ресурсы
-  $("#p-up").innerHTML = `
-    ${box("Время действия баффов и дебаффов", "Доля времени, пока вы были живы. Дебаффы — на основной цели.",
-      `<div class="chart" style="height:${90+R.uptime.length*44}px"><canvas id="cUp"></canvas></div>`)}
-    ${(R.boss_debuffs||[]).length ? box("Дебаффы на боссе", "Свои — вешаете вы; рейдовые — другие игроки; окно уязвимости — дебафф, под который топ держит бурст. Совпадение — доля времени главного кулдауна внутри дебаффа.",
-      table(["Дебафф","Тип","Время действия у вас","У топа","Бурст внутри: вы","Бурст внутри: топ"], R.boss_debuffs.map(x=>[esc(x.name), esc(x.kind), pct(x.my,0), pct(x.ref,0),
-        x.my_overlap==null?"—":pct(x.my_overlap,0), x.ref_overlap==null?"—":pct(x.ref_overlap,0)]), {num:[2,3,4,5],
-        flag:i=>{const x=R.boss_debuffs[i]; return x.kind==="окно уязвимости" ? (x.my_overlap!=null && x.ref_overlap!=null && x.my_overlap < x.ref_overlap-0.1) : x.my < (x.p25||0)-0.15;}})) : ""}
-    ${(R.externals||[]).length ? box("Внешние баффы", "Баффы от других игроков рейда: их наличие влияет на DPS, но не зависит от вас.",
-      table(["Бафф","Вы","Топ (медиана)","Доля топа с баффом"], R.externals.map(x=>[esc(x.name), num(x.my), num(x.ref,1), pct(x.share,0)]), {num:[1,2,3]})) : ""}
-    <div class="grid2">
-      ${box(`Ресурс${R.resource_name?": "+R.resource_name:""}`, "Переполнение — ресурс у предела и после следующего каста тоже: прирост потерян.",
-        table(["Показатель","Вы","Топ","P25–P75"], R.resource.map(x=>[esc(x.metric), pct(x.my), pct(x.ref), `${pct(x.p25)}–${pct(x.p75)}`]), {num:[1,2,3], empty:"В событиях нет данных ресурса."}))}
-      ${box("Проки", "Потеряно — истёк без использования или перезаписан новым проком.",
-        table(["Прок","Тратится через","Получено","Потеряно у вас","Потеряно у топа","Реакция"],
-          R.procs.map(p=>[esc(p.name), esc(p.consumer), num(p.gained), num(p.expired+p.refreshed), num((p.ref_expired||0)+(p.ref_refreshed||0),1), `${num(p.reaction,1)} с / ${num(p.ref_reaction,1)} с`]),
-          {num:[2,3,4,5], flag:i=>(R.procs[i].expired+R.procs[i].refreshed)-((R.procs[i].ref_expired||0)+(R.procs[i].ref_refreshed||0))>=2}))}
-    </div>`;
-  chart("cUp", {type:"bar", data:{labels:R.uptime.map(u=>`${u.name} (${u.kind.toLowerCase()})`), datasets:[
-      {label:"Вы", data:R.uptime.map(u=>u.my), backgroundColor:C.you, borderRadius:3},
-      {label:"Медиана топа", data:R.uptime.map(u=>u.ref), backgroundColor:C.top, borderRadius:3}]},
-    options:{indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{position:"bottom"}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${pct(c.raw)}`}}},
-      scales:{x:{min:0,max:1,ticks:{callback:v=>Math.round(v*100)+"%"}}}}});
-
-  // GCD
-  const G = R.gcd, n30 = Math.max(G.by30_my.length, G.by30_ref.length);
-  $("#p-gcd").innerHTML = `
-    <div class="grid2">
-      ${box("Простой между действиями", "Время от конца глобального кулдауна или каста до следующего действия. Не считаются смерть, общие для топа паузы и каналы.",
-        table(["Показатель","Вы","Топ"], [["Глобальный кулдаун", num(G.my.gcd,2)+" с", num(G.ref.gcd,2)+" с"], ["Простой на действие", num(G.my.idle,2)+" с", num(G.ref.idle,2)+" с"],
-          ["Доля времени в простое", pct(G.my.share), pct(G.ref.share)], ["Простой за бой", num(G.my.total,1)+" с", num(G.ref.total,1)+" с"]], {num:[1,2]}))}
-      ${box("Самые длинные паузы", "Сравните с простоем топа в том же 30-секундном отрезке.",
-        table(["Когда","Пауза","После","Перед","Топ в отрезке"], G.worst.map(w=>[`${w.from}–${w.to}`, num(w.idle,1)+" с", esc(w.prev), esc(w.next), w.ref==null?"—":num(w.ref,1)+" с"]), {num:[1,4]}))}
-    </div>
-    ${box("Простой по 30-секундным отрезкам", "", '<div class="chart"><canvas id="cIdle"></canvas></div>')}`;
-  chart("cIdle", {type:"line", data:{labels:[...Array(n30).keys()].map(i=>mmss(i*30).replace(/,0$/,"")), datasets:[
-      {label:"Вы", data:G.by30_my, borderColor:C.you, backgroundColor:C.you, tension:0, pointRadius:3},
-      {label:"Медиана топа", data:G.by30_ref, borderColor:C.top, backgroundColor:C.top, tension:0, pointRadius:3}]},
-    options:{maintainAspectRatio:false, plugins:{legend:{position:"bottom"}}, scales:{y:{title:{display:true,text:"секунд простоя"}, beginAtZero:true}}}});
-
-  // Таймлайн
-  const laneY = {"Медиана топа":3, "Мой лог":2, "Механики":1};
-  const tlMech = new Set(R.timeline.filter(e=>e.cat==="Механика").map(e=>e.name));
-  const cats = [...new Set(R.timeline.map(e=>e.cat))];
-  const style = {"Атакующий кулдаун":["circle",C.you], "Защитный":["rect","#4F7CC0"], "Зелье":["triangle","#7A4FB5"], "Жажда крови":["rectRot","#D2691E"], "Механика":["crossRot",C.ink], "Расовая":["star","#B7800F"], "Тринкет":["rectRounded","#2A9DC4"]};
-  $("#p-tl").innerHTML = `
-    ${box("Кулдауны, зелья и механики на одной оси", "Верхняя дорожка — медиана топа, средняя — вы, нижняя — механики вашего боя. Красный круг — отличие больше 10 секунд.",
-      '<div class="chart" style="height:340px"><canvas id="cTl"></canvas></div>')}
-    ${R.dps_5s.length ? box("Ваш DPS по времени", "По 5-секундным отрезкам; пунктир — средний DPS медианы топа за бой.", '<div class="chart"><canvas id="cDps"></canvas></div>') : ""}
-    ${box("Тайминги механик", "Большие расхождения означают другую стратегию или темп и снижают надёжность сравнения.",
-      table(["Механика","Топ","Ваш бой","Разница"], R.mechanics.filter(m=>tlMech.has(m.name)).map(m=>[`${esc(m.name)} №${m.k}`, mmss(m.ref), mmss(m.my), m.my==null?"—":sgn(m.my-m.ref, v=>num(v,1)+" с")]), {num:[1,2,3]}))}`;
-  const ds = cats.map(cat => ({label:cat, data:R.timeline.filter(e=>e.cat===cat).map(e=>({x:e.t, y:laneY[e.lane], e})),
-      pointStyle:(style[cat]||["circle",C.muted])[0], backgroundColor:(style[cat]||["circle",C.muted])[1], borderColor:(style[cat]||["circle",C.muted])[1], pointRadius:7, pointHoverRadius:9}));
-  const dev = R.timeline.filter(e=>e.delta!=null && Math.abs(e.delta)>10);
-  if (dev.length) ds.push({label:"Отличие > 10 с", data:dev.map(e=>({x:e.t, y:2, e})), pointStyle:"circle", backgroundColor:"transparent", borderColor:C.bad, borderWidth:3, pointRadius:13, pointHoverRadius:14});
-  chart("cTl", {type:"scatter", data:{datasets:ds}, options:{maintainAspectRatio:false,
-    plugins:{legend:{position:"bottom", labels:{usePointStyle:true}}, tooltip:{callbacks:{label:c=>{const e=c.raw.e; return `${e.name} №${e.k}: ${mmss(e.t)}${e.delta!=null?` (${sgn(e.delta,v=>num(v,1))} с к топу)`:""}`;}}}},
-    scales:{x:{min:0, max:R.duration_s+5, ticks:{callback:v=>mmss(v).replace(/,0$/,"")}, title:{display:true,text:"время боя"}},
-            y:{min:0.4, max:3.6, ticks:{stepSize:1, callback:v=>({3:"Медиана топа",2:"Вы",1:"Механики"})[v]||""}, grid:{color:c=>[1,2,3].includes(c.tick.value)?"#E4E8EE":"transparent"}}}}});
-  if (R.dps_5s.length) chart("cDps", {type:"line", data:{labels:R.dps_5s.map((_,i)=>mmss(i*5).replace(/,0$/,"")), datasets:[
-      {label:"Ваш DPS", data:R.dps_5s, borderColor:C.you, backgroundColor:C.you, tension:0, pointRadius:0, borderWidth:2},
-      {label:"Медиана топа (средний)", data:R.dps_5s.map(()=>I.ref_dps), borderColor:C.top, borderDash:[6,5], pointRadius:0, borderWidth:2}]},
-    options:{maintainAspectRatio:false, interaction:{mode:"index",intersect:false}, plugins:{legend:{position:"bottom"}}, scales:{x:{ticks:{maxTicksLimit:14}}, y:{ticks:{callback:v=>num(v)}}}}});
-
-  // Гайд
-  $("#p-guide").innerHTML = R.guide.map(s => box(s.title, "", table(["Когда","Что делать","Подтверждение","Доверие"],
-      s.rows.map(r=>[esc(r[0]), esc(r[1]), esc(r[2]), r[3]==null?"":pct(r[3],0)]), {num:[3], empty:"Недостаточно данных."}))).join("") +
-    '<p class="hint">Доверие — нижняя граница 95% интервала Уилсона: 18 из 20 игроков дают около 70%.</p>';
-
-  // Все отличия
-  $("#p-all").innerHTML = box("Все найденные отличия", "Каждое — факт расхождения с большинством топа, а не вердикт. Серым — отличие, которое так же часто бывает у игроков топа (в выжимку не попадает).",
-    table(["Раздел","Отличие","Вы","Топ","Влияние","Контекст"], R.findings.map(f=>[esc(f.section), esc(f.title),
-      f.my==null?"—":num(f.my, Math.abs(f.my)<10?2:0), f.ref==null?"—":num(f.ref, Math.abs(f.ref)<10?2:0),
-      f.context?'<span class="imp Unknown">не зависит от вас</span>':f.noise?'<span class="imp LOW">как у топа</span>':`<span class="imp ${f.level}">${f.impact?"−"+pct(f.impact)+" DPS":IMP_RU[f.level]||f.level}</span>`, esc(f.note)]),
-      {num:[2,3], rowClass:i=>R.findings[i].noise||R.findings[i].context?"noise":""}));
+  // Рейдовые кулдауны в пики урона
+  renderRaidPeaks(R.raid_peaks, $("#p-raidcd"));
 
   el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+}
+
+/* Вкладка разбора игрока: какие рейдовые защитные кулдауны были нажаты в самые тяжёлые моменты
+   и что в те же моменты жмут лучшие гильдии */
+function renderRaidPeaks(P, el){
+  if (!P) { el.innerHTML = box("Рейдовые кулдауны в пики урона", "", '<p class="empty">Нет данных: урон по рейду для этого боя не загрузился. Разборы, сохранённые до этой версии, тоже без этой вкладки.</p>'); return; }
+  const X = P.extras || {}, V = X.vs_top, H = X.heaviest || [];
+  el.innerHTML = `
+    ${(P.brief||[]).length ? `<div class="box brief"><ul class="lines">${P.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
+    ${box("Урон по рейду и рейдовые кулдауны", "Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники — рейдовые кулдауны вашего рейда (красная обводка — нажат вне пиков)" + (V ? ", полые бирюзовые — что жмут лучшие киллы." : "."),
+      '<div class="chart" style="height:300px"><canvas id="cRaidDmg"></canvas></div>')}
+    ${V ? `<div class="box"><h3>Пики урона: что нажал ваш рейд и что жмёт топ</h3>
+      <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${esc(k.duration)})`).join(", ")}.
+      Кулдауном закрыто: у топа ${pct(V.top_cover,0)}, у вашего рейда ${pct(V.my_cover,0)}.</p>` +
+      table(["Когда","Пик","Нажато у вас","У топа закрыт","Чем закрывает топ"], V.rows.map(r=>[r.time, esc(r.mechanic),
+        r.my==null ? '<span style="color:var(--muted)">не дошли</span>' : r.my.length ? esc(r.my.join(", ")) : '<span class="worse">ничего</span>',
+        r.top_share==null ? "—" : pct(r.top_share,0), esc((r.top_cds||[]).join(", ")||"—")]),
+        {num:[3], flag:i=>{const r=V.rows[i]; return r.my!=null && !r.my.length && (r.top_share||0)>=0.5;}}) + "</div>" : ""}
+    ${box("Самые тяжёлые моменты вашего боя", "5 секунд с наибольшим уроном по рейду. Кулдаун засчитан, если нажат за 8 с до момента или во время него.",
+      table(["Когда","Урон за 5 с","Доля боя","Механики","Нажатые рейдовые кулдауны"], H.map(h=>[h.time, num(h.damage), pct(h.share,0), esc(h.abilities.join(", ")),
+        h.cds.length?esc(h.cds.join(", ")):'<span class="worse">ничего</span>']), {num:[1,2], empty:"Нет данных об уроне.", flag:i=>!H[i].cds.length}))}
+    ${V && (V.plan||[]).length ? box("План рейдовых кулдаунов на следующий пулл", `Кулдауны, которые ваш рейд нажимал в этом бою, расставлены на пики с учётом перезарядки. «Как у топа» — тот же кулдаун жмут лучшие гильдии.`,
+      table(["Когда","Пик","Кулдаун и кто"], V.plan.map(r=>[r.time, esc(r.mechanic),
+        (r.cd ? `<b>${esc(r.cd)}</b> — ${esc(r.player)}` + (r.like_top ? ' <span class="tag HIGH">как у топа</span>' : "") : '<span class="worse">нет свободного кулдауна</span>')
+        + (!r.like_top && r.top ? `<div style="font-size:12.5px;color:var(--muted)">у топа здесь: ${esc(r.top)}</div>` : "")]))) : ""}`;
+  raidDamageChart(P);
 }
 
 /* ---------- режим «Весь рейд» ---------- */

@@ -362,6 +362,15 @@ def test_pick_by_percentile():
         raise AssertionError("должна быть ошибка: никто не прошёл отбор")
     except LookupError as e:
         assert "порог выше" in str(e)
+    # вкладка «Рейдовые кулдауны в пики урона» в разборе игрока
+    from wcl_analyzer import web
+    job = {"id": "t", "progress": 0.0, "log": []}
+    web._run_player(job, {"demo": True}, None, lambda m: None)
+    rp = job["result"]["raid_peaks"]
+    assert rp and rp["extras"]["damage_timeline"] and rp["extras"]["heaviest"], rp
+    assert rp["extras"]["vs_top"] and rp["extras"]["vs_top"]["rows"], "нет сравнения с лучшими киллами"
+    import json
+    json.dumps(job["result"]["raid_peaks"])
     print(f"OK отбор по процентилю: ≤50% — {len(keep)} из {len(dps)} DPS, вайп — все")
 
 

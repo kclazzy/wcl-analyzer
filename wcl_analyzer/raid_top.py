@@ -31,43 +31,50 @@ RAID_CD_COOLDOWN = {
 DEFAULT_CD_S = 180
 
 
+def light_raid(client, code: str, fid: int, report: dict | None = None) -> dict:
+    """Облегчённый разбор боя: только урон по рейду и рейдовые кулдауны (один пакетный запрос).
+    Возвращает результат analyze_raid: пики урона, тяжёлые моменты, нажатия рейдовых кулдаунов."""
+    from .api import WCLError
+    from .raid import RAID_CD_IDS, analyze_raid
+    ids = ", ".join(str(x) for x in sorted(RAID_CD_IDS))
+    report = report or client.report(code)
+    f = next(x for x in report["fights"] if int(x["id"]) == int(fid))
+    s, e = float(f["startTime"]), float(f["endTime"])
+    got = None
+    if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
+        try:  # урон по рейду и рейдовые кулдауны — одним запросом
+            got = client.events_multi(code, fid, s, e, {
+                "taken": {"data_type": "DamageTaken"},
+                "casts": {"data_type": "Casts", "filter_expression": f"ability.id in ({ids})"}})
+        except WCLError:
+            got = None
+    if got is None:
+        try:
+            casts = client.events(code, fid, s, e, "Casts", filter_expression=f"ability.id in ({ids})")
+        except (WCLError, TypeError):
+            casts = client.events(code, fid, s, e, "Casts")
+        got = {"taken": client.events(code, fid, s, e, "DamageTaken"), "casts": casts}
+    raw = {"report": report, "fight": f, "details": client.player_details(code, fid),
+           "taken": got["taken"], "casts": got["casts"], "deaths": [], "pulls": []}
+    return analyze_raid(raw)
+
+
 def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KILLS, log=print,
                     progress=lambda x: None) -> list[dict]:
     """Лучшие киллы босса по скорости: пики урона по рейду и рейдовые кулдауны каждого."""
     from .api import WCLError
     from .collect import parallel_workers
-    from .raid import RAID_CD_IDS, analyze_raid
 
     ranks = client.fight_rankings(encounter_id, difficulty, "speed")
     cands = [r for r in ranks if (r.get("report") or {}).get("code")][: n + 3]
-    ids = ", ".join(str(x) for x in sorted(RAID_CD_IDS))
 
     def load(rk):
         rep = rk["report"]
         code, fid = rep["code"], int(rep.get("fightID") or rep.get("fightId") or 0)
         try:
-            report = client.report(code)
-            f = next(x for x in report["fights"] if int(x["id"]) == fid)
-            s, e = float(f["startTime"]), float(f["endTime"])
-            got = None
-            if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
-                try:  # урон по рейду и рейдовые кулдауны — одним запросом
-                    got = client.events_multi(code, fid, s, e, {
-                        "taken": {"data_type": "DamageTaken"},
-                        "casts": {"data_type": "Casts", "filter_expression": f"ability.id in ({ids})"}})
-                except WCLError:
-                    got = None
-            if got is None:
-                try:
-                    casts = client.events(code, fid, s, e, "Casts", filter_expression=f"ability.id in ({ids})")
-                except (WCLError, TypeError):
-                    casts = client.events(code, fid, s, e, "Casts")
-                got = {"taken": client.events(code, fid, s, e, "DamageTaken"), "casts": casts}
-            raw = {"report": report, "fight": f, "details": client.player_details(code, fid),
-                   "taken": got["taken"], "casts": got["casts"], "deaths": [], "pulls": []}
-            R = analyze_raid(raw)
+            R = light_raid(client, code, fid)
             guild = (rk.get("guild") or {}).get("name") or rk.get("name") or code
-            return {"guild": guild, "duration": (e - s) / 1000, "code": code, "fight": fid,
+            return {"guild": guild, "duration": R["info"]["duration_s"], "code": code, "fight": fid,
                     "spikes": R["extras"]["spikes"], "cds": R["extras"]["raid_cds"]}
         except (WCLError, StopIteration, KeyError, LookupError) as ex:
             log(f"  пропущен килл {code}: {ex}")
@@ -81,6 +88,29 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
                 out.append(k)
                 log(f"  Килл {len(out)} из {n}: {k['guild']}, {_fmt_t(k['duration'])}")
     return out
+
+
+def raid_cd_peaks(client, code: str, fid: int, log=print, progress=lambda x: None) -> dict | None:
+    """Для разбора игрока: какие рейдовые защитные кулдауны были нажаты в моменты наибольшего
+    урона по рейду — в вашем бою и у лучших киллов этого босса."""
+    report = client.report(code)
+    R = light_raid(client, code, fid, report)
+    X = R["extras"]
+    if not X.get("damage_timeline"):
+        return None
+    vs = None
+    f = next(x for x in report["fights"] if int(x["id"]) == int(fid))
+    if hasattr(client, "fight_rankings") and f.get("encounterID"):
+        try:
+            kills = fetch_top_kills(client, int(f["encounterID"]), int(f.get("difficulty") or 0), log=log,
+                                    progress=progress)
+            vs = compare_with_top(R, kills)
+        except Exception as e:  # noqa: BLE001 — сравнение с топом не обязательно
+            log(f"Сравнение с лучшими киллами недоступно: {e}")
+    return {"info": {"duration_s": R["info"]["duration_s"]},
+            "extras": {"damage_timeline": X.get("damage_timeline"), "heaviest": X.get("heaviest") or [],
+                       "raid_cds": X.get("raid_cds") or [], "vs_top": vs},
+            "brief": brief_lines(vs)}
 
 
 def _aggregate(kills: list[dict]) -> dict:

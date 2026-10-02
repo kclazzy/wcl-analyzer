@@ -439,13 +439,17 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
         if (x["active"] is not None and x["role"] != "tank" and med_active is not None
                 and x["active"] < min(ACTIVE_LOW, med_active - 0.05)):
             add(3, "Активность", f"Активное время {x['active']:.0%} (медиана рейда {med_active:.0%})")
-        if pot_from_details and x["potions"] == 0:
-            add(2, "Зелья", "Боевое зелье не использовано")
         if x["role"] == "dps" and x["parse"] is not None and x["parse"] < PARSE_LOW:
             add(1, "Парс", f"Парс {x['parse']:.0f}% среди игроков своего спека")
         for kind, sev, text in extras["issues"].get(x["id"], []):
             add(sev, kind, text)
     issues.sort(key=lambda i: (-i["severity"], i["player"]))
+    # Боевое зелье — в блок «Расходники на пулле», а не в «Что проверить»
+    no_potion = sorted(x["name"] for x in rows if x["potions"] == 0)
+    if extras.get("consumables") is None:
+        extras["consumables"] = {"checked": None, "no_flask": None, "no_food": None, "no_rune": None}
+    extras["consumables"]["no_potion"] = no_potion
+    extras["consumables"]["potion_source"] = "playerDetails" if pot_from_details else "касты"
 
     # ------------------------------------------------------------ сводка
     comp = Counter(x["role"] for x in rows)
@@ -605,7 +609,7 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
         out["consumables"] = {"checked": len(cons), "no_flask": no_flask, "no_food": no_food,
                               "no_rune": [players[p]["name"] for p, c in cons.items() if not c["rune"]]}
         for pid, c in cons.items():
-            miss = [w for w, k in (("фиала", "flask"), ("еды", "food")) if not c[k]]
+            miss = [w for w, k in (("настоя", "flask"), ("еды", "food")) if not c[k]]
             if miss:
                 issues[pid].append(("Расходники", 2, "На пулле не было " + " и ".join(miss)))
     else:
@@ -830,9 +834,16 @@ def _raid_brief(info, summary, issues, extras, deaths, kill) -> list[str]:
     if av:
         out.append("Больше всего избегаемого урона: " + ", ".join(f"{n} ({h})" for n, h in av.most_common(3)))
     c = extras.get("consumables")
-    if c and (c["no_flask"] or c["no_food"]):
-        out.append(f"Без фиала: {len(c['no_flask'])}, без еды: {len(c['no_food'])} из {c['checked']}"
-                   + (" — " + ", ".join(sorted(set(c["no_flask"] + c["no_food"]))[:5])))
+    if c and (c.get("no_flask") or c.get("no_food") or c.get("no_potion")):
+        parts = []
+        if c.get("no_flask"):
+            parts.append(f"без настоя: {len(c['no_flask'])}")
+        if c.get("no_food"):
+            parts.append(f"без еды: {len(c['no_food'])}")
+        if c.get("no_potion"):
+            parts.append(f"без боевого зелья: {len(c['no_potion'])}")
+        who = sorted(set((c.get("no_flask") or []) + (c.get("no_food") or []) + (c.get("no_potion") or [])))
+        out.append("Расходники — " + ", ".join(parts) + " — " + ", ".join(who[:5]) + ("…" if len(who) > 5 else ""))
     ad = extras.get("adds") or {}
     if ad.get("low"):
         out.append("Почти не били аддов: " + ", ".join(x["name"] for x in ad["low"][:4]))

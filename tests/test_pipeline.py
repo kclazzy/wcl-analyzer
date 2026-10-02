@@ -154,8 +154,9 @@ def test_raid():
     assert cats["Сокрушение"] == "По танкам" and cats["Осколки льда"] == "Выборочно"
     texts = {(i["player"], i["kind"]) for i in R["issues"]}
     for expected in (("Лиана", "Смерть"), ("Мирель", "Смерть"), ("Торвин", "Механики"), ("Мирель", "Механики"),
-                     ("Брам", "Активность"), ("Квелл", "Механики"), ("Ровен", "Зелья")):
+                     ("Брам", "Активность"), ("Квелл", "Механики")):
         assert expected in texts, expected
+    assert R["extras"]["consumables"]["no_potion"] == ["Ровен"], R["extras"]["consumables"]  # зелье — в «Расходниках»
     assert R["deaths"][0]["player"] == "Лиана" and R["deaths"][0]["first"]
     assert len(R["pulls"]) == 6 and R["pulls"][-1]["kill"] and R["pulls"][0]["boss_pct"] == 78.4
     out = Path(tempfile.gettempdir()) / "wcl_test_raid.xlsx"
@@ -216,6 +217,8 @@ def test_analysis_quality():
     X = R["extras"]
     assert 2 <= len(R["brief"]) <= 7, R["brief"]
     assert X["missed_kicks"] and X["consumables"]["no_flask"] == ["Брам"], X["consumables"]
+    assert isinstance(X["consumables"]["no_potion"], list), X["consumables"]
+    assert not any("зелье" in i["text"].lower() for i in R["issues"]), "боевое зелье — в «Расходниках», не в «Что проверить»"
     assert [a["name"] for a in X["adds"]["low"]] == ["Норра"], X["adds"]
     assert any(not s["covered_by"] for s in X["spikes"]) and X["avoidable"]
     assert X["heaviest"][0]["abilities"][0] == "Ледяная волна", X["heaviest"][0]

@@ -1075,8 +1075,12 @@ function renderRaid(R){
     <div>
       ${box("Прерывания", "Каст прошёл, хотя эту способность в бою прерывали.",
         table(["Способность","Пропущено","Когда"], (X.missed_kicks||[]).map(m=>[esc(m.name), num(m.count), esc(m.times.join(", "))]), {num:[1], empty:"Пропущенных прерываний нет."}))}
-      ${X.consumables ? box("Расходники на пулле", `Проверено игроков: ${X.consumables.checked}.`,
-        table(["Чего не было","Игроки"], [["Фиал", esc(X.consumables.no_flask.join(", ")||"у всех есть")], ["Еда", esc(X.consumables.no_food.join(", ")||"у всех есть")], ["Руна", esc(X.consumables.no_rune.join(", ")||"у всех есть")]])) : ""}
+      ${X.consumables ? (() => { const c = X.consumables;
+          const cell = (v, ok) => v == null ? '<span style="color:var(--muted)">нет данных</span>' : v.length ? esc(v.join(", ")) : ok;
+          return box("Расходники на пулле", (c.checked != null ? `Проверено игроков: ${c.checked}. ` : "") + "Боевое зелье — за весь бой.",
+            table(["Чего не было","Игроки"], [["Настой", cell(c.no_flask, "у всех есть")], ["Еда", cell(c.no_food, "у всех есть")],
+              ["Руна", cell(c.no_rune, "у всех есть")], ["Боевое зелье", cell(c.no_potion, "все использовали")]]));
+        })() : ""}
     </div>
     <div>
       ${(X.boss_debuffs||[]).length ? box("Дебаффы на боссе", "Рейдовые дебаффы и кто их вешал.",

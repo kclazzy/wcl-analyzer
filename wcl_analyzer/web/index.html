@@ -196,6 +196,7 @@ dialog .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
 
 .pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .pill.plain{font-weight:500}
+.pill .short{display:none}
 .pill.upd i{background:var(--you)}
 .appfoot{margin:36px 0 8px;padding-top:14px;border-top:1px solid var(--line);font-size:13.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
 .appfoot .btn{padding:7px 14px;font-size:14px}
@@ -249,7 +250,10 @@ dialog label.check input{width:auto;margin:0}
   /* Телефон: шапка и «таблетки» переносятся, а не вылезают за край (в т.ч. при крупном шрифте системы) */
   header h1,.pill,.pill.limit{white-space:normal}
   .pill{max-width:100%;text-align:left;font-size:13px;padding:6px 11px}
-  header h1{font-size:19px}
+  header{flex-direction:column;align-items:stretch;gap:8px}
+  header h1{font-size:clamp(16px,5.4vw,20px);overflow-wrap:anywhere}
+  .pills{justify-content:flex-start}
+  .pill .long{display:none}.pill .short{display:inline}
   /* Вкладки — в несколько строк, все видны сразу, без прокрутки вбок */
   .tabs{flex-wrap:wrap;overflow-x:visible;gap:2px 0}
   .tabs button{padding:9px 10px;font-size:14px;white-space:normal;text-align:left}
@@ -491,7 +495,7 @@ async function refreshKey(){
   $("#importAndroidHint").hidden = STATUS.app !== "android";
   $("#keyForget").hidden = !KEY;
   const p = $("#keyPill"); p.classList.toggle("ok", has_key);
-  p.querySelector("span").textContent = has_key ? "Ключ API подключён" : "Подключить ключ API";
+  p.querySelector("span").innerHTML = has_key ? 'Ключ API<span class="long"> подключён</span><span class="short"> ✓</span>' : "Подключить ключ API";
   refreshLimit();
   return has_key;
 }
@@ -517,7 +521,7 @@ function drawLimit(){
   pill.classList.toggle("mid", share >= 0.6 && share < 0.9);
   pill.classList.toggle("high", share >= 0.9);
   const reset = left < 60 ? "< 1 мин" : `${Math.ceil(left / 60)} мин`;
-  pill.querySelector("span").textContent = `Лимит WCL ${num(LIMIT.spent)} / ${num(LIMIT.limit)} · сброс ${reset}`;
+  pill.querySelector("span").innerHTML = `<span class="long">Лимит </span>WCL ${num(LIMIT.spent)} / ${num(LIMIT.limit)} · <span class="long">сброс </span>${reset}`;
   if (left <= 0) refreshLimit();
 }
 setInterval(drawLimit, 15000);

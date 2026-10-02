@@ -322,8 +322,9 @@ def build_player_log(report: dict, fight: dict, actor: dict, raw: dict,
             tree = ev.get("talentTree") or ev.get("talents") or []
             log.talents = sorted({int(x.get("nodeID") or x.get("id") or 0) * 10 + int(x.get("rank", 1) or 1)
                                   for x in tree if isinstance(x, dict) and (x.get("nodeID") or x.get("id"))})
+            # (узел, талант, ранг); если узла нет в событии — 0, узел найдётся по таланту в справочнике
             log.talent_tree = sorted({(int(x.get("nodeID") or 0), int(x.get("id") or 0), int(x.get("rank", 1) or 1))
-                                      for x in tree if isinstance(x, dict) and x.get("nodeID")})
+                                      for x in tree if isinstance(x, dict) and (x.get("nodeID") or x.get("id"))})
             if len(gear) > 13:
                 log.trinket_ids = [int(gear[12].get("id", 0)), int(gear[13].get("id", 0))]
             break
@@ -361,7 +362,9 @@ def fetch_raw(client, report: dict, fight: dict, actor_id: int,
                                      include_resources=True)
     raw["deaths"] = client.events(code, fid, s, e, "Deaths")
     raw["boss_casts"] = client.events(code, fid, s, e, "Casts", hostility="Enemies")
-    raw["combatant"] = client.events(code, fid, s, s + 1, "CombatantInfo")
+    # Таланты и экипировка (CombatantInfo): событие бывает не ровно в начале боя — берём весь бой,
+    # событий этого типа всего по одному на игрока
+    raw["combatant"] = client.events(code, fid, s, e, "CombatantInfo")
     raw["dmg_table"] = client.damage_table(code, fid, actor_id)
     if with_damage_events:
         raw["dmg_done"] = client.events(code, fid, s, e, "DamageDone", source_id=actor_id)
@@ -380,7 +383,7 @@ def _fetch_raw_batched(client, report: dict, fight: dict, actor_id: int, with_da
         "dmg_taken": {"data_type": "DamageTaken", "target_id": actor_id, "include_resources": True},
         "deaths": {"data_type": "Deaths"},
         "boss_casts": {"data_type": "Casts", "hostility": "Enemies"},
-        "combatant": {"data_type": "CombatantInfo", "end": s + 1},
+        "combatant": {"data_type": "CombatantInfo"},  # весь бой: событие бывает не ровно в начале
     }
     bosses = boss_actor_ids(report, fight)[:3]
     for i, bid in enumerate(bosses):

@@ -331,7 +331,9 @@ def simulate(policy: Policy, dur: float, ilvl: float, seed: int, name: str,
         if "hitPoints" in c and prev:
             c["hitPoints"] = min(MAX_HP, int(prev[-1] + (tc - [th for th, _ in hp_track if th <= tc][-1]) * 0.12 * MAX_HP))
 
-    talents = list(range(40)) if not policy.alt_build else list(range(8, 48))
+    # 0–9 — дерево класса, 10–39 — спека, 40–43 / 44–47 — две героические ветки
+    talents = (list(range(40)) if not policy.alt_build else list(range(8, 40))) + \
+              (list(range(40, 44)) if not policy.alt_build else list(range(44, 48)))
     gear = [{"id": 200000 + i, "itemLevel": round(ilvl + rng.uniform(-3, 3))} for i in range(16)]
     gear[3] = {"id": 0, "itemLevel": 1}
     gear[12] = {"id": trinkets[0], "itemLevel": round(ilvl)}
@@ -386,12 +388,12 @@ def demo_logs(n_top: int = 25, seed: int = 42):
     rep, fight, actor, raw = simulate(my_policy(rng), 305.0, 689.5, seed + 999, "Игрок",
                                       "DEMOMYLOGxx", base_ms, (219314, 212456), with_damage_events=True)
     me = build_player_log(rep, fight, actor, raw, spec="Frost", cls="Mage")
-    # Демо-отличия в талантах: в узле выбора 5010 — другой вариант, 5003 не взят, взят редкий 5045
+    # Демо-отличия в талантах: в узле выбора 5010 — другой вариант, 5003 не взят
     tt = {nd: (e, r) for nd, e, r in me.talent_tree}
     tt.pop(5003, None)
+    tt.pop(5042, None)  # и в героической ветке один талант не взят
     if 5010 in tt:
         tt[5010] = (9010, 1)
-    tt[5045] = (1045, 1)
     me.talent_tree = sorted((nd, e, r) for nd, (e, r) in tt.items())
     me.talents = sorted(nd * 10 + r for nd, (e, r) in tt.items())
     return tops, me

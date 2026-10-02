@@ -162,7 +162,11 @@ def _talents_sheet(wb, r: CompareResult, demo: bool) -> None:
     T = getattr(r, "talents", None)
     if not T:
         return
-    s = Sheet(wb, "Таланты", demo, {"A": 34, "B": 30, "C": 26, "D": 26, "E": 14, "F": 16, "G": 16})
+    if T.get("error"):
+        s = Sheet(wb, "Таланты", demo, {"A": 100})
+        s.title("Таланты против топа", T["error"])
+        return
+    s = Sheet(wb, "Таланты", demo, {"A": 26, "B": 34, "C": 30, "D": 26, "E": 26, "F": 14, "G": 16, "H": 16})
     s.title("Таланты против топа", f"Все скачанные логи топа ({T['n']}), без отбора по билду. "
             + ("Названия — из справочника Raidbots." if T["has_names"] else "Справочник талантов недоступен: показаны номера узлов."))
     for line in T["summary"]:
@@ -175,9 +179,9 @@ def _talents_sheet(wb, r: CompareResult, demo: bool) -> None:
                 [[h["name"] + (" (у вас)" if h["name"] == T["hero"]["my"] else ""), h["share"], _v(h["dps"], 0)] for h in T["hero"]["top"]],
                 [None, F_PCT, F_INT])
     s.section("Отличия от большинства топа")
-    s.table(["Талант", "Отличие", "У вас", "У топа", "Доля топа", "DPS топа: с ним", "DPS топа: без"],
-            [[x["name"], TALENT_KIND[x["kind"]], x["my"], x["top"], x["share"], _v(x["dps_with"], 0), _v(x["dps_without"], 0)]
-             for x in T["rows"]], [None, None, None, None, F_PCT, F_INT, F_INT])
+    s.table(["Ветка", "Талант", "Отличие", "У вас", "У топа", "Доля топа", "DPS топа: с ним", "DPS топа: без"],
+            [[x.get("branch", ""), x["name"], TALENT_KIND[x["kind"]], x["my"], x["top"], x["share"], _v(x["dps_with"], 0),
+              _v(x["dps_without"], 0)] for x in T["rows"]], [None, None, None, None, None, F_PCT, F_INT, F_INT])
 
 
 def write_reference_workbook(ref: Ref, path: str | Path) -> Path:

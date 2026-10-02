@@ -407,7 +407,17 @@ def test_pick_by_percentile():
     # сравнение талантов с топом
     T = job["result"]["talents"]
     kinds = {r["kind"] for r in T["rows"]}
-    assert {"missing", "choice", "extra"} <= kinds, kinds
+    assert {"missing", "choice"} <= kinds, kinds
+    branches = {r["branch"] for r in T["rows"]}
+    assert {"Класс", "Специализация", "Героическая: Вестник льда"} <= branches, branches
+    assert T["hero"]["my"] == "Вестник льда" and T["hero_same_n"] >= 3
+    # таланты, у которых в событии нет номера узла, находятся по справочнику
+    from wcl_analyzer.talents import _picks, demo_tree_data, spec_tree
+    nodes = spec_tree(demo_tree_data(), "Mage", "Frost")["nodes"]
+    by_entry = {e: nid for nid, nd in nodes.items() for e in nd["entries"]}
+    class _L:
+        talent_tree = [(0, 1003, 1), (5004, 1004, 1)]
+    assert _picks(_L(), by_entry) == {5003: (1003, 1), 5004: (1004, 1)}
     assert T["has_names"] and all(not r["name"].startswith("узел") for r in T["rows"])
     json.dumps(T)
     import openpyxl, io

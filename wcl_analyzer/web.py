@@ -177,13 +177,13 @@ def _client(creds, job: dict, log):
     return client
 
 
-def _excel_bytes(job: dict, name: str, writer, data) -> None:
+def _excel_bytes(job: dict, name: str, writer, data, key: str = "xlsx") -> None:
     """Excel собирается во временной папке и сразу удаляется; файл живёт только в памяти задачи."""
     fname = re.sub(r"[^\w\-]+", "_", f"{name}_{time.strftime('%Y%m%d_%H%M%S')}") + ".xlsx"
     with tempfile.TemporaryDirectory() as tmp:
         path = writer(data, Path(tmp) / fname)
-        job["xlsx"] = Path(path).read_bytes()
-    job["xlsx_name"] = fname
+        job[key] = Path(path).read_bytes()
+    job[key + "_name"] = fname
 
 
 def _max_age_s(params: dict) -> float:
@@ -194,13 +194,15 @@ def _max_age_s(params: dict) -> float:
     return max(1.0, min(30.0, days)) * 86400
 
 
-def _run_player(job: dict, params: dict, creds, log) -> None:
-    from .collect import collect_reference, load_my_log
-    from .compare import compare
-    from .excel_report import write_compare_workbook
-    from .metrics import load_overrides
-    from .reference import build_reference
+MYTHIC = 5
 
+
+def _run_player(job: dict, params: dict, creds, log) -> None:
+    """Разбор игрока: эталон — топ той же сложности, что и ваш бой; если бой не эпохальный —
+    дополнительно эпохальный топ (переключатель в шапке результата)."""
+    from .collect import collect_reference, load_my_log
+
+    client = None
     ref_meta: dict = {}
     if params.get("demo"):
         from .demo import demo_logs
@@ -221,44 +223,78 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
             other = load_my_log(client, params["against"])
             tops, label = [other], f"Игрок {other.name}"
         else:
-            n = {"top1": 1, "top10": 10, "top25": 25, "top50": 50, "median25": 25}.get(params.get("ref") or "top25", 25)
-            log(f"Собираю эталон: топ-{n} {spec_ru(me.cls, me.spec)} на этом боссе. "
-                "Первый раз это занимает несколько минут, дальше быстрее.")
-            if params.get("refresh"):
-                log("Обновляю рейтинг лучших логов…")
-            tops, label = collect_reference(client, me.encounter_id, me.cls, me.spec, me.difficulty,
-                                            top_n=n, duration=me.duration, log=log,
-                                            force=bool(params.get("refresh")), meta=ref_meta,
-                                            max_age_s=_max_age_s(params), save=not SERVER["public"])
-            if params.get("ref") == "median25":
-                label = label.replace("топ-25", "медиана топ-25")
-    if not params.get("demo"):
+            tops, label = _player_ref(client, me, me.difficulty, params, log, ref_meta)
+    main = _player_result(job, params, client, me, tops, label, ref_meta, me.difficulty, log, alt=False)
+
+    want_mythic = params.get("mythic") is not False and str(params.get("mythic")).lower() not in ("0", "false")
+    if (client is not None and not params.get("against") and want_mythic
+            and me.difficulty and int(me.difficulty) != MYTHIC):
+        log("Эталон 2 — эпохальный топ: сравнение с самой высокой сложностью…")
+        meta2: dict = {}
+        try:
+            tops2, label2 = _player_ref(client, me, MYTHIC, params, log, meta2)
+            main["alt"] = _player_result(job, params, client, me, tops2, label2, meta2, MYTHIC, log, alt=True)
+        except Exception as e:  # noqa: BLE001 — второй эталон не обязателен
+            log(f"Эпохальный эталон не собран: {e}")
+    job["result"] = main
+    log("Готово.")
+
+
+def _player_ref(client, me, difficulty: int, params: dict, log, meta: dict):
+    from .collect import collect_reference
+    from .config import DIFFICULTY_NAMES
+    n = {"top1": 1, "top10": 10, "top25": 25, "top50": 50, "median25": 25}.get(params.get("ref") or "top25", 25)
+    log(f"Собираю эталон: топ-{n} {spec_ru(me.cls, me.spec)} на этом боссе, сложность — "
+        f"{DIFFICULTY_NAMES.get(int(difficulty or 0), difficulty)}. Первый раз это занимает несколько минут, дальше быстрее.")
+    if params.get("refresh"):
+        log("Обновляю рейтинг лучших логов…")
+    tops, label = collect_reference(client, me.encounter_id, me.cls, me.spec, difficulty,
+                                    top_n=n, duration=me.duration, log=log,
+                                    force=bool(params.get("refresh")), meta=meta,
+                                    max_age_s=_max_age_s(params), save=not SERVER["public"])
+    if params.get("ref") == "median25":
+        label = label.replace("топ-25", "медиана топ-25")
+    return tops, label
+
+
+def _player_result(job, params, client, me, tops, label, ref_meta, top_diff, log, alt: bool) -> dict:
+    from .compare import compare
+    from .config import DIFFICULTY_NAMES
+    from .excel_report import write_compare_workbook
+    from .metrics import load_overrides
+    from .reference import build_reference
+    from .talents import compare_talents, demo_tree_data, load_tree_data
+    if client is not None:
         from .raid_rotation import report_points
         report_points(client, log)
-    log("Считаю эталон и сравниваю…")
+    log("Считаю эталон и сравниваю…" + (" (эпохальный топ)" if alt else ""))
     ref = build_reference(tops, load_overrides(_spell_meta_path()), label=label, me=me)
     r = compare(me, ref)
-    from .talents import compare_talents, demo_tree_data, load_tree_data
     try:  # по всем скачанным логам топа, а не только по отобранным с похожим билдом
         data = demo_tree_data() if params.get("demo") else load_tree_data(log, save=not SERVER["public"])
         r.talents = compare_talents(me, tops, data=data, log=log)
     except Exception as e:  # noqa: BLE001 — сравнение талантов не обязательно
         log(f"Сравнение талантов недоступно: {e}")
         r.talents = None
-    _excel_bytes(job, f"{me.name}_{me.encounter_name}", write_compare_workbook, r)
+    diff_name = DIFFICULTY_NAMES.get(int(top_diff or 0), "")
+    suffix = "_эпохальный_топ" if alt else ""
+    _excel_bytes(job, f"{me.name}_{me.encounter_name}{suffix}", write_compare_workbook, r,
+                 key="xlsx_alt" if alt else "xlsx")
     result = to_json(r, job["id"])
+    if alt:
+        result["excel"] = f"/api/report/{job['id']}/alt"
+    result["info"]["ref_difficulty"] = diff_name
     if ref_meta:
         result["ref"] = {k: ref_meta.get(k) for k in REF_FIELDS}
         result["info"]["ref_collected_at"] = ref_meta["collected_at"]
         result["info"]["ref_stale"] = time.time() - ref_meta["collected_at"] > _max_age_s(params)
     result["params"] = {k: params.get(k) for k in ("url", "fight", "actor", "ref")}
     result["talents"] = r.talents
-    result["raid_peaks"] = _raid_peaks(job, params, None if params.get("demo") else client, me, log)
-    job["result"] = result
-    log("Готово.")
+    result["raid_peaks"] = _raid_peaks(job, params, client, me, log, top_diff=top_diff)
+    return result
 
 
-def _raid_peaks(job: dict, params: dict, client, me, log):
+def _raid_peaks(job: dict, params: dict, client, me, log, top_diff=None):
     """Вкладка «Рейдовые кулдауны в пики урона»: что рейд нажимал в самые тяжёлые моменты
     и что в те же моменты жмут лучшие гильдии. Не обязательна: при ошибке разбор игрока не ломается."""
     from .raid_top import raid_cd_peaks
@@ -270,7 +306,7 @@ def _raid_peaks(job: dict, params: dict, client, me, log):
             fid = next(int(f["id"]) for f in c.report(CODE)["fights"] if f.get("kill"))
             return raid_cd_peaks(c, CODE, fid, log=lambda m: None)
         log("Пики урона по рейду и рейдовые кулдауны — ваш бой и лучшие киллы босса…")
-        return raid_cd_peaks(client, me.report_code, me.fight_id, log=log,
+        return raid_cd_peaks(client, me.report_code, me.fight_id, log=log, top_difficulty=top_diff,
                              progress=lambda x: job.__setitem__("progress", max(job["progress"], 0.85 + 0.1 * x)))
     except Exception as e:  # noqa: BLE001
         log(f"Пики урона по рейду недоступны: {e}")
@@ -365,7 +401,8 @@ def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:
     else:
         R = run_raid_rotation(_client(creds, job, log), params["url"], params.get("fight"), top_n=n, log=log,
                               progress=progress, overrides=load_overrides(_spell_meta_path()),
-                              max_age_s=_max_age_s(params), save=not SERVER["public"], pick=params.get("pick"))
+                              max_age_s=_max_age_s(params), save=not SERVER["public"], pick=params.get("pick"),
+                              mythic=params.get("mythic") is not False)
     I = R["info"]
     _excel_bytes(job, f"Ротация_рейда_{I['boss']}", write_raid_rotation_workbook, R)
     players = []
@@ -632,11 +669,12 @@ class Handler(BaseHTTPRequestHandler):
                         "log_total": len(job["log"]), "error": job.get("error"), "need_key": job.get("need_key", False),
                         "result": job.get("result") if job["state"] == "done" else None})
         elif path.startswith("/api/report/"):
-            job = JOBS.get(path.rsplit("/", 1)[-1])
-            if not job or not job.get("xlsx"):
+            parts = path[len("/api/report/"):].split("/")
+            job, key = JOBS.get(parts[0]), "xlsx_alt" if parts[1:] == ["alt"] else "xlsx"
+            if not job or not job.get(key):
                 return self._json({"error": "Отчёт уже удалён с сервера — откройте его из истории разборов"}, 404)
-            self._file(job["xlsx"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                       extra={"Content-Disposition": f"attachment; filename*=UTF-8''{_quote(job['xlsx_name'])}"})
+            self._file(job[key], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                       extra={"Content-Disposition": f"attachment; filename*=UTF-8''{_quote(job[key + '_name'])}"})
         else:
             self._json({"error": "Не найдено"}, 404)
 
@@ -658,7 +696,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against",
-                                                   "refresh", "max_age_days", "pick")}
+                                                   "refresh", "max_age_days", "pick", "mythic")}
                 if params["mode"] not in (None, "raid", "raidrot"):
                     params["mode"] = None
                 return self._json({"job": start_job(creds, params)})

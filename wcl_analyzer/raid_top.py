@@ -97,7 +97,8 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
     return out
 
 
-def raid_cd_peaks(client, code: str, fid: int, log=print, progress=lambda x: None) -> dict | None:
+def raid_cd_peaks(client, code: str, fid: int, log=print, progress=lambda x: None,
+                  top_difficulty: int | None = None) -> dict | None:
     """Для разбора игрока: какие рейдовые защитные кулдауны были нажаты в моменты наибольшего
     урона по рейду — в вашем бою и у лучших киллов этого босса."""
     report = client.report(code)
@@ -109,12 +110,12 @@ def raid_cd_peaks(client, code: str, fid: int, log=print, progress=lambda x: Non
     f = next(x for x in report["fights"] if int(x["id"]) == int(fid))
     if hasattr(client, "fight_rankings") and f.get("encounterID"):
         try:
-            kills = fetch_top_kills(client, int(f["encounterID"]), int(f.get("difficulty") or 0), log=log,
-                                    progress=progress)
+            diff = int(top_difficulty or f.get("difficulty") or 0)  # по умолчанию — сложность вашего боя
+            kills = fetch_top_kills(client, int(f["encounterID"]), diff, log=log, progress=progress)
             vs = compare_with_top(R, kills)
             if vs:
                 from .config import DIFFICULTY_NAMES
-                vs["difficulty"] = DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), "")
+                vs["difficulty"] = DIFFICULTY_NAMES.get(diff, "")
         except Exception as e:  # noqa: BLE001 — сравнение с топом не обязательно
             log(f"Сравнение с лучшими киллами недоступно: {e}")
     return {"info": {"duration_s": R["info"]["duration_s"]},

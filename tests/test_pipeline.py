@@ -429,8 +429,64 @@ def test_same_difficulty():
     print("OK сложность: эталон только из боёв той же сложности, бой другой сложности пропущен")
 
 
+def test_two_references():
+    """Героический бой: эталон 1 — героический топ, эталон 2 — эпохальный; у каждого свой Excel."""
+    import copy
+    from wcl_analyzer import web
+
+    class TwoDiff(FakeClient):
+        def __init__(self):
+            super().__init__()
+            self.heroic = []
+            for rk in self.ranks:
+                code = rk["report"]["code"]
+                hcode = "H" + code[1:]
+                rep = copy.deepcopy(self.reports[code])
+                rep["code"] = hcode
+                for f in rep["fights"]:
+                    f["difficulty"] = 4
+                self.reports[hcode], self.raws[hcode] = rep, self.raws[code]
+                self.heroic.append({**rk, "report": {**rk["report"], "code": hcode}})
+            for f in self.reports["MYREPORT0001"]["fights"]:
+                f["difficulty"] = 4
+
+        def rankings(self, encounter_id, class_name, spec_name, difficulty, page=1, force=False, max_age_s=None):
+            out = super().rankings(encounter_id, class_name, spec_name, difficulty, page, force, max_age_s)
+            if difficulty == 4:
+                out = {**out, "characterRankings": {"rankings": self.heroic, "hasMorePages": False}}
+            return out
+
+    c = TwoDiff()
+    old = web.CLIENT_FACTORY
+    web.CLIENT_FACTORY = lambda creds: c
+    try:
+        job = {"id": "two", "progress": 0.0, "log": []}
+        web._run_player(job, {"url": "https://www.warcraftlogs.com/reports/MYREPORT0001#fight=1&source=7",
+                              "fight": "1", "actor": "7", "ref": "top10"}, ("a", "b"), lambda m: None)
+    finally:
+        web.CLIENT_FACTORY = old
+    R = job["result"]
+    assert R["info"]["ref_difficulty"] == "героический" and R["info"]["ref_same_diff"] == R["info"]["ref_n"]
+    A = R.get("alt")
+    assert A and A["info"]["ref_difficulty"] == "эпохальный" and A["info"]["ref_same_diff"] == 0, "нет эпохального эталона"
+    assert A["excel"].endswith("/alt") and job.get("xlsx") and job.get("xlsx_alt")
+    crit = {x["criterion"]: x for x in A["reliability"]["criteria"]}
+    assert crit["Босс, сложность, спек"]["level"] == "MEDIUM", crit["Босс, сложность, спек"]
+    # без галочки — только героический
+    web.CLIENT_FACTORY = lambda creds: c
+    try:
+        job2 = {"id": "one", "progress": 0.0, "log": []}
+        web._run_player(job2, {"url": "https://www.warcraftlogs.com/reports/MYREPORT0001#fight=1&source=7",
+                               "fight": "1", "actor": "7", "ref": "top10", "mythic": False}, ("a", "b"), lambda m: None)
+    finally:
+        web.CLIENT_FACTORY = old
+    assert "alt" not in job2["result"]
+    print("OK два эталона: героический топ и эпохальный топ, у каждого свой Excel")
+
+
 if __name__ == "__main__":
     test_batched_fetch()
+    test_two_references()
     test_same_difficulty()
     test_real_talent_data()
     test_pick_by_percentile()

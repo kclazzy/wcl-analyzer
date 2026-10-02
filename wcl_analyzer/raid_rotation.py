@@ -104,6 +104,32 @@ def summarize(rows: list[dict], skipped: list[dict]) -> list[str]:
     return [x for x in out if x and not x.endswith(": ")]
 
 
+def _mythic_gaps(client, rows: list[dict], players: list[dict], top_n: int, log) -> None:
+    """Отставание каждого DPS от эпохального топа своего спека — по DPS из рейтинга, без скачивания логов
+    (один запрос на спек). Полное сравнение с эпохальным топом — в разборе отдельного игрока."""
+    logs = {p["id"]: p.get("log") for p in players}
+    cache: dict = {}
+    for r in rows:
+        me = logs.get(r.get("id"))
+        if "error" in r or me is None:
+            continue
+        key = (me.encounter_id, me.cls, me.spec)
+        if key not in cache:
+            try:
+                enc = client.rankings(me.encounter_id, me.cls, me.spec, 5, 1)
+                amounts = [float(x["amount"]) for x in ((enc.get("characterRankings") or {}).get("rankings") or [])[:top_n]
+                           if x.get("amount")]
+                cache[key] = median(amounts) if amounts else None
+            except Exception as e:  # noqa: BLE001
+                log(f"  Эпохальный рейтинг {spec_ru(me.cls, me.spec)} недоступен: {e}")
+                cache[key] = None
+        m = cache[key]
+        if m:
+            r["mythic_dps"], r["mythic_gap"] = m, me.dps / m - 1
+    if cache:
+        log(f"Эпохальный топ по рейтингу: {sum(1 for v in cache.values() if v)} из {len(cache)} спеков")
+
+
 def report_points(client, log) -> None:
     """Пишет в журнал, сколько запросов сделано и сколько очков API осталось в этом часе."""
     left = client.points_left() if hasattr(client, "points_left") else None
@@ -150,7 +176,7 @@ def pick_players(dps: list[dict], pick, log=print) -> tuple[list[dict], list[dic
 
 def run_raid_rotation(client, url: str, fight=None, top_n: int = 10, log=print, progress=lambda x: None,
                       overrides: dict | None = None, max_age_s: float | None = None, save: bool = False,
-                      pick: str | None = None) -> dict:
+                      pick: str | None = None, mythic: bool = True) -> dict:
     from .collect import collect_reference, inspect_report, load_my_log
     insp = inspect_report(client, url, fight)
     dps = [p for p in insp["players"] if p["role"] == "DPS"]
@@ -215,8 +241,14 @@ def run_raid_rotation(client, url: str, fight=None, top_n: int = 10, log=print, 
 
     report_points(client, log)
     rows, results = analyze_players(players, refs_for, overrides, log, progress)
+    if mythic and first and first.difficulty and int(first.difficulty) != 5:
+        _mythic_gaps(client, rows, players, top_n, log)
     m = first
     brief = summarize(rows, skipped)
+    mg = [r["mythic_gap"] for r in rows if r.get("mythic_gap") is not None]
+    if mg:
+        brief.insert(1, f"К эпохальному топу своего спека (по рейтингу, медиана топ-{top_n}): "
+                        f"медиана отставания {_pct(max(0.0, -median(mg)))}")
     rule = parse_pick(pick)
     if rule and not_picked:
         brief.insert(0, f"Разобраны только DPS с {PICK_LABEL[rule[0]]} ≤ {rule[1]:g}%: {len(dps)} из {len(dps) + len(not_picked)}")

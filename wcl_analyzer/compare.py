@@ -805,9 +805,19 @@ def _reliability(me: PlayerLog, ref: Reference, mm: dict, mech_offsets: list[flo
     same = all(log.encounter_id == me.encounter_id and log.difficulty == me.difficulty
                and log.spec == me.spec for log in ref.logs)
     other_diff = sum(1 for log in ref.logs if log.difficulty != me.difficulty)
-    add("Босс, сложность, спек", "HIGH" if same else "LOW",
-        f"у всех {ref.n} логов топа — тот же босс, спек и сложность ({me.difficulty_name}), как в вашем бою" if same
-        else (f"логов другой сложности: {other_diff} из {ref.n}" if other_diff else "есть логи другого босса или спека"))
+    same_boss = all(log.encounter_id == me.encounter_id and log.spec == me.spec for log in ref.logs)
+    diffs = {log.difficulty for log in ref.logs}
+    if same:
+        add("Босс, сложность, спек", "HIGH",
+            f"у всех {ref.n} логов топа — тот же босс, спек и сложность ({me.difficulty_name}), как в вашем бою")
+    elif same_boss and len(diffs) == 1 and (next(iter(diffs)) or 0) > (me.difficulty or 0):
+        # Намеренное сравнение с топом более высокой сложности (эпохальный эталон)
+        add("Босс, сложность, спек", "MEDIUM",
+            f"эталон — {ref.logs[0].difficulty_name} топ, ваш бой — {me.difficulty_name}: у босса больше здоровья, "
+            "механики бьют сильнее, тайминги могут отличаться")
+    else:
+        add("Босс, сложность, спек", "LOW",
+            f"логов другой сложности: {other_diff} из {ref.n}" if other_diff else "есть логи другого босса или спека")
     d = ref.agg["duration"]["median"] or me.duration
     rel = abs(me.duration - d) / d
     add("Длительность боя", "HIGH" if rel <= 0.1 else "MEDIUM" if rel <= 0.2 else "LOW",

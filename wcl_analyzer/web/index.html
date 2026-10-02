@@ -213,6 +213,10 @@ dialog label.check input{width:auto;margin:0}
 .refline{margin-top:10px;font-size:14px;color:#B8C2D9;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 .refline button{background:transparent;border:1px solid #4A5878;color:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:13px}
 .refline .stale{color:#FFD9A0}
+.diffsw{display:inline-flex;border:1px solid #4A5878;border-radius:8px;overflow:hidden;margin:0 0 12px}
+.diffsw button{background:transparent;border:0;color:#B8C2D9;padding:6px 14px;font-weight:600;cursor:pointer;font-size:14px}
+.diffsw button[aria-pressed=true]{background:var(--you);color:#16213A}
+.picks .chk{display:inline-flex;gap:6px;align-items:center;font-size:14px;color:var(--muted)}
 .paste{margin:4px 0 6px;font-size:14px}
 .paste summary{cursor:pointer;color:var(--top)}
 .data-actions{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:6px;font-size:14px}
@@ -283,6 +287,7 @@ dialog label.check input{width:auto;margin:0}
         <button class="btn you" id="runBtn" type="button">Разобрать игрока</button>
         <button class="btn" id="raidBtn" type="button">Весь рейд</button>
         <button class="btn" id="raidRotBtn" type="button" title="Каждый DPS боя (или только отобранные) против топа своего спека">Ротация всего рейда</button>
+        <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
       </div>
     </div>
@@ -504,7 +509,9 @@ $("#findForm").onsubmit = ev => { ev.preventDefault(); inspect(); };
 /* Вставили ссылку — сразу ищем бой, без нажатия кнопки */
 $("#url").addEventListener("paste", () => setTimeout(() => inspect(), 50));
 $("#fight").onchange = () => inspect($("#fight").value);
-$("#runBtn").onclick = () => run({url:$("#url").value.trim(), fight:$("#fight").value, actor:$("#player").value, ref:$("#ref").value});
+try { if (localStorage.getItem("wclMythicToo") === "0") $("#mythicToo").checked = false; } catch(e){}
+$("#mythicToo").addEventListener("change", () => { try { localStorage.setItem("wclMythicToo", $("#mythicToo").checked ? "1" : "0"); } catch(e){} });
+$("#runBtn").onclick = () => run({url:$("#url").value.trim(), fight:$("#fight").value, actor:$("#player").value, ref:$("#ref").value, mythic: $("#mythicToo").checked});
 $("#demoBtn").onclick = () => run({demo:true});
 $("#raidBtn").onclick = () => run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value});
 $("#demoRaidBtn").onclick = () => run({mode:"raid", demo:true});
@@ -532,7 +539,7 @@ function updatePickInfo(){
 }
 $("#pickBy").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
-$("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: refTouched ? $("#ref").value : "top10", pick: pickValue() || null});
+$("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: refTouched ? $("#ref").value : "top10", pick: pickValue() || null, mythic: $("#mythicToo").checked});
 $("#demoRaidRotBtn").onclick = () => run({mode:"raidrot", demo:true});
 const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn"];
 
@@ -596,7 +603,18 @@ async function onDone(job, R){
         if (m) filename = decodeURIComponent(m[1]);
       }
     } catch(e){}
-    const item = {id: job, created: Date.now(), mode: R.mode, title: histTitle(R), result: R, filename, blob};
+    let blobAlt = null, filenameAlt = "report_mythic.xlsx";
+    if (R.alt && R.alt.excel) {
+      try {
+        const r = await fetch(R.alt.excel, {headers:authHeaders()});
+        if (r.ok) {
+          blobAlt = await r.blob();
+          const m = (r.headers.get("Content-Disposition") || "").match(/filename\*=UTF-8''([^;]+)/);
+          if (m) filenameAlt = decodeURIComponent(m[1]);
+        }
+      } catch(e){}
+    }
+    const item = {id: job, created: Date.now(), mode: R.mode, title: histTitle(R), result: R, filename, blob, filenameAlt, blobAlt};
     await hist.put(item);
     await trimHistory();
     openResult(item);
@@ -612,6 +630,7 @@ function histTitle(R){
 }
 function openResult(item){
   const R = {...item.result, excel: "#excel-" + item.id, _hid: item.id, _created: item.created};
+  if (R.alt) R.alt = {...R.alt, excel: "#excelalt-" + item.id};
   (R.mode === "raid" ? renderRaid : R.mode === "raidrot" ? renderRaidRot : render)(R);
 }
 async function trimHistory(){
@@ -659,6 +678,8 @@ function dumbbells(summary){
 function render(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, gap = R.info.ref_dps - R.info.dps;
+  /* Два эталона: топ вашей сложности (основной) и эпохальный топ (R.alt). Переключатель перерисовывает разбор */
+  const pair = R.alt ? {main:R, alt:{...R.alt, _main:R, _back:R._back}} : R._main ? {main:R._main, alt:R} : null;
   /* Только три вкладки: остальные подробности — в Excel */
   const tabs = [["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["tal","Таланты"],["raidcd","Рейдовые кулдауны в пики урона"]];
   const B = R.brief || {  // разборы, сохранённые до появления выжимки
@@ -670,9 +691,13 @@ function render(R){
     ${R._back?'<button class="mini" id="backRaid" type="button" style="margin-bottom:12px">← К ротации всего рейда</button> ':""}${I.demo?'<div class="demo-flag">Демо: синтетические данные, не реальный лог</div>':""}
     <div class="hero">
       <div>
+        ${pair ? `<div class="diffsw" role="group" aria-label="С каким топом сравнивать">
+          <button type="button" data-sw="main" aria-pressed="${R===pair.main}">Топ: ${esc(pair.main.info.ref_difficulty||pair.main.info.difficulty)}</button>
+          <button type="button" data-sw="alt" aria-pressed="${R===pair.alt}">Топ: ${esc(pair.alt.info.ref_difficulty||"эпохальный")}</button></div>` : ""}
         <div class="who"><strong>${esc(I.name)}, ${esc(who(I.cls, I.spec))}</strong>${esc(I.boss)}, ${esc(I.difficulty)}, ${I.kill?"килл":"вайп"} за ${I.duration}.
-          Эталон: ${esc(I.ref_label)}, ${I.ref_n} ${plural(I.ref_n,"лог","лога","логов")}${I.ref_same_diff==null ? "" : I.ref_same_diff===I.ref_n
-            ? ` — все той же сложности (${esc(I.difficulty)})` : ` — <span class="stale">той же сложности только ${I.ref_same_diff} из ${I.ref_n}</span>`}.</div>
+          Эталон: ${esc(I.ref_label)}, ${I.ref_n} ${plural(I.ref_n,"лог","лога","логов")}${I.ref_same_diff==null ? ""
+            : I.ref_difficulty && I.ref_difficulty !== I.difficulty ? ` — ${esc(I.ref_difficulty)} топ (ваш бой — ${esc(I.difficulty)})`
+            : I.ref_same_diff===I.ref_n ? ` — все той же сложности (${esc(I.difficulty)})` : ` — <span class="stale">той же сложности только ${I.ref_same_diff} из ${I.ref_n}</span>`}.</div>
         ${I.ref_collected_at ? `<div class="refline">Рейтинг лучших логов от ${fmtDate(I.ref_collected_at)}${I.ref_stale?' — <span class="stale">устарел</span>':""}
           <button type="button" id="refAgain">Обновить эталон и пересчитать</button></div>` : ""}
         <div class="dps">${num(I.dps)} <small>DPS против ${num(I.ref_dps)} у медианы топа</small></div>
@@ -705,6 +730,7 @@ function render(R){
   el.hidden = false;
   $("#more").addEventListener("toggle", () => charts.forEach(c => c.resize()));
   if (R._back) $("#backRaid").onclick = () => renderRaidRot(R._back);
+  el.querySelectorAll(".diffsw button").forEach(b => b.onclick = () => render(b.dataset.sw === "alt" ? pair.alt : pair.main));
   showProgress(R);
   el.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
     el.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
@@ -857,13 +883,14 @@ function renderRaidRot(R){
       <div class="chart" style="height:${70+P.length*30}px"><canvas id="cRot"></canvas></div>
     </div>
     ${box("Каждый игрок", "Главное действие — первое из трёх в его выжимке. «Подробно» открывает полный разбор игрока: выжимку, графики и все отличия.",
-      table(["Игрок","Проц.","ilvl%","DPS","К топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
+      table(["Игрок","Проц.","ilvl%","DPS","К топу","К эпох. топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
         `<b>${esc(p.name)}</b><div style="font-size:12.5px;color:var(--muted)">${esc(who(p.cls, p.spec))}</div>`,
         pctChip(p.rank), pctChip(p.ilvl), num(p.dps), `<span class="${p.gap<-0.1?"worse":p.gap>=0?"better":""}">${sgn(p.gap, v=>pct(v))}</span>`,
+        p.mythic_gap==null ? "—" : `<span title="Эпохальный топ: ${num(p.mythic_dps)} DPS (медиана по рейтингу)">${sgn(p.mythic_gap, v=>pct(v))}</span>`,
         `<span class="tag ${p.reliability}">${esc(REL_RU[p.reliability]||p.reliability)}</span>`,
         esc(p.actions[0] ? p.actions[0].do : "существенных отличий нет"),
         p.actions[0] ? `<span class="imp ${p.actions[0].level}">${esc(p.actions[0].gain)}</span>` : "",
-        `<button class="mini" type="button" data-i="${i}">Подробно</button>`]), {num:[3,4]}))}
+        `<button class="mini" type="button" data-i="${i}">Подробно</button>`]), {num:[3,4,5]}))}
     <details class="more"><summary>Все действия по каждому игроку</summary>
       ${P.map(p=>box(`${p.name} — ${who(p.cls, p.spec)}`, `${num(p.dps)} DPS, ${sgn(p.gap, v=>pct(v))} к медиане топа`,
         p.actions.length ? p.actions.map((a,i)=>`<div class="act"><div class="n">${i+1}</div><div><div class="do">${esc(a.do)}</div><div class="why">${esc(a.title)}</div></div><span class="imp ${a.level}">${esc(a.gain)}</span></div>`).join("")
@@ -1113,12 +1140,14 @@ async function saveBlob(blob, name){
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 document.addEventListener("click", async ev => {
-  const a = ev.target.closest('a[href^="#excel-"]');
+  const a = ev.target.closest('a[href^="#excel-"], a[href^="#excelalt-"]');
   if (!a) return;
   ev.preventDefault();
-  const item = await hist.get(a.getAttribute("href").slice(7));
-  if (!item || !item.blob) return showErr("Excel для этого разбора не сохранился — запустите разбор ещё раз.");
-  saveBlob(item.blob, item.filename);
+  const href = a.getAttribute("href"), isAlt = href.startsWith("#excelalt-");
+  const item = await hist.get(href.slice(isAlt ? 10 : 7));
+  const blob = item && (isAlt ? item.blobAlt : item.blob);
+  if (!blob) return showErr("Excel для этого разбора не сохранился — запустите разбор ещё раз.");
+  saveBlob(blob, isAlt ? item.filenameAlt : item.filename);
 });
 
 /* ---------- эталоны: список в этом браузере ---------- */

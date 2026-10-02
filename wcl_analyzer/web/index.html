@@ -255,7 +255,7 @@ dialog label.check input{width:auto;margin:0}
 
   <section class="start" aria-labelledby="startTitle">
     <h2 id="startTitle">Чем ваш бой отличается от лучших игроков вашего спека</h2>
-    <p class="lead">Вставьте ссылку на свой отчёт. Программа найдёт бой, соберёт топ-25 того же спека на том же боссе и покажет, что тренировать в первую очередь.</p>
+    <p class="lead">Вставьте ссылку на свой отчёт. Программа найдёт бой, соберёт топ-10 того же спека на том же боссе и покажет, что тренировать в первую очередь.</p>
     <form class="urlrow" id="findForm">
       <input id="url" type="text" inputmode="url" placeholder="https://www.warcraftlogs.com/reports/…" aria-label="Ссылка на отчёт Warcraft Logs" autocomplete="off">
       <button class="btn" id="findBtn" type="submit">Найти бой</button>
@@ -267,11 +267,9 @@ dialog label.check input{width:auto;margin:0}
       <div><label for="player">Игрок</label><select id="player"></select></div>
       <div><label for="ref">Сравнить с</label>
         <select id="ref">
-          <option value="top25" selected>Топ-25 (рекомендуется)</option>
-          <option value="top10">Топ-10</option>
-          <option value="top50">Топ-50</option>
+          <option value="top10" selected>Топ-10 (рекомендуется)</option>
+          <option value="top3">Топ-3</option>
           <option value="top1">Топ-1</option>
-          <option value="median25">Медиана топ-25</option>
         </select></div>
       <div><label for="pickBy">Кого брать в ротацию рейда</label>
         <div class="pickrow">
@@ -515,10 +513,6 @@ $("#runBtn").onclick = () => run({url:$("#url").value.trim(), fight:$("#fight").
 $("#demoBtn").onclick = () => run({demo:true});
 $("#raidBtn").onclick = () => run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value});
 $("#demoRaidBtn").onclick = () => run({mode:"raid", demo:true});
-/* Для ротации всего рейда по умолчанию топ-10 каждого спека (в 2,5 раза меньше запросов);
-   если игрок сам выбрал другой эталон в списке — берём его */
-let refTouched = false;
-$("#ref").addEventListener("change", () => { refTouched = true; });
 /* Отбор игроков по процентилю WCL: rank% — среди всех игроков спека, ilvl% — среди игроков с тем же уровнем предметов */
 function pickValue(){
   const by = $("#pickBy").value, n = parseInt($("#pickMax").value, 10);
@@ -539,7 +533,7 @@ function updatePickInfo(){
 }
 $("#pickBy").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
-$("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: refTouched ? $("#ref").value : "top10", pick: pickValue() || null, mythic: $("#mythicToo").checked});
+$("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: $("#ref").value, pick: pickValue() || null, mythic: $("#mythicToo").checked});
 $("#demoRaidRotBtn").onclick = () => run({mode:"raidrot", demo:true});
 const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn"];
 
@@ -1017,7 +1011,7 @@ function renderRaid(R){
   const th = R.thresholds;
   const canCompare = !I.demo;
   $("#p-r-pl").innerHTML = box("Все игроки", `Активное время — доля времени, пока игрок жив. Красным — ниже ${pct(th.active,0)}, смерти и урон от выборочных механик от ${ratio(th.select)} среднего.` +
-      (canCompare ? " Кнопка «Сравнить с топом» разбирает игрока против топ-25 его спека." : ""),
+      (canCompare ? " Кнопка «Сравнить с топом» разбирает игрока против топа его спека (размер — в списке «Сравнить с»)." : ""),
     table(["Игрок","Уровень предметов","DPS","HPS","Парс","Активное время","Смерти","Зелья / камни","Прерыв. / диспелы","Выборочные механики", ...(canCompare?[""]:[])],
       P.map(p=>[`<span style="white-space:nowrap"><i class="role ${p.role}"></i>${esc(p.name)}</span><div style="font-size:12.5px;color:var(--muted);white-space:nowrap">${esc(who(p.cls, p.spec))}</div>`, num(p.ilvl,1), num(p.dps), p.role==="healer"?num(p.hps):"—",
         p.parse==null?"—":num(p.parse)+"%",

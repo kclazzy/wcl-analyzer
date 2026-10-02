@@ -195,6 +195,8 @@ def _max_age_s(params: dict) -> float:
 
 
 MYTHIC = 5
+# Размер эталона: топ-1, топ-3 или топ-10 (по умолчанию)
+REF_SIZES = {"top1": 1, "top3": 3, "top10": 10}
 
 
 def _run_player(job: dict, params: dict, creds, log) -> None:
@@ -208,7 +210,7 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
         from .demo import demo_logs
         log("Генерирую демо-логи: 25 игроков топа и ваш бой…")
         tops, me = demo_logs()
-        label = "топ-25"
+        label = "топ-25 (демо)"
         job["progress"] = 0.8
     else:
         client = _client(creds, job, log)
@@ -243,7 +245,7 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
 def _player_ref(client, me, difficulty: int, params: dict, log, meta: dict):
     from .collect import collect_reference
     from .config import DIFFICULTY_NAMES
-    n = {"top1": 1, "top10": 10, "top25": 25, "top50": 50, "median25": 25}.get(params.get("ref") or "top25", 25)
+    n = REF_SIZES.get(params.get("ref") or "top10", 10)
     log(f"Собираю эталон: топ-{n} {spec_ru(me.cls, me.spec)} на этом боссе, сложность — "
         f"{DIFFICULTY_NAMES.get(int(difficulty or 0), difficulty)}. Первый раз это занимает несколько минут, дальше быстрее.")
     if params.get("refresh"):
@@ -252,8 +254,6 @@ def _player_ref(client, me, difficulty: int, params: dict, log, meta: dict):
                                     top_n=n, duration=me.duration, log=log,
                                     force=bool(params.get("refresh")), meta=meta,
                                     max_age_s=_max_age_s(params), save=not SERVER["public"])
-    if params.get("ref") == "median25":
-        label = label.replace("топ-25", "медиана топ-25")
     return tops, label
 
 
@@ -394,8 +394,8 @@ def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:
     def progress(x: float) -> None:
         job["progress"] = max(job["progress"], min(0.95, x))
 
-    n = {"top1": 1, "top10": 10, "top25": 25, "top50": 25, "median25": 25}.get(params.get("ref") or "top10", 10)
-    log(f"Эталон для каждого спека: топ-{n}." + (" Для рейда по умолчанию топ-10: так быстрее; другой размер можно выбрать в списке «Сравнить с»." if n == 10 else ""))
+    n = REF_SIZES.get(params.get("ref") or "top10", 10)
+    log(f"Эталон для каждого спека: топ-{n} (размер — в списке «Сравнить с»).")
     if params.get("demo"):
         R = run_demo(25, log=log, progress=progress)
     else:

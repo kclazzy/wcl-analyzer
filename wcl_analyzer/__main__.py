@@ -6,7 +6,7 @@ import re
 import sys
 from pathlib import Path
 
-REF_MODES = {"top1": 1, "top10": 10, "top25": 25, "top50": 50, "median25": 25}
+REF_MODES = {"top1": 1, "top3": 3, "top10": 10}
 
 
 def _safe(name: str) -> str:
@@ -54,8 +54,6 @@ def cmd_compare(a):
         print(f"Собираю эталон {a.ref} ({me.cls} {me.spec}, {me.encounter_name})…")
         tops, label = collect_reference(client, me.encounter_id, me.cls, me.spec, me.difficulty,
                                         top_n=n, duration=me.duration, force=a.refresh)
-        if a.ref == "median25":
-            label = label.replace("топ-25", "медиана топ-25")
     ref = build_reference(tops, load_overrides(a.meta), label=label, me=me)
     r = compare(me, ref)
     out = a.out or f"compare_{_safe(me.name)}_{_safe(me.encounter_name)}.xlsx"
@@ -169,7 +167,7 @@ def main(argv=None):
     c.add_argument("url", help="ссылка на отчёт WCL (можно с #fight=…&source=…)")
     c.add_argument("--fight", help="номер боя в отчёте (по умолчанию — последний килл)")
     c.add_argument("--player", help="имя персонажа (если в ссылке нет source=)")
-    c.add_argument("--ref", choices=list(REF_MODES), default="top25", help="эталонная группа")
+    c.add_argument("--ref", choices=list(REF_MODES), default="top10", help="эталонная группа")
     c.add_argument("--against", help="сравнить с конкретным логом (ссылка) вместо топа")
     c.add_argument("--against-fight")
     c.add_argument("--against-player")

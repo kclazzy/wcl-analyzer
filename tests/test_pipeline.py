@@ -133,7 +133,10 @@ def test_raid():
     from wcl_analyzer.raid import run_raid
     from wcl_analyzer.raid_demo import CODE, DEMO_URL, FakeRaidClient
 
-    R = run_raid(FakeRaidClient(), DEMO_URL, log=lambda *_: None)
+    R = run_raid(FakeRaidClient(), DEMO_URL, log=lambda *_: None, talent_data=[])
+    Xs = R["extras"]
+    assert Xs["plan"] and all(r["picks"] for r in Xs["plan"]), "во вкладке «Полученный урон и сейвы» нет плана"
+    assert Xs["roster_cds"] and Xs["saves_brief"], "нет кулдаунов состава или выжимки сейвов"
     assert R["info"]["size"] == 20 and R["info"]["kill"]
     cats = {a["name"]: a["category"] for a in R["abilities"]}
     assert cats["Ледяная волна"] == "По всему рейду" and cats["Лужа холода"] == "Выборочно"

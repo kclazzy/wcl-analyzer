@@ -548,7 +548,7 @@ def _pull_trend(pulls: list[dict], death_abs: dict[int, list]) -> dict:
 
 def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = None,
              compare_top: bool = True, progress=lambda x: None, talent_data=None,
-             save_talents: bool = True) -> dict:
+             save_talents: bool = True, mythic: bool = True) -> dict:
     raw = fetch_raid_raw(client, url, fight, log)
     R = analyze_raid(raw, avoidable)
     try:  # кулдауны состава — для плана сейвов на следующий пулл
@@ -564,7 +564,7 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
         log(f"Сравниваю с лучшими киллами этого босса (топ-{TOP_KILLS} гильдий по скорости)…")
         try:
             kills = fetch_top_kills(client, int(f["encounterID"]), int(f.get("difficulty") or 0), log=log,
-                                    progress=lambda x: progress(0.5 + 0.45 * x))
+                                    progress=lambda x: progress(0.5 + 0.25 * x))
             vs = compare_with_top(R, kills)
             if vs:
                 from .config import DIFFICULTY_NAMES
@@ -573,12 +573,31 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
             log(f"Сравнение с топ-гильдиями недоступно: {e}")
             vs = None
         R["extras"]["vs_top"] = vs
+        # Вкладка «Полученный урон и сейвы»: переключатель на лучшие эпохальные киллы
+        if mythic and int(f.get("difficulty") or 0) not in (0, 5):
+            log("Лучшие киллы на эпохальной сложности — для вкладки «Полученный урон и сейвы»…")
+            try:
+                kills_m = fetch_top_kills(client, int(f["encounterID"]), 5, log=log,
+                                          progress=lambda x: progress(0.75 + 0.2 * x))
+                vs_m = compare_with_top(R, kills_m)
+                if vs_m:
+                    vs_m["difficulty"] = "эпохальный"
+                R["extras"]["vs_top_alt"] = vs_m
+            except Exception as e:  # noqa: BLE001
+                log(f"Эпохальные киллы недоступны: {e}")
         extra = brief_lines(vs)
         if extra:  # строка «Пики урона по рейду…» дублирует сравнение с топом
             R["brief"] = [x for x in R["brief"] if not x.startswith("Пики урона по рейду")]
             # Сразу после строки про самый тяжёлый момент
             pos = next((i + 1 for i, line in enumerate(R["brief"]) if line.startswith("Больше всего урона")), 1)
             R["brief"] = (R["brief"][:pos] + extra + R["brief"][pos:])[:7]
+    from .raid_top import _roster_lines, brief_lines as _bl, make_plan
+    X = R["extras"]
+    vs = X.get("vs_top")
+    X["plan"] = vs["plan"] if vs else make_plan(X, {}, [], {})
+    X["saves_brief"] = _bl(vs) + _roster_lines(X.get("roster_cds") or [], X["plan"])
+    if X.get("vs_top_alt"):
+        X["saves_brief_alt"] = _bl(X["vs_top_alt"]) + _roster_lines(X.get("roster_cds") or [], X["vs_top_alt"]["plan"])
     trend = R["extras"].get("pull_trend") or {}
     if trend.get("line") and len(R["brief"]) < 7:
         R["brief"].append(trend["line"])

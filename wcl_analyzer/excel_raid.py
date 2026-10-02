@@ -448,16 +448,17 @@ def write_raid_cd_workbook(R: dict, path: str | Path) -> Path:
 def _vs_top(wb, R, demo):
     X = R.get("extras") or {}
     V, T = X.get("vs_top"), X.get("pull_trend") or {}
-    if not V and not T.get("rows"):
+    if not V and not T.get("rows") and not X.get("roster_cds"):
         return
     s = Sheet(wb, "Против топа", demo, {"A": 12, "B": 30, "C": 36, "D": 22, "E": 30, "F": 10, "G": 10, "H": 10})
     s.title("Рейд против лучших киллов этого босса",
             "Пики урона сопоставлены по механике и её номеру в бою; кулдауны — по номеру способности.")
     if V:
         s.section("План рейдовых кулдаунов на следующий пулл",
-                  "Кулдауны, которые ваш рейд нажимал в этом бою, расставлены на пики с учётом перезарядки.")
+                  "Кулдауны состава (классы, спеки, взятые таланты) расставлены на пики с учётом перезарядки.")
         f, l = s.table(["Нажать в", "Пик", "Кулдауны и кто", "", "У топа здесь"],
                        [[r["time"], r["mechanic"], _plan_text(r), "", r["top"] or "—"] for r in V["plan"]])
+        s.ws.column_dimensions["C"].width = 70
         if V["plan"]:
             s.ws.conditional_formatting.add(f"C{f}:C{l}", CellIsRule(operator="equal", formula=['"нет свободного кулдауна"'], fill=RED))
         s.section("Пики урона: ваш бой и лучшие киллы",
@@ -472,6 +473,11 @@ def _vs_top(wb, R, demo):
         s.section("Лучшие киллы")
         s.table(["Время боя", "Гильдия", "Ссылка"], [[k["duration"], k["guild"], k["url"]] for k in V["kills"]],
                 links={2: lambda i: V["kills"][i]["url"]})
+    if X.get("roster_cds"):
+        s.section("Рейдовые кулдауны состава", "У кого какой рейдовый кулдаун есть: откат, сколько раз нажат, сколько можно за бой.")
+        s.table(["Игрок", "Кулдаун", "Откуда известно", "Откат, с", "Нажато / можно за бой"],
+                [[c["player"], c["name"], c["source"], _v(c["cd"], 0), f"{c['used']} / {c['max_uses'] or '—'}"]
+                 for c in X["roster_cds"]])
     if T.get("rows"):
         s.section("От чего умирает рейд по пуллам", "Смерти до конца вайпа; последние 15 с вайпа не считаются.")
         s.table(["Механика"] + [f"Пулл {n}" for n in T["pulls"]] + ["Всего"],

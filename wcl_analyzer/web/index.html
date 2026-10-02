@@ -216,6 +216,7 @@ dialog label.check input{width:auto;margin:0}
 .diffsw{display:inline-flex;border:1px solid #4A5878;border-radius:8px;overflow:hidden;margin:0 0 12px}
 .diffsw button{background:transparent;border:0;color:#B8C2D9;padding:6px 14px;font-weight:600;cursor:pointer;font-size:14px}
 .diffsw button[aria-pressed=true]{background:var(--you);color:#16213A}
+.diffsw.light{border-color:var(--line);margin:14px 0 4px}.diffsw.light button{color:var(--muted)}.diffsw.light button[aria-pressed=true]{color:#16213A}
 .picks .chk{display:inline-flex;gap:6px;align-items:center;font-size:14px;color:var(--muted)}
 .paste{margin:4px 0 6px;font-size:14px}
 .paste summary{cursor:pointer;color:var(--top)}
@@ -260,7 +261,7 @@ dialog label.check input{width:auto;margin:0}
       <input id="url" type="text" inputmode="url" placeholder="https://www.warcraftlogs.com/reports/…" aria-label="Ссылка на отчёт Warcraft Logs" autocomplete="off">
       <button class="btn" id="findBtn" type="submit">Найти бой</button>
     </form>
-    <div class="hint">Нет ключа или лога под рукой? Посмотрите на демо-данных: <button class="linkbtn" id="demoBtn" type="button">разбор игрока</button>, <button class="linkbtn" id="demoRaidBtn" type="button">разбор рейда</button>, <button class="linkbtn" id="demoRaidRotBtn" type="button">ротация всего рейда</button> или <button class="linkbtn" id="demoRaidCdBtn" type="button">полученный урон и сейвы рейда</button>.</div>
+    <div class="hint">Нет ключа или лога под рукой? Посмотрите на демо-данных: <button class="linkbtn" id="demoBtn" type="button">разбор игрока</button>, <button class="linkbtn" id="demoRaidBtn" type="button">разбор рейда</button> или <button class="linkbtn" id="demoRaidRotBtn" type="button">ротация всего рейда</button>.</div>
 
     <div class="picks" id="picks" hidden>
       <div><label for="fight">Бой</label><select id="fight"></select></div>
@@ -284,7 +285,6 @@ dialog label.check input{width:auto;margin:0}
       <div class="runrow">
         <button class="btn you" id="runBtn" type="button">Разобрать игрока</button>
         <button class="btn" id="raidBtn" type="button">Весь рейд</button>
-        <button class="btn" id="raidCdBtn" type="button" title="Пики урона по рейду, нажатые сейвы, сравнение с лучшими киллами и план сейвов по составу">Полученный урон и сейвы рейда</button>
         <button class="btn" id="raidRotBtn" type="button" title="Каждый DPS боя (или только отобранные) против топа своего спека">Ротация всего рейда</button>
         <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
@@ -512,7 +512,7 @@ try { if (localStorage.getItem("wclMythicToo") === "0") $("#mythicToo").checked 
 $("#mythicToo").addEventListener("change", () => { try { localStorage.setItem("wclMythicToo", $("#mythicToo").checked ? "1" : "0"); } catch(e){} });
 $("#runBtn").onclick = () => run({url:$("#url").value.trim(), fight:$("#fight").value, actor:$("#player").value, ref:$("#ref").value, mythic: $("#mythicToo").checked});
 $("#demoBtn").onclick = () => run({demo:true});
-$("#raidBtn").onclick = () => run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value});
+$("#raidBtn").onclick = () => run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value, mythic: $("#mythicToo").checked});
 $("#demoRaidBtn").onclick = () => run({mode:"raid", demo:true});
 /* Отбор игроков по процентилю WCL: rank% — среди всех игроков спека, ilvl% — среди игроков с тем же уровнем предметов */
 function pickValue(){
@@ -536,9 +536,7 @@ $("#pickBy").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
 $("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: $("#ref").value, pick: pickValue() || null, mythic: $("#mythicToo").checked});
 $("#demoRaidRotBtn").onclick = () => run({mode:"raidrot", demo:true});
-$("#demoRaidCdBtn").onclick = () => run({mode:"raidcd", demo:true});
-$("#raidCdBtn").onclick = () => run({mode:"raidcd", url:$("#url").value.trim(), fight:$("#fight").value, mythic: $("#mythicToo").checked});
-const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn", "#raidCdBtn"];
+const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn"];
 
 /* ---------- анализ ---------- */
 async function run(params, path="/api/analyze"){
@@ -834,7 +832,7 @@ function planTable(plan){
   }));
 }
 
-/* ---------- режим «Полученный урон и сейвы рейда» ---------- */
+/* ---------- «Полученный урон и сейвы рейда» отдельным разбором (кнопки больше нет; для разборов из истории) ---------- */
 function renderRaidCd(R){
   charts.splice(0).forEach(c => c.destroy());
   const pair = R.alt ? {main:R, alt:{...R.alt, info:{...R.info, ...R.alt.info}, excel:R.excel, _main:R, mode:"raidcd"}} : R._main ? {main:R._main, alt:R} : null;
@@ -957,7 +955,7 @@ function renderRaid(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, S = R.summary, fd = S.first_death;
   const outcome = I.kill ? "килл" : (I.boss_pct!=null ? `вайп на ${num(I.boss_pct,1)}% здоровья босса` : "вайп");
-  const tabs = [["r-sum","Обзор"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
+  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
   const el = $("#result");
   el.innerHTML = `
     ${I.demo?'<div class="demo-flag">Демо: синтетический рейд, не реальный лог</div>':""}
@@ -976,26 +974,21 @@ function renderRaid(R){
     <div class="box brief">
       <h3>Главное по бою</h3>
       ${(R.brief||[]).length ? `<ul class="lines">${R.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : '<p class="empty">Явных проблем не найдено.</p>'}
-      ${(R.extras||{}).damage_timeline ? `<h3 style="margin-top:16px">Когда рейд получает больше всего урона</h3>
-        <p class="sub">Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники сверху — рейдовые кулдауны (цвет — роль, красная обводка — нажат вне пиков урона).</p>
-        <div class="chart" style="height:300px"><canvas id="cRaidDmg"></canvas></div>` : ""}
-      ${(((R.extras||{}).vs_top||{}).plan||[]).length ? `<h3 style="margin-top:16px">План рейдовых кулдаунов на следующий пулл</h3>
-        <p class="sub">Кулдауны всего состава (классы, спеки, взятые таланты) расставлены на пики урона с учётом перезарядки. «Как у топа» — тот же кулдаун жмут лучшие гильдии (${R.extras.vs_top.n} ${plural(R.extras.vs_top.n,"килл","килла","киллов")}).</p>
-        ${planTable(R.extras.vs_top.plan)}` : ""}
+      ${(R.extras||{}).damage_timeline ? `<p class="hint" style="margin:12px 0 0">График урона по рейду, план сейвов на следующий пулл и сравнение с лучшими киллами — во вкладке «Полученный урон и сейвы».</p>` : ""}
       ${topIssues(R.issues).length ? `<h3 style="margin-top:16px">Кому что поправить</h3>` + topIssues(R.issues).map(i=>`<div class="issue"><div class="who"><b>${esc(i.player)}</b><span>${esc(i.role)}, ${esc(who(i.cls, i.spec))}</span></div>
           <div>${esc(i.text)}</div><span class="sev s${i.severity}">${i.kind?esc(i.kind):""}</span></div>`).join("") : ""}
     </div>
-    <details class="more" id="more"><summary>Подробности: все игроки, механики, смерти, пуллы</summary>
+    <details class="more" id="more"><summary>Подробности: полученный урон и сейвы, игроки, механики, смерти, пуллы</summary>
     <div class="legend raidleg"><span><i class="role tank"></i>Танк</span><span><i class="role healer"></i>Лекарь</span><span><i class="role dps"></i>DPS</span></div>
     <div class="tabs" role="tablist">${tabs.map(([k,t],i)=>`<button role="tab" aria-selected="${i==0}" aria-controls="p-${k}" id="t-${k}">${t}</button>`).join("")}</div>
     ${tabs.map(([k],i)=>`<div class="panel ${i==0?"on":""}" role="tabpanel" id="p-${k}" aria-labelledby="t-${k}"></div>`).join("")}
     </details>`;
   el.hidden = false;
   $("#more").addEventListener("toggle", () => charts.forEach(c => c.resize()));
-  raidDamageChart(R);
   el.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
     el.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
     el.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "p-"+b.id.slice(2)));
+    charts.forEach(c => c.resize());  // график во вкладке, которая была скрыта
   });
   const P = R.players;
 
@@ -1020,25 +1013,29 @@ function renderRaid(R){
     </div>`;
   const X = R.extras || {};
   const V = X.vs_top;
-  if (V) $("#p-r-sum").insertAdjacentHTML("beforeend", `<div class="box"><h3>Пики урона: ваш бой и лучшие киллы</h3>
-      <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы${V.difficulty?` той же сложности (${esc(V.difficulty)})`:""}: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${k.duration})`).join(", ")}.
-      Кулдауном закрыто: у топа ${pct(V.top_cover,0)}, у вас ${pct(V.my_cover,0)}.</p>
-      ${table(["Когда","Пик","Ваши кулдауны","У топа закрыт","Чем закрывает топ"], V.rows.map(r=>[r.time, esc(r.mechanic),
-        r.my==null ? '<span style="color:var(--muted)">не дошли</span>' : r.my.length ? esc(r.my.join(", ")) : '<span class="worse">нет</span>',
-        r.top_share==null ? "—" : pct(r.top_share,0), esc((r.top_cds||[]).join(", ")||"—")]), {num:[3]})}</div>`);
+  /* Вкладка «Полученный урон и сейвы»: топ вашей сложности или эпохальный (переключатель) */
+  const savesTab = alt => {
+    const vs = alt ? X.vs_top_alt : X.vs_top;
+    const Pd = {info:R.info, extras:{...X, vs_top:vs, plan: vs ? vs.plan : X.plan},
+                brief: (alt ? X.saves_brief_alt : X.saves_brief) || []};
+    const pane = $("#p-r-cd");
+    charts.filter(c => c.canvas && c.canvas.id === "cRaidDmg").forEach(c => { c.destroy(); charts.splice(charts.indexOf(c), 1); });
+    pane.innerHTML = (X.vs_top_alt ? `<div class="diffsw light" role="group" aria-label="С какими лучшими киллами сравнивать">
+        <button type="button" data-sw="0" aria-pressed="${!alt}">Топ: ${esc((X.vs_top||{}).difficulty || I.difficulty)}</button>
+        <button type="button" data-sw="1" aria-pressed="${!!alt}">Топ: эпохальный</button></div>` : "") + '<div id="savesBody"></div>';
+    renderRaidPeaks(Pd, $("#savesBody"));
+    pane.querySelectorAll(".diffsw button").forEach(b => b.onclick = () => savesTab(b.dataset.sw === "1"));
+  };
+  if (X.damage_timeline) savesTab(false);
+  else $("#p-r-cd").innerHTML = '<p class="empty">Нет данных об уроне по рейду.</p>';
   if (Object.keys(X).length) $("#p-r-sum").insertAdjacentHTML("beforeend", `<div class="grid2">
-    <div>
-    ${box("Самые тяжёлые моменты", "5 секунд с наибольшим уроном по рейду (без танков). Кулдаун засчитан, если нажат за 8 с до момента или во время него.",
-      table(["Когда","Урон за 5 с","Доля боя","Механики","Рейдовые кулдауны"], (X.heaviest||[]).map(h=>[h.time, num(h.damage), pct(h.share,0), esc(h.abilities.join(", ")), h.cds.length?esc(h.cds.join(", ")):'<span class="worse">нет</span>']), {num:[1,2], empty:"Нет данных об уроне."}))}
-    ${box("Рейдовые кулдауны", "Все нажатия за бой. «Список» — известный рейдовый кулдаун, «по логу» — редкая способность лекаря. Урон за 10 с — сколько рейд получил после нажатия.",
-      table(["Когда","Кулдаун","Игрок","На пик урона","Урон за 10 с","Источник"], (X.raid_cds||[]).map(c=>[c.time, esc(c.name), `${esc(c.player)} <span style="color:var(--muted);font-size:12.5px">${esc(c.role)}</span>`,
-        c.on_peak?c.on_peak:'<span class="worse">вне пиков</span>', num(c.taken_10s), esc(c.source)]), {num:[4], empty:"Рейдовых кулдаунов не найдено."}))}
-    </div>
     <div>
       ${box("Прерывания", "Каст прошёл, хотя эту способность в бою прерывали.",
         table(["Способность","Пропущено","Когда"], (X.missed_kicks||[]).map(m=>[esc(m.name), num(m.count), esc(m.times.join(", "))]), {num:[1], empty:"Пропущенных прерываний нет."}))}
       ${X.consumables ? box("Расходники на пулле", `Проверено игроков: ${X.consumables.checked}.`,
         table(["Чего не было","Игроки"], [["Фиал", esc(X.consumables.no_flask.join(", ")||"у всех есть")], ["Еда", esc(X.consumables.no_food.join(", ")||"у всех есть")], ["Руна", esc(X.consumables.no_rune.join(", ")||"у всех есть")]])) : ""}
+    </div>
+    <div>
       ${(X.boss_debuffs||[]).length ? box("Дебаффы на боссе", "Рейдовые дебаффы и кто их вешал.",
         table(["Дебафф","Время действия","Кто"], X.boss_debuffs.map(d=>[esc(d.name), pct(d.uptime,0), esc(d.by.join(", "))]), {num:[1]})) : ""}
       ${(X.avoidable||[]).length ? box("Избегаемый урон", "Механики из списка избегаемых (spell_meta.json, поле _avoidable).",

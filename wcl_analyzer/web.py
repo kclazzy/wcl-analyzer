@@ -408,6 +408,7 @@ def _run_raid(job: dict, params: dict, creds, log) -> None:
         client, url = _client(creds, job, log), params["url"]
     R = run_raid(client, url, params.get("fight"), log=step, avoidable=avoidable,
                  talent_data=[] if params.get("demo") else None, save_talents=not SERVER["public"],
+                 mythic=params.get("mythic") is not False,
                  progress=lambda x: job.__setitem__("progress", max(job["progress"], min(0.97, x))))
     _excel_bytes(job, f"Рейд_{R['info']['boss']}_пулл{R['summary']['pull_n']}", write_raid_workbook, R)
     job["result"] = {**R, "excel": f"/api/report/{job['id']}", "source_url": url}

@@ -23,8 +23,13 @@ orientation = portrait
 fullscreen = 0
 
 android.permissions = INTERNET
-android.api = 33
+# Целевая версия Android: свежая, иначе Play Защита считает приложение устаревшим
+android.api = 35
 android.minapi = 24
+android.ndk_api = 24
+# Релизная сборка — обычный подписанный APK (не .aab для Google Play)
+android.release_artifact = apk
+android.debug_artifact = apk
 android.archs = arm64-v8a, armeabi-v7a
 android.accept_sdk_license = True
 android.allow_backup = False

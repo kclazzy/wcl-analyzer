@@ -72,12 +72,39 @@ jobs:
             ~/.buildozer
             android/.buildozer
           key: buildozer-${{ hashFiles('android/buildozer.spec') }}
+      - name: Ключ подписи APK
+        # Постоянный ключ из секретов репозитория: Play Защита доверяет приложению, подписанному
+        # одним и тем же ключом, и обновления ставятся поверх без удаления (данные сохраняются).
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE }}
+          PW: ${{ secrets.ANDROID_KEY_PASS }}
+        run: |
+          if [ -n "$KS" ] && [ -n "$PW" ]; then
+            echo "$KS" | base64 -d > "$HOME/wcl.keystore"
+          else
+            echo "::warning title=Ключ подписи::Секреты ANDROID_KEYSTORE и ANDROID_KEY_PASS не заданы — APK подписан временным ключом. Обновление поверх старой версии не встанет."
+            PW=temp-$(date +%s%N)
+            echo "::add-mask::$PW"
+            keytool -genkeypair -keystore "$HOME/wcl.keystore" -storetype PKCS12 -alias wcl -keyalg RSA -keysize 2048 \
+              -validity 10000 -storepass "$PW" -keypass "$PW" -dname "CN=WCL Analyzer"
+          fi
+          {
+            echo "P4A_RELEASE_KEYSTORE=$HOME/wcl.keystore"
+            echo "P4A_RELEASE_KEYALIAS=wcl"
+            echo "P4A_RELEASE_KEYSTORE_PASSWD=$PW"
+            echo "P4A_RELEASE_KEYALIAS_PASSWD=$PW"
+          } >> "$GITHUB_ENV"
       - name: Сборка APK
+        env:
+          # NDK r25b знает Android API до 33; нативные части собираются под minapi, приложение нацелено на 35
+          APP_PLATFORM: android-24
         run: |
           cp -r wcl_analyzer android/
           cd android
+          # Номер версии растёт с каждой сборкой — Android ставит обновление поверх
+          sed -i "s/^version = .*/version = 1.1.${{ github.run_number }}/" buildozer.spec
           set +e
-          { yes || true; } | buildozer -v android debug > build.log 2>&1
+          { yes || true; } | buildozer -v android release > build.log 2>&1
           code=${PIPESTATUS[1]}
           set -e
           if [ "$code" != "0" ]; then

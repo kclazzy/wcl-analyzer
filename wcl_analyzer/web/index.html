@@ -246,7 +246,18 @@ dialog label.check input{width:auto;margin:0}
   .picks{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.hero{grid-template-columns:1fr}
   .hero .side{align-items:flex-start}.db{grid-template-columns:1fr;gap:4px}.db .v{text-align:left}
   .urlrow{flex-direction:column}.start h2{font-size:24px}
+  /* Телефон: шапка и «таблетки» переносятся, а не вылезают за край (в т.ч. при крупном шрифте системы) */
+  header h1,.pill,.pill.limit{white-space:normal}
+  .pill{max-width:100%;text-align:left;font-size:13px;padding:6px 11px}
+  header h1{font-size:19px}
+  /* Вкладки — в несколько строк, все видны сразу, без прокрутки вбок */
+  .tabs{flex-wrap:wrap;overflow-x:visible;gap:2px 0}
+  .tabs button{padding:9px 10px;font-size:14px;white-space:normal;text-align:left}
+  .diffsw{max-width:100%}.diffsw button{padding:6px 10px}
 }
+/* Колонки и блоки не шире экрана: таблицы внутри прокручиваются сами, текст переносится */
+.grid2>*,.picks>*,.hero>*{min-width:0}
+.box,.lines li,.who,.act .do,.act .why,.issue,.sub,.hint,.empty{overflow-wrap:anywhere}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>

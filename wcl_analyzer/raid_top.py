@@ -156,7 +156,7 @@ def _roster_lines(roster: list[dict], plan: list[dict]) -> list[str]:
 
 def _aggregate(kills: list[dict]) -> dict:
     ref: dict = defaultdict(lambda: {"times": [], "peaks": [], "covered": 0, "kills": 0, "cds": Counter(),
-                                     "name": None, "damage": []})
+                                     "name": None, "damage": [], "n_cds": []})
     for k in kills:
         for sp in k["spikes"]:
             r = ref[(sp.get("ability_id"), sp.get("k", 1))]
@@ -168,6 +168,7 @@ def _aggregate(kills: list[dict]) -> dict:
             if sp.get("covered_ids"):
                 r["covered"] += 1
             r["cds"].update(sp.get("covered_ids") or [])
+            r["n_cds"].append(len(sp.get("covered_ids") or []))  # сколько кулдаунов топ жмёт на этот пик
     need = max(2, MIN_SHARE * len(kills)) if len(kills) >= 3 else 1
     return {key: r for key, r in ref.items() if r["kills"] >= need}
 
@@ -224,7 +225,10 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
 
 from .raid_cds import POWER  # noqa: E402
 
-HEAVY_PEAK = 1.4   # пик тяжелее медианы пиков в 1,4 раза и больше — на него два кулдауна
+HEAVY_PEAK = 1.25    # пик тяжелее медианы пиков в 1,25 раза — на него два кулдауна
+DANGER_PEAK = 1.6    # в 1,6 раза — три
+MAX_PER_PEAK = 3
+MAX_SPARE = 3        # запасных вариантов на пик
 
 
 def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
@@ -252,7 +256,7 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
             seen = min(gaps) if gaps else None
             cds[key]["cd"] = min(v for v in (known, seen) if v) if (known or seen) else DEFAULT_CD_S
     events = [{"t": s.get("peak_t", s["t"]), "mechanic": f"«{s['ability']}» №{s.get('k', 1)}", "key": (s.get("ability_id"), s.get("k", 1)),
-               "prio": s["damage"]} for s in X.get("spikes", [])]
+               "prio": s["damage"], "deaths": s.get("deaths", 0)} for s in X.get("spikes", [])]
     top_dmg = max((e["prio"] for e in events), default=1.0)
     for r in late:
         events.append({"t": r["peak_t"], "mechanic": r["mechanic"], "key": r["_key"], "prio": top_dmg * 0.5 * (r["top_share"] or 0.5)})
@@ -262,8 +266,12 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
     for ev in sorted(events, key=lambda e: e["t"]):
         r = ref.get(ev["key"])
         pref = [i for i, _ in r["cds"].most_common()] if r else []
-        heavy = med and ev["prio"] >= HEAVY_PEAK * med
-        need = 2 if heavy and len(cds) >= 4 else 1
+        # Сколько кулдаунов: по тяжести пика и по тому, сколько на него жмёт топ (медиана по киллам)
+        sev = (1 + (bool(med) and ev["prio"] >= HEAVY_PEAK * med) + (bool(med) and ev["prio"] >= DANGER_PEAK * med)
+               + (ev.get("deaths", 0) > 0))  # в этот пик в вашем бою кто-то умер
+        top_need = int(round(median(r["n_cds"]))) if r and r.get("n_cds") else 0
+        need = max(1, min(MAX_PER_PEAK, max(sev, top_need), len({c["player"] for c in cds.values()})))
+        heavy = need >= 2
         picks, players = [], set()
         for _ in range(need):
             best = None
@@ -287,7 +295,9 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
             players.add(cds[k]["player"])
             picks.append((k, at))
         t0 = picks[0][1] if picks else max(0.0, ev["t"] - PRESS_LEAD_S)
-        row = {"time": _fmt_t(t0), "t": t0, "mechanic": ev["mechanic"], "heavy": bool(heavy),
+        row = {"time": _fmt_t(t0), "t": t0, "mechanic": ev["mechanic"], "heavy": bool(heavy), "need": need,
+               "deaths": ev.get("deaths", 0),
+               "top_n": top_need,
                "top": ", ".join(names.get(i, f"#{i}") for i in pref[:2]),
                "picks": [{"cd": cds[k]["name"], "player": cds[k]["player"], "like_top": k[1] in pref[:2],
                           "cooldown": _fmt_t(cds[k]["cd"]), "ready": _fmt_t(at + cds[k]["cd"]), "at": _fmt_t(at)}
@@ -297,7 +307,26 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
             row.update({"cd": f["cd"], "player": f["player"], "like_top": any(x["like_top"] for x in row["picks"])})
         else:
             row.update({"cd": None, "player": None, "like_top": False})
+        row["_t"] = ev["t"]
+        row["_keys"] = [k for k, _ in picks]
         plan.append(row)
+    # Запасные варианты: кулдауны, которые к этому пику откатаны и не мешают остальному плану
+    for row in plan:
+        at = max(0.0, row["_t"] - PRESS_LEAD_S)
+        spare = [k for k in cds if k not in row["_keys"]
+                 and all(abs(at - t) >= cds[k]["cd"] for t in assigned[k])]
+        busy = {cds[k]["player"] for k in row["_keys"]}  # сначала — другие игроки, не те, кто уже жмёт
+        spare.sort(key=lambda k: (cds[k]["player"] in busy, -POWER.get(k[1], 2), cds[k]["cd"]))
+        seen, out = set(), []
+        for k in spare:
+            if (cds[k]["player"], cds[k]["name"]) in seen:
+                continue
+            seen.add((cds[k]["player"], cds[k]["name"]))
+            out.append({"cd": cds[k]["name"], "player": cds[k]["player"], "cooldown": _fmt_t(cds[k]["cd"])})
+            if len(out) >= MAX_SPARE:
+                break
+        row["spare"] = out
+        del row["_t"], row["_keys"]
     return sorted(plan, key=lambda r: r["t"])
 
 

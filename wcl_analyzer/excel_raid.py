@@ -399,8 +399,11 @@ def _plan_text(r: dict) -> str:
         return (r["cd"] + " — " + (r["player"] or "") + (" (как у топа)" if r["like_top"] else "")) if r["cd"] else "нет свободного кулдауна"
     if not picks:
         return "нет свободного кулдауна"
-    return "; ".join(f"{p['cd']} — {p['player']}{' (как у топа)' if p['like_top'] else ''}, откат {p['cooldown']}, "
+    text = "; ".join(f"{p['cd']} — {p['player']}{' (как у топа)' if p['like_top'] else ''}, откат {p['cooldown']}, "
                      f"снова готов в {p['ready']}" for p in picks)
+    if r.get("spare"):
+        text += ". Запасные: " + "; ".join(f"{x['cd']} — {x['player']}" for x in r["spare"])
+    return text
 
 
 def write_raid_cd_workbook(R: dict, path: str | Path) -> Path:

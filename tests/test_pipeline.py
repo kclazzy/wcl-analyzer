@@ -137,6 +137,17 @@ def test_raid():
     Xs = R["extras"]
     assert Xs["plan"] and all(r["picks"] for r in Xs["plan"]), "во вкладке «Полученный урон и сейвы» нет плана"
     assert Xs["roster_cds"] and Xs["saves_brief"], "нет кулдаунов состава или выжимки сейвов"
+    # пик со смертью — опасный: несколько сейвов разных игроков; у каждого пика — запасные, уже откатанные
+    danger = [r for r in Xs["plan"] if r["deaths"]]
+    assert danger and all(len(r["picks"]) >= 2 and len({p["player"] for p in r["picks"]}) == len(r["picks"]) for r in danger)
+    assert all(r["spare"] for r in Xs["plan"]), "нет запасных вариантов"
+    cdmap = {(c["player"], c["name"]): c["cd"] for c in Xs["roster_cds"]}
+    uses = {}
+    for r in Xs["plan"]:
+        for p in r["picks"]:
+            uses.setdefault((p["player"], p["cd"]), []).append(r["t"])
+    for k, ts in uses.items():
+        assert all(b - a >= cdmap[k] - 0.01 for a, b in zip(sorted(ts), sorted(ts)[1:])), (k, ts)
     assert R["info"]["size"] == 20 and R["info"]["kill"]
     cats = {a["name"]: a["category"] for a in R["abilities"]}
     assert cats["Ледяная волна"] == "По всему рейду" and cats["Лужа холода"] == "Выборочно"

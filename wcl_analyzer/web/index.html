@@ -802,7 +802,7 @@ function renderRaidPeaks(P, el){
     ${(P.brief||[]).length ? `<div class="box brief"><ul class="lines">${P.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
     ${box("Урон по рейду и рейдовые кулдауны", "Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники — рейдовые кулдауны вашего рейда (красная обводка — нажат вне пиков)" + (V ? ", полые бирюзовые — что жмут лучшие киллы." : "."),
       '<div class="chart" style="height:300px"><canvas id="cRaidDmg"></canvas></div>')}
-    ${(R => R.length ? box("План сейвов на следующий пулл", "Кулдауны всего состава — классы и спеки, взятые таланты — расставлены на пики с учётом перезарядки: нажать за 1–5 с до пика. На самые тяжёлые пики — два кулдауна разных игроков. «Как у топа» — тот же кулдаун на этот пик жмут лучшие гильдии.",
+    ${(R => R.length ? box("План сейвов на следующий пулл", "Кулдауны всего состава — классы и спеки, взятые таланты — расставлены на пики с учётом перезарядки: нажать за 1–5 с до пика. Сколько сейвов на пик — по тому, сколько жмут лучшие гильдии, и по тяжести пика (до трёх, разных игроков). «Запасные» — что ещё откатано к этому моменту и не сломает остальной план. «Как у топа» — тот же кулдаун на этот пик жмут лучшие гильдии.",
       planTable(R)) : "")(X.plan || (V && V.plan) || [])}
     ${V ? `<div class="box"><h3>Пики урона: что нажал ваш рейд и что жмёт топ</h3>
       <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы${V.difficulty?` той же сложности (${esc(V.difficulty)})`:""}: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${esc(k.duration)})`).join(", ")}.
@@ -824,11 +824,13 @@ function renderRaidPeaks(P, el){
 function planTable(plan){
   return table(["Нажать в","Пик","Кулдауны и кто"], plan.map(r=>{
     const picks = r.picks || (r.cd ? [{cd:r.cd, player:r.player, like_top:r.like_top}] : []);
-    return [r.time, esc(r.mechanic) + (r.heavy ? ' <span class="tag LOW">тяжёлый</span>' : ""),
+    return [r.time, esc(r.mechanic) + (r.heavy ? ` <span class="tag LOW">опасный: ${r.need} ${plural(r.need,"сейв","сейва","сейвов")}</span>` : "")
+        + (r.top_n || r.deaths ? `<div style="font-size:12.5px;color:var(--muted)">${[r.top_n ? `топ жмёт: ${r.top_n}` : "", r.deaths ? `смертей в этот пик: ${r.deaths}` : ""].filter(Boolean).join(", ")}</div>` : ""),
       (picks.length ? picks.map(p=>`<div><b>${esc(p.cd)}</b> — ${esc(p.player)}${p.like_top?' <span class="tag HIGH">как у топа</span>':""}`
           + (p.cooldown ? `<span style="color:var(--muted);font-size:12.5px"> · откат ${esc(p.cooldown)}, снова готов в ${esc(p.ready)}</span>` : "") + "</div>").join("")
         : '<span class="worse">нет свободного кулдауна</span>')
-      + (!picks.some(p=>p.like_top) && r.top ? `<div style="font-size:12.5px;color:var(--muted)">у топа здесь: ${esc(r.top)}</div>` : "")];
+      + (!picks.some(p=>p.like_top) && r.top ? `<div style="font-size:12.5px;color:var(--muted)">у топа здесь: ${esc(r.top)}</div>` : "")
+      + ((r.spare||[]).length ? `<div style="font-size:12.5px;color:var(--muted);margin-top:3px">Запасные, откатаны к этому моменту: ${r.spare.map(x=>`${esc(x.cd)} — ${esc(x.player)}`).join("; ")}</div>` : "")];
   }));
 }
 

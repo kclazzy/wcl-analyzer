@@ -665,6 +665,9 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
                 spikes.append({"t": float(i), "damage": w, "ability": nm(top_ab) if main else "—", "ability_id": top_ab})
             elif spikes and i - spikes[-1]["t"] <= SPIKE_GAP_S and w > spikes[-1]["damage"]:
                 spikes[-1]["damage"] = w
+    # Смерти в пик (от начала окна до 6 с после него) — признак опасного пика для плана сейвов
+    for sp in spikes:
+        sp["deaths"] = sum(1 for d in deaths if not d.get("wipe_tail") and sp["t"] <= d["t"] <= sp["t"] + 5 + 6)
     # Рейдовые кулдауны: известные (по ID и названию) у любого класса + эвристика для лекарей
     raid_cds = []
     used_by_others = {ab for pid, cs in casts_by.items() if players.get(pid, {}).get("role") != "healer"

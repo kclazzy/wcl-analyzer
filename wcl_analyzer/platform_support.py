@@ -30,19 +30,53 @@ def default_data_dir() -> Path:
 
 
 # ---------------------------------------------------------------- Android
-def _android():
+# Классы Java нужно загрузить в главном потоке: потоки веб-сервера (где обрабатываются нажатия)
+# не видят классы самого приложения — autoclass("org.kivy.android.PythonActivity") там даёт
+# ClassNotFoundException. Поэтому serve() вызывает android_preload() при запуске, а дальше
+# функции берут уже загруженные классы.
+_J: dict = {}
+_JAVA = {
+    "PythonActivity": "org.kivy.android.PythonActivity",
+    "Build": "android.os.Build$VERSION",
+    "MediaStore": "android.provider.MediaStore$Downloads",
+    "ContentValues": "android.content.ContentValues",
+    "Environment": "android.os.Environment",
+    "Intent": "android.content.Intent",
+    "Uri": "android.net.Uri",
+}
+
+
+def android_preload() -> None:
+    """Загружает нужные классы Java (вызывать в главном потоке, до запуска сервера)."""
     from jnius import autoclass  # есть только внутри Android-приложения
-    return autoclass
+    for key, name in _JAVA.items():
+        if key in _J:
+            continue
+        try:
+            _J[key] = autoclass(name)
+        except Exception:  # noqa: BLE001 — например, MediaStore$Downloads нет на Android 9 и старше
+            pass
+    act = _J.get("PythonActivity")
+    if act is not None:
+        _J["activity"] = act.mActivity
+
+
+def _j(key: str):
+    if key not in _J:
+        android_preload()  # запасной путь: если вызвано до preload (в главном потоке сработает)
+    if key not in _J:
+        raise OSError(f"Android: класс {_JAVA.get(key, _JAVA['PythonActivity'] if key == 'activity' else key)} "
+                      "недоступен — перезапустите приложение")
+    return _J[key]
 
 
 def android_save_download(name: str, data: bytes, mime: str) -> str:
     """Сохраняет файл в общую папку «Загрузки» телефона. Возвращает, где искать файл."""
-    autoclass = _android()
-    Build = autoclass("android.os.Build$VERSION")
-    activity = autoclass("org.kivy.android.PythonActivity").mActivity
+    Build = _j("Build")
+    activity = _j("activity")
     if Build.SDK_INT >= 29:
-        MediaStore = autoclass("android.provider.MediaStore$Downloads")
-        ContentValues = autoclass("android.content.ContentValues")
+        MediaStore = _j("MediaStore")
+        ContentValues = _j("ContentValues")
         values = ContentValues()
         values.put("_display_name", name)
         values.put("mime_type", mime)
@@ -58,7 +92,7 @@ def android_save_download(name: str, data: bytes, mime: str) -> str:
             stream.close()
         return f"Загрузки/WCL Analyzer/{name}"
     # Android 7–9: личная папка приложения на общем хранилище — разрешения не нужны
-    Environment = autoclass("android.os.Environment")
+    Environment = _j("Environment")
     folder = Path(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath())
     folder.mkdir(parents=True, exist_ok=True)
     (folder / name).write_bytes(data)
@@ -67,9 +101,8 @@ def android_save_download(name: str, data: bytes, mime: str) -> str:
 
 def android_open_url(url: str) -> None:
     """Открывает ссылку в браузере телефона (Warcraft Logs, страница создания ключа)."""
-    autoclass = _android()
-    Intent, Uri = autoclass("android.content.Intent"), autoclass("android.net.Uri")
-    activity = autoclass("org.kivy.android.PythonActivity").mActivity
+    Intent, Uri = _j("Intent"), _j("Uri")
+    activity = _j("activity")
     intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     activity.startActivity(intent)

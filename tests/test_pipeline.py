@@ -658,8 +658,62 @@ def test_code_update():
     print("OK обновление кода: подключается при запуске, чужая оболочка и сломанный код — встроенная версия")
 
 
+def test_android_java_threads():
+    """Android: классы приложения из потока сервера не находятся — загружаем их заранее в главном потоке."""
+    import threading
+    import types
+    calls = []
+
+    class _Cls:
+        def __init__(self, name):
+            self.name = name
+            self.mActivity = self
+            self.SDK_INT = 33
+            self.ACTION_VIEW, self.FLAG_ACTIVITY_NEW_TASK = "view", 1
+
+        def __call__(self, *a):
+            return self
+
+        def parse(self, u):
+            return u
+
+        def addFlags(self, f):
+            pass
+
+        def startActivity(self, intent):
+            calls.append("open")
+
+    def autoclass(name):
+        if name.startswith("org.kivy") and threading.current_thread() is not threading.main_thread():
+            raise Exception("JVM exception occurred: java.lang.ClassNotFoundException")
+        return _Cls(name)
+
+    sys.modules["jnius"] = types.SimpleNamespace(autoclass=autoclass)
+    try:
+        from wcl_analyzer import platform_support as ps
+        ps._J.clear()
+        errs = []
+        # без загрузки заранее — в потоке ошибка (как была у пользователя)
+        def no_preload():
+            try:
+                ps.android_open_url("https://x")
+            except Exception as e:  # noqa: BLE001
+                errs.append(str(e))
+        t = threading.Thread(target=no_preload); t.start(); t.join()
+        assert errs and "PythonActivity" in errs[0], errs
+        ps._J.clear()
+        ps.android_preload()  # главный поток — как в serve()
+        t = threading.Thread(target=lambda: ps.android_open_url("https://x")); t.start(); t.join()
+        assert calls == ["open"], calls
+    finally:
+        del sys.modules["jnius"]
+        ps._J.clear()
+    print("OK Android: классы Java загружаются в главном потоке — сохранение файлов и ссылки работают из потоков")
+
+
 if __name__ == "__main__":
     test_batched_fetch()
+    test_android_java_threads()
     test_code_update()
     test_single_sources()
     test_talent_data_without_ids()

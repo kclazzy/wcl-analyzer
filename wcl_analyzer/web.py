@@ -799,6 +799,12 @@ def _free_port(preferred: int, host: str) -> int:
 
 def serve(port: int = 8765, open_browser: bool = True, local_only: bool = False, public: bool = False) -> None:
     public = public or os.environ.get("WCL_PUBLIC") == "1"
+    from .platform_support import android_preload, app_mode
+    if app_mode() == "android":
+        try:  # классы Java — в главном потоке, иначе сохранение файлов и ссылки падают в потоках сервера
+            android_preload()
+        except Exception as e:  # noqa: BLE001
+            print(f"Android: классы Java не загружены заранее: {e}")
     if public:  # публичный сервер ничего не пишет на диск — и игровые данные держит только в памяти
         from . import game_data
         game_data.SAVE["enabled"] = False

@@ -188,7 +188,7 @@ tr.flag td{background:var(--bad-soft)}
 .bt-sev{font-size:11.5px;font-weight:700;border-radius:6px;padding:1px 7px}.bt-sev.high{background:var(--bad);color:#fff}.bt-sev.medium{background:var(--warn-soft);color:#6B4A05}
 .bt-ln{grid-column:2;font-size:13.5px;line-height:1.4}.bt-ln .ic{display:inline-block;width:20px}
 .bt-ln.top{color:var(--top)}.bt-ln.bad{color:var(--bad)}.bt-hidetop .bt-ln.top{display:none}
-.bt-map{position:sticky;top:8px;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel)}
+.bt-map{position:sticky;top:64px;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel)}
 .bt-map svg{width:100%;height:auto;display:block;touch-action:none}
 .bt-mapbar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:8px;font-size:13px}
 .bt-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -796,7 +796,7 @@ function render(R){
   /* Два эталона: топ вашей сложности (основной) и эпохальный топ (R.alt). Переключатель перерисовывает разбор */
   const pair = R.alt ? {main:R, alt:{...R.alt, _main:R, _back:R._back}} : R._main ? {main:R._main, alt:R} : null;
   /* Только три вкладки: остальные подробности — в Excel */
-  const tabs = [["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["tal","Таланты"],["gear","Экипировка"]];
+  const tabs = [["battle","Бой по шагам"],["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["tal","Таланты"],["gear","Экипировка"]];
   const B = R.brief || {  // разборы, сохранённые до появления выжимки
     verdict: `${num(I.dps)} DPS против ${num(I.ref_dps)} у медианы топа`, reliability: R.reliability.overall, reliability_note: "",
     actions: (R.top5||[]).slice(0,3).map(f=>({do:f.focus||f.title, title:f.title, why:"", level:f.level,
@@ -820,7 +820,7 @@ function render(R){
       </div>
       <div class="side">
         <span class="rel ${R.reliability.overall}">Надёжность сравнения: ${REL_RU[R.reliability.overall]||R.reliability.overall}</span>
-        ${R.battle && !R.battle.error ? '<button type="button" class="btn" id="toBattle" style="background:#fff;color:var(--ink)">Бой по шагам ↓</button>' : ""}
+        ${R.battle && !R.battle.error ? '<button type="button" class="btn" id="toBattle" style="background:#fff;color:var(--ink)">Бой по шагам</button>' : ""}
         <a class="btn you" href="${R.excel}" download>Скачать Excel</a>
         <a href="${esc(I.url)}" target="_blank" rel="noopener" style="color:#B8C2D9;font-size:14px">Открыть лог на WCL</a>
       </div>
@@ -838,8 +838,7 @@ function render(R){
       ${R.talents && (R.talents.summary||[]).length ? `<p class="hint" style="margin:10px 0 0">${R.talents.summary.map(esc).join(". ")}. Подробно — во вкладке «Таланты».</p>` : ""}
       ${B.noise_hidden?`<p class="hint" style="margin:10px 0 0">Скрыто отличий, которые так же часто встречаются у самих игроков топа: ${B.noise_hidden}. Они есть в подробностях.</p>`:""}
     </div>
-    <div id="battle"></div>
-    <details class="more" id="more"><summary>Подробности: ротация, кулдауны и бурст, таланты, экипировка</summary>
+    <details class="more" id="more"><summary>Подробности: бой по шагам, ротация, кулдауны и бурст, таланты, экипировка</summary>
     <div class="legend"><span class="l-you">Вы</span><span class="l-top">Медиана топа</span><span class="l-bad">Отличие не в вашу пользу</span></div>
     <div class="tabs" role="tablist">${tabs.map(([k,t],i)=>`<button role="tab" aria-selected="${i==0}" aria-controls="p-${k}" id="t-${k}">${t}</button>`).join("")}</div>
     ${tabs.map(([k],i)=>`<div class="panel ${i==0?"on":""}" role="tabpanel" id="p-${k}" aria-labelledby="t-${k}"></div>`).join("")}
@@ -849,8 +848,10 @@ function render(R){
   if (R._back) $("#backRaid").onclick = () => renderRaidRot(R._back);
   el.querySelectorAll(".diffsw button").forEach(b => b.onclick = () => render(b.dataset.sw === "alt" ? pair.alt : pair.main));
   showProgress(R);
-  renderBattle(R.battle, $("#battle"), I);
-  if ($("#toBattle")) $("#toBattle").onclick = () => $("#battle").scrollIntoView({behavior:"smooth"});
+  renderBattle(R.battle, $("#p-battle"), I);
+  // кнопка в шапке: раскрыть подробности и открыть вкладку «Бой по шагам»
+  if ($("#toBattle")) $("#toBattle").onclick = () => { $("#more").open = true; $("#t-battle").click();
+    $("#more").scrollIntoView({behavior:"smooth"}); };
   el.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
     el.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
     el.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "p-"+b.id.slice(2)));
@@ -916,7 +917,7 @@ function btT(t){ if (t==null) return "—"; t=Math.max(0,t); const m=Math.floor(
 
 function renderBattle(B, el, I){
   if (!el) return;
-  if (!B) { el.innerHTML = ""; return; }   // разборы старых версий — без этого блока
+  if (!B) { el.innerHTML = box("Бой по шагам", "", '<p class="empty">Этот разбор сохранён до появления пошагового разбора. Запустите разбор заново — вкладка заполнится.</p>'); return; }
   if (B.error) { el.innerHTML = box("Бой по шагам", "", `<p class="empty">${esc(B.error)}</p>`); return; }
   const M = B.movement || {}, has = !!M.available;
   const st = {sel:null, mode:"both", heat:false, all:false, f:new Set(BT_FILTERS.map(x=>x[0])), t:null, playing:false, speed:1, raf:0};

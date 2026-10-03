@@ -252,6 +252,7 @@ dialog label.check input{width:auto;margin:0}
 .tabs{position:sticky;top:0;z-index:5;background:var(--paper)}
 
 @media (max-width:820px){
+  .runrow .btn{white-space:normal;max-width:100%;text-align:left}
   .wrap{padding:16px 12px 60px}
   header{flex-wrap:wrap;margin-bottom:16px}
   .start,.refs{padding:18px 16px}
@@ -303,7 +304,7 @@ dialog label.check input{width:auto;margin:0}
       <input id="url" type="text" inputmode="url" placeholder="https://www.warcraftlogs.com/reports/…" aria-label="Ссылка на отчёт Warcraft Logs" autocomplete="off">
       <button class="btn" id="findBtn" type="submit">Найти бой</button>
     </form>
-    <div class="hint">Нет ключа или лога под рукой? Посмотрите на демо-данных: <button class="linkbtn" id="demoBtn" type="button">разбор игрока</button>, <button class="linkbtn" id="demoRaidBtn" type="button">разбор рейда</button> или <button class="linkbtn" id="demoRaidRotBtn" type="button">ротация всего рейда</button>.</div>
+    <div class="hint">Нет ключа или лога под рукой? Посмотрите на демо-данных: <button class="linkbtn" id="demoBtn" type="button">разбор игрока</button>, <button class="linkbtn" id="demoRaidBtn" type="button">разбор рейда</button> или <button class="linkbtn" id="demoRaidRotBtn" type="button">разбор ротации рейда</button>.</div>
 
     <div class="picks" id="picks" hidden>
       <div><label for="fight">Бой</label><select id="fight"></select></div>
@@ -326,8 +327,8 @@ dialog label.check input{width:auto;margin:0}
         </div></div>
       <div class="runrow">
         <button class="btn you" id="runBtn" type="button">Разобрать игрока</button>
-        <button class="btn" id="raidBtn" type="button" title="Весь бой целиком: игроки, механики, смерти, пуллы, полученный урон и сейвы">Разобрать бой рейда</button>
-        <button class="btn" id="raidRotBtn" type="button" title="Каждый DPS боя (или только отобранные) против топа своего спека">Ротация всего рейда</button>
+        <button class="btn" id="raidBtn" type="button" title="Весь бой целиком: полученный урон и план сейвов, смерти, механики, игроки (расходники, прерывания, диспелы), пуллы">Разбор рейда: урон, сейвы, смерти</button>
+        <button class="btn" id="raidRotBtn" type="button" title="Каждый DPS боя (или только отобранные) против топа своего спека">Разбор ротации рейда</button>
         <button class="btn" id="allBtn" type="button" title="Выбранный игрок (или все DPS) на каждом боссе отчёта: последний килл, без киллов — лучший пулл. Сравнение с топ-1 ради экономии запросов WCL; если лимита не хватит — «Продолжить» после сброса">Разобрать всех боссов</button>
         <label class="chk" title="Для «Разобрать всех боссов»: когда часовой лимит WCL кончится, не останавливаться, а дождаться сброса и продолжить (можно оставить на ночь)"><input type="checkbox" id="waitLimit"> Кончится лимит — ждать и продолжать</label>
         <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
@@ -590,7 +591,7 @@ $("#url").addEventListener("paste", () => setTimeout(() => inspect(), 50));
 $("#fight").onchange = () => { if ($("#fight").value !== "all") inspect($("#fight").value); };
 try { if (localStorage.getItem("wclMythicToo") === "0") $("#mythicToo").checked = false; } catch(e){}
 $("#mythicToo").addEventListener("change", () => { try { localStorage.setItem("wclMythicToo", $("#mythicToo").checked ? "1" : "0"); } catch(e){} });
-/* «Все игроки» в одном бою — это ротация всего рейда */
+/* «Все игроки» в одном бою — это разбор ротации рейда */
 $("#runBtn").onclick = () => $("#player").value === "all" ? $("#raidRotBtn").click() : run({url:$("#url").value.trim(), fight:$("#fight").value, actor:$("#player").value, ref:$("#ref").value, mythic: $("#mythicToo").checked});
 $("#demoBtn").onclick = () => run({demo:true});
 $("#raidBtn").onclick = () => run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value, mythic: $("#mythicToo").checked});
@@ -713,7 +714,7 @@ async function onDone(job, R){
 function histTitle(R){
   const I = R.info;
   if (R.mode === "raidcd") return `Полученный урон и сейвы: ${I.boss}, ${I.difficulty}`;
-  if (R.mode === "raidrot") return `Ротация рейда: ${I.boss}, ${I.difficulty} (${R.players.length} DPS)`;
+  if (R.mode === "raidrot") return `Разбор ротации рейда: ${I.boss}, ${I.difficulty} (${R.players.length} DPS)`;
   if (R.mode === "playerall") return `${R.everyone ? "Все игроки" : (I.name || "Игрок")} — все боссы (${R.bosses.length}${(R.pending||[]).length?`, ещё ${R.pending.length} ждут лимита`:""})`;
   if (R.mode === "saves") return `Сейвы на всех боссов: ${I.boss || I.title} (${R.bosses.length} ${plural(R.bosses.length,"босс","босса","боссов")})`;
   return R.mode === "raid" ? `Рейд: ${I.boss}, ${I.difficulty}, пулл ${R.summary.pull_n} (${I.kill?"килл":"вайп"})`
@@ -781,7 +782,7 @@ function render(R){
   const el = $("#result");
   el.innerHTML = `
     ${R._back && R._back.mode==="playerall" ? allNav(R._back, R._navFid, R._navActor)
-      : R._back ? '<button class="mini" id="backRaid" type="button" style="margin-bottom:12px">← К ротации всего рейда</button> ' : ""}${I.demo?'<div class="demo-flag">Демо: синтетические данные, не реальный лог</div>':""}
+      : R._back ? '<button class="mini" id="backRaid" type="button" style="margin-bottom:12px">← К разбору ротации рейда</button> ' : ""}${I.demo?'<div class="demo-flag">Демо: синтетические данные, не реальный лог</div>':""}
     <div class="hero">
       <div>
         ${pair ? `<div class="diffsw" role="group" aria-label="С каким топом сравнивать">
@@ -1034,12 +1035,12 @@ function renderRaidCd(R){
   charts.splice(0).forEach(c => c.destroy());
   const el = $("#result"), I = R.info || {};
   el.innerHTML = `<div class="box"><h3>Полученный урон и сейвы: ${esc(I.boss||"")}, ${esc(I.difficulty||"")}</h3>
-    <p class="sub">Разбор из прежней версии. Теперь это вкладка «Полученный урон и сейвы» в разборе «Разобрать бой рейда».</p></div><div id="rcdBody"></div>`;
+    <p class="sub">Разбор из прежней версии. Теперь это вкладка «Полученный урон и сейвы» в «Разбор рейда: урон, сейвы, смерти».</p></div><div id="rcdBody"></div>`;
   el.hidden = false;
   renderRaidPeaks(R, $("#rcdBody"));
 }
 
-/* ---------- режим «Разобрать бой рейда» ---------- */
+/* ---------- режим «Разбор рейда: урон, сейвы, смерти» ---------- */
 const ROLE_C = {tank:"#4F7CC0", healer:"#2F8F4E", dps:"#E39B2F"};
 const ratio = v => v==null ? "—" : v.toFixed(1).replace(".",",")+"×";
 
@@ -1224,7 +1225,7 @@ function renderRaidRot(R){
     ${I.demo?'<div class="demo-flag">Демо: синтетические данные — все игроки одного спека</div>':""}
     <div class="hero">
       <div>
-        <div class="who"><strong>Ротация всего рейда: ${esc(I.boss)}, ${esc(I.difficulty)}</strong>
+        <div class="who"><strong>Разбор ротации рейда: ${esc(I.boss)}, ${esc(I.difficulty)}</strong>
           Бой ${esc(I.duration)}. Каждый DPS сравнён с топ-${I.top_n} своего спека.</div>
         <div class="dps">${P.length} <small>${plural(P.length,"игрок разобран","игрока разобрано","игроков разобрано")}</small></div>
         ${R.skipped.length?`<div class="gapline">Танки и лекари пропущены: ${R.skipped.length}</div>`:""}

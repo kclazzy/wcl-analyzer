@@ -213,7 +213,7 @@ def main(argv=None):
     rd.add_argument("--out")
     rd.set_defaults(func=cmd_raid)
 
-    rr = sub.add_parser("raidrot", help="ротация всего рейда: каждый DPS против топа своего спека")
+    rr = sub.add_parser("raidrot", help="разбор ротации рейда: каждый DPS против топа своего спека")
     rr.add_argument("url", nargs="?", help="ссылка на отчёт WCL")
     rr.add_argument("--fight")
     rr.add_argument("--demo", action="store_true")

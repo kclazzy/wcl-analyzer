@@ -406,6 +406,7 @@ def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:
         if "result" in r:
             row["actions"] = r["actions"]
             row["detail"] = to_json(r["result"], job["id"])
+            row["detail"]["battle"] = _battle(r["result"], log)  # «Бой по шагам» и в «Подробно» у каждого игрока
         players.append(row)
     job["result"] = {"mode": "raidrot", "info": I, "brief": R["brief"], "players": players,
                      "skipped": [p.get("name") for p in R["skipped"]], "not_picked": R.get("not_picked", []),

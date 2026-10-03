@@ -205,12 +205,13 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
     pool = X.get("roster_cds")
     if pool:
         for c in pool:
-            cds[(c["pid"], c["id"])] = {"player": c["player"], "name": c["name"], "id": c["id"], "cd": float(c["cd"])}
+            cds[(c["pid"], c["id"])] = {"player": c["player"], "name": c["name"], "id": c["id"], "cd": float(c["cd"]),
+                                        "cls": c.get("cls") or ""}
     else:
         uses = defaultdict(list)
         for c in X.get("raid_cds", []):
             uses[(c["pid"], c["id"])].append(c["t"])
-            cds[(c["pid"], c["id"])] = {"player": c["player"], "name": c["name"], "id": c["id"]}
+            cds[(c["pid"], c["id"])] = {"player": c["player"], "name": c["name"], "id": c["id"], "cls": c.get("cls") or ""}
         for key, ts in uses.items():
             ts.sort()
             gaps = [b - a for a, b in zip(ts, ts[1:])]
@@ -262,8 +263,10 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
                "top_n": top_need,
                "top": ", ".join(names.get(i, f"#{i}") for i in pref[:2]),
                "picks": [{"cd": cds[k]["name"], "player": cds[k]["player"], "like_top": k[1] in pref[:2],
-                          "cooldown": _fmt_t(cds[k]["cd"]), "ready": _fmt_t(at + cds[k]["cd"]), "at": _fmt_t(at)}
+                          "cooldown": _fmt_t(cds[k]["cd"]), "ready": _fmt_t(at + cds[k]["cd"]), "at": _fmt_t(at),
+                          "id": cds[k]["id"], "cls": cds[k].get("cls") or game_data.class_of(cds[k]["id"])}
                          for k, at in picks]}
+        row["mrt"] = mrt_line(t0, ev["mechanic"], row["picks"])
         if picks:
             f = row["picks"][0]
             row.update({"cd": f["cd"], "player": f["player"], "like_top": any(x["like_top"] for x in row["picks"])})
@@ -290,6 +293,39 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
         row["spare"] = out
         del row["_t"], row["_keys"]
     return sorted(plan, key=lambda r: r["t"])
+
+
+# Цвета классов WoW — так MRT раскрашивает имена в заметке (|cffRRGGBBИмя|r)
+CLASS_COLOR = {"Warrior": "C69B6D", "Paladin": "F48CBA", "Hunter": "AAD372", "Rogue": "FFF468", "Priest": "FFFFFF",
+               "DeathKnight": "C41E3A", "Shaman": "0070DD", "Mage": "3FC7EB", "Warlock": "8788EE", "Monk": "00FF98",
+               "Druid": "FF7C0A", "DemonHunter": "A330C9", "Evoker": "33937F"}
+
+
+def _mrt_time(t: float) -> str:
+    t = max(0, int(round(t)))
+    return f"{t // 60}:{t % 60:02d}"
+
+
+def mrt_line(t: float, mechanic: str, picks: list[dict]) -> str:
+    """Строка заметки Method Raid Tools: {time:м:сс} — таймер от пулла, {spell:id} — иконка способности.
+    Пустая строка, если на пик нет кулдауна."""
+    if not picks:
+        return ""
+    who = []
+    for p in picks:
+        color = CLASS_COLOR.get(p.get("cls") or "")
+        name = f"|cff{color}{p['player']}|r" if color else p["player"]
+        who.append(f"{name} {{spell:{p['id']}}}" if p.get("id") else f"{name} {p['cd']}")
+    return f"{{time:{_mrt_time(t)}}}{mechanic.replace('«', '').replace('»', '')} - " + "  ".join(who)
+
+
+def mrt_note(plan: list[dict], title: str = "") -> str:
+    """Весь план сейвов одной заметкой для MRT (вставить в Заметки → Общая заметка)."""
+    lines = [r.get("mrt") for r in plan if r.get("mrt")]
+    if not lines:
+        return ""
+    head = [f"Сейвы: {title}" if title else "Сейвы"]
+    return "\n".join(head + lines)
 
 
 def brief_lines(vs: dict | None) -> list[str]:

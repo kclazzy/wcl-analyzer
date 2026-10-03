@@ -217,6 +217,13 @@ def test_raid():
     danger = [r for r in Xs["plan"] if r["deaths"]]
     assert danger and all(len(r["picks"]) >= 2 and len({p["player"] for p in r["picks"]}) == len(r["picks"]) for r in danger)
     assert all(r["spare"] for r in Xs["plan"]), "нет запасных вариантов"
+    # Заметка для MRT: таймер от пулла, имя в цвете класса, иконка способности
+    from wcl_analyzer.raid_top import mrt_note
+    note = mrt_note(Xs["plan"], "Демо")
+    lines = note.split("\n")
+    assert lines[0] == "Сейвы: Демо" and len(lines) == 1 + len(Xs["plan"]), note
+    assert all(ln.startswith("{time:") and "{spell:" in ln and "|cff" in ln and "|r" in ln for ln in lines[1:]), note
+    assert "«" not in note
     cdmap = {(c["player"], c["name"]): c["cd"] for c in Xs["roster_cds"]}
     uses = {}
     for r in Xs["plan"]:

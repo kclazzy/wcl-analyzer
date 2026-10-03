@@ -1156,7 +1156,7 @@ function renderRaidPeaks(P, el){
     ${box("Урон по рейду и рейдовые кулдауны", "Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники — рейдовые кулдауны вашего рейда (красная обводка — нажат вне пиков)" + (V ? ", полые бирюзовые — что жмут лучшие киллы." : "."),
       '<div class="chart" style="height:300px"><canvas id="cRaidDmg"></canvas></div>')}
     ${(R => R.length ? box("План сейвов на следующий пулл", "Кулдауны всего состава — классы и спеки, взятые таланты — расставлены на пики с учётом перезарядки: нажать за 1–5 с до пика. Сколько сейвов на пик — по тому, сколько жмут лучшие гильдии, и по тяжести пика (до трёх, разных игроков). «Запасные» — что ещё откатано к этому моменту и не сломает остальной план. «Как у топа» — тот же кулдаун на этот пик жмут лучшие гильдии.",
-      planTable(R)) : "")(X.plan || (V && V.plan) || [])}
+      planTable(R, (P.info||{}).boss)) : "")(X.plan || (V && V.plan) || [])}
     ${V ? `<div class="box"><h3>Пики урона: что нажал ваш рейд и что жмёт топ</h3>
       <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы${V.difficulty?` той же сложности (${esc(V.difficulty)})`:""}: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${esc(k.duration)})`).join(", ")}.
       Кулдауном закрыто: у топа ${pct(V.top_cover,0)}, у вашего рейда ${pct(V.my_cover,0)}.</p>` +
@@ -1185,7 +1185,43 @@ function scopeCell(raid, self, mine){
 }
 
 /* План сейвов: на пик — один или два кулдауна; у каждого — откат и когда он снова готов */
-function planTable(plan){
+/* Заметка для Method Raid Tools: строки готовит сервер (поле mrt у каждого пика) */
+function mrtNote(plan, title){
+  const lines = plan.map(r => r.mrt || ((r.picks||[]).length
+    ? `{time:${(r.time||"0:00").replace(/,\d+$/,"")}}${String(r.mechanic||"").replace(/[«»]/g,"")} - ${r.picks.map(p=>p.player+" "+p.cd).join("  ")}` : "")).filter(Boolean);
+  return lines.length ? [title ? "Сейвы: "+title : "Сейвы", ...lines].join("\n") : "";
+}
+function mrtBlock(plan, title){
+  const note = mrtNote(plan, title);
+  if (!note) return "";
+  return `<div class="mrt" style="margin-top:12px">
+    <button type="button" class="mini" data-mrt>Скопировать для MRT</button>
+    <span class="hint" style="margin-left:8px">В игре: /mrt → Заметки → вставить (Ctrl+V) → Отправить. Время — от пулла, имена в цветах классов, у кулдаунов — иконки.</span>
+    <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:13.5px">Текст заметки</summary>
+      <textarea readonly rows="${Math.min(14, note.split("\n").length + 1)}" style="width:100%;margin-top:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;box-sizing:border-box">${esc(note)}</textarea></details></div>`;
+}
+async function copyText(text, ta){
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch (e) {}
+  try {  // запасной путь (Android WebView, старые браузеры): выделить текст и скопировать
+    const t = ta || Object.assign(document.createElement("textarea"), {value:text});
+    if (!ta) { t.style.position = "fixed"; t.style.opacity = "0"; document.body.appendChild(t); }
+    t.focus(); t.select(); t.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy"); if (!ta) t.remove(); return ok;
+  } catch (e) { return false; }
+}
+document.addEventListener("click", async ev => {
+  const b = ev.target.closest && ev.target.closest("[data-mrt]"); if (!b) return;
+  const wrap = b.closest(".mrt"), ta = wrap.querySelector("textarea");
+  const ok = await copyText(ta.value, null);
+  if (!ok) { wrap.querySelector("details").open = true; ta.focus(); ta.select(); }
+  const old = "Скопировать для MRT"; b.textContent = ok ? "Скопировано ✓" : "Выделено — нажмите «Копировать»";
+  setTimeout(() => b.textContent = old, 2500);
+});
+
+function planTable(plan, title){
+  return planRows(plan) + mrtBlock(plan, title);
+}
+function planRows(plan){
   return table(["Нажать в","Пик","Кулдауны и кто"], plan.map(r=>{
     const picks = r.picks || (r.cd ? [{cd:r.cd, player:r.player, like_top:r.like_top}] : []);
     return [r.time, esc(r.mechanic) + (r.heavy ? ` <span class="tag LOW">опасный: ${r.need} ${plural(r.need,"сейв","сейва","сейвов")}</span>` : "")

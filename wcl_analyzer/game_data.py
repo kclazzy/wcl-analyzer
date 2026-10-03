@@ -89,6 +89,15 @@ def cooldown(sid: int, default: float | None = None) -> float | None:
     return next((float(c["cd"]) for c in raid_cds() if int(c["id"]) == int(sid)), default)
 
 
+def class_of(sid: int) -> str:
+    """Класс по рейдовому кулдауну (из таблицы игровых данных); неизвестный — пустая строка."""
+    for src in (raid_cds(), _bundled_cds()):
+        for c in src:
+            if int(c["id"]) == int(sid) and c.get("class"):
+                return str(c["class"])
+    return ""
+
+
 def scope(sid: int) -> str:
     """raid — действует сразу на рейд; self — усиливает исцеление самого лекаря. Неизвестные — raid."""
     for src in (raid_cds(), _bundled_cds()):  # в старой копии таблицы поля scope ещё нет — берём из сборки

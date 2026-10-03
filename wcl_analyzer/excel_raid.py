@@ -422,6 +422,14 @@ def _vs_top(wb, R, demo):
         s.ws.column_dimensions["C"].width = 70
         if V["plan"]:
             s.ws.conditional_formatting.add(f"C{f}:C{l}", CellIsRule(operator="equal", formula=['"нет свободного кулдауна"'], fill=RED))
+        from .raid_top import mrt_note
+        note = mrt_note(V["plan"], (R.get("info") or {}).get("boss", ""))
+        if note:
+            s.section("Заметка для MRT", "Скопируйте строки ниже целиком: в игре /mrt → Заметки → вставить → Отправить.")
+            for line in note.split("\n"):
+                s.cell(s.row, 1, line)
+                s.row += 1
+            s.row += 1
         s.section("Пики урона: ваш бой и лучшие киллы",
                   f"Закрыто кулдауном: у топа {V['top_cover']:.0%}, у вас {V['my_cover']:.0%}." if V["top_cover"] is not None
                   and V["my_cover"] is not None else None)

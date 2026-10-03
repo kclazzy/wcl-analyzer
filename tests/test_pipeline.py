@@ -198,7 +198,29 @@ def test_battle_analysis():
     print("OK бой по шагам: 10–20 событий, движение с причиной только по данным, смена цели и бурст против топа")
 
 
+def test_saves_all_bosses():
+    from wcl_analyzer.excel_raid import write_saves_workbook
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    from wcl_analyzer.raid_saves import pick_fights, run_raid_saves
+    f = lambda i, enc, diff, kill, pct, t: {"id": i, "encounterID": enc, "difficulty": diff, "kill": kill,  # noqa: E731
+                                          "fightPercentage": pct, "startTime": t, "endTime": t + 300_000}
+    rep = {"fights": [f(1, 10, 4, False, 40.0, 0), f(2, 10, 4, True, 0, 1e6), f(3, 10, 4, True, 0, 2e6),  # килл ×2
+                      f(4, 11, 5, False, 30.0, 3e6), f(5, 11, 5, False, 12.5, 4e6),                    # лучший вайп
+                      f(6, 12, 3, True, 0, 5e6), f(7, 13, 1, True, 0, 6e6), f(8, 0, 0, False, None, 7e6)]}
+    got = [(c["fight"]["id"], c["pulls"], c["kills"]) for c in pick_fights(rep)]
+    assert got == [(3, 3, 2), (5, 2, 0)], got   # обычная сложность, ЛФР и треш пропущены
+    R = run_raid_saves(FakeRaidClient(), DEMO_URL, log=lambda *_: None, talent_data=[])
+    b = R["bosses"][0]
+    assert R["mode"] == "saves" and b["plan"] and b["mrt"].startswith("Сейвы: Демо-босс") and len(b["phases"]) == 3
+    with tempfile.TemporaryDirectory() as d:
+        from openpyxl import load_workbook
+        wb = load_workbook(write_saves_workbook(R, Path(d) / "s.xlsx"))
+        assert wb.sheetnames[0] == "Все боссы" and len(wb.sheetnames) == 2
+    print("OK сейвы на всех боссов: героическая и эпохальная, килл или лучший пулл, заметка MRT на каждого")
+
+
 if __name__ == "__main__":
+    test_saves_all_bosses()
     test_battle_analysis()
     test_gear_and_trinkets()
     main()
@@ -223,7 +245,7 @@ def test_raid():
     lines = note.split("\n")
     assert lines[0] == "Сейвы: Демо" and len(lines) == 1 + len(Xs["plan"]), note
     assert all(ln.startswith("{time:") and "{spell:" in ln and "|cff" in ln and "|r" in ln for ln in lines[1:]), note
-    assert "«" not in note
+    assert "«" not in note and "Ледяная волна" not in note and "{spell:900002}" in note  # механика — иконкой
     cdmap = {(c["player"], c["name"]): c["cd"] for c in Xs["roster_cds"]}
     uses = {}
     for r in Xs["plan"]:

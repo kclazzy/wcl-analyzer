@@ -147,6 +147,8 @@ def _run_job(job: dict, params: dict, creds) -> None:
             _run_raid(job, params, creds, log)
         elif mode == "raidrot":
             _run_raid_rotation(job, params, creds, log)
+        elif mode == "saves":
+            _run_saves(job, params, creds, log)
         elif mode == "refresh":
             _run_refresh(job, params, creds, log)
         else:
@@ -376,6 +378,25 @@ def _run_raid(job: dict, params: dict, creds, log) -> None:
                  mythic=params.get("mythic") is not False,
                  progress=lambda x: job.__setitem__("progress", max(job["progress"], min(0.97, x))))
     _excel_bytes(job, f"Рейд_{R['info']['boss']}_пулл{R['summary']['pull_n']}", write_raid_workbook, R)
+    job["result"] = {**R, "excel": f"/api/report/{job['id']}", "source_url": url}
+    log("Готово.")
+
+
+def _run_saves(job: dict, params: dict, creds, log) -> None:
+    """План рейдовых сейвов на всех боссов отчёта (по одному бою на босса)."""
+    from .excel_raid import write_saves_workbook
+    from .raid_saves import run_raid_saves
+
+    if params.get("demo"):
+        from .raid_demo import DEMO_URL, FakeRaidClient
+        log("Демо-рейд: один босс — на настоящем отчёте план будет на каждого босса вечера.")
+        client, url = FakeRaidClient(), DEMO_URL
+    else:
+        client, url = _client(creds, job, log), params["url"]
+    R = run_raid_saves(client, url, log=log, talent_data=[] if params.get("demo") else None,
+                       save_talents=not SERVER["public"], avoidable=set(_avoidable_list()),
+                       progress=lambda x: job.__setitem__("progress", max(job["progress"], min(0.97, x))))
+    _excel_bytes(job, f"Сейвы_{R['info']['zone'] or R['info']['code']}", write_saves_workbook, R)
     job["result"] = {**R, "excel": f"/api/report/{job['id']}", "source_url": url}
     log("Готово.")
 
@@ -739,7 +760,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against",
                                                    "refresh", "max_age_days", "pick", "mythic")}
-                if params["mode"] not in (None, "raid", "raidrot"):
+                if params["mode"] not in (None, "raid", "raidrot", "saves"):
                     params["mode"] = None
                 return self._json({"job": start_job(creds, params)})
             if path == "/api/refs/refresh":

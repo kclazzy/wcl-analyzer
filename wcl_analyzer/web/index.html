@@ -343,7 +343,7 @@ dialog label.check input{width:auto;margin:0}
       <input id="url" type="text" inputmode="url" placeholder="https://www.warcraftlogs.com/reports/…" aria-label="Ссылка на отчёт Warcraft Logs" autocomplete="off">
       <button class="btn" id="findBtn" type="submit">Найти бой</button>
     </form>
-    <div class="hint">Нет ключа или лога под рукой? Посмотрите на демо-данных: <button class="linkbtn" id="demoBtn" type="button">разбор игрока</button>, <button class="linkbtn" id="demoRaidBtn" type="button">разбор рейда</button> или <button class="linkbtn" id="demoRaidRotBtn" type="button">ротация всего рейда</button>.</div>
+    <div class="hint">Нет ключа или лога под рукой? Посмотрите на демо-данных: <button class="linkbtn" id="demoBtn" type="button">разбор игрока</button>, <button class="linkbtn" id="demoRaidBtn" type="button">разбор рейда</button> или <button class="linkbtn" id="demoRaidRotBtn" type="button">ротация всего рейда</button> или <button class="linkbtn" id="demoSavesBtn" type="button">сейвы на всех боссов</button>.</div>
 
     <div class="picks" id="picks" hidden>
       <div><label for="fight">Бой</label><select id="fight"></select></div>
@@ -368,6 +368,7 @@ dialog label.check input{width:auto;margin:0}
         <button class="btn you" id="runBtn" type="button">Разобрать игрока</button>
         <button class="btn" id="raidBtn" type="button" title="Весь бой целиком: игроки, механики, смерти, пуллы, полученный урон и сейвы">Разобрать бой рейда</button>
         <button class="btn" id="raidRotBtn" type="button" title="Каждый DPS боя (или только отобранные) против топа своего спека">Ротация всего рейда</button>
+        <button class="btn" id="savesBtn" type="button" title="План рейдовых кулдаунов и заметка MRT на каждого босса из отчёта (героическая и эпохальная сложность): по последнему киллу или лучшему пуллу">Сейвы на всех боссов</button>
         <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
       </div>
@@ -654,7 +655,11 @@ $("#pickBy").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
 $("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: $("#ref").value, pick: pickValue() || null, mythic: $("#mythicToo").checked});
 $("#demoRaidRotBtn").onclick = () => run({mode:"raidrot", demo:true});
-const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn"];
+$("#savesBtn").onclick = () => { const url = $("#url").value.trim();
+  if (!url) { showErr("Вставьте ссылку на отчёт Warcraft Logs — бой выбирать не нужно, план составится на каждого босса."); return; }
+  run({mode:"saves", url}); };
+$("#demoSavesBtn").onclick = () => run({mode:"saves", demo:true});
+const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn", "#savesBtn"];
 
 /* ---------- анализ ---------- */
 async function run(params, path="/api/analyze"){
@@ -740,13 +745,15 @@ function histTitle(R){
   const I = R.info;
   if (R.mode === "raidcd") return `Полученный урон и сейвы: ${I.boss}, ${I.difficulty}`;
   if (R.mode === "raidrot") return `Ротация рейда: ${I.boss}, ${I.difficulty} (${R.players.length} DPS)`;
+  if (R.mode === "saves") return `Сейвы на всех боссов: ${I.boss || I.title} (${R.bosses.length} ${plural(R.bosses.length,"босс","босса","боссов")})`;
   return R.mode === "raid" ? `Рейд: ${I.boss}, ${I.difficulty}, пулл ${R.summary.pull_n} (${I.kill?"килл":"вайп"})`
                            : `${I.name}, ${who(I.cls, I.spec)} — ${I.boss}, ${I.difficulty}`;
 }
 function openResult(item){
   const R = {...item.result, excel: "#excel-" + item.id, _hid: item.id, _created: item.created};
   if (R.alt && R.mode !== "raidcd") R.alt = {...R.alt, excel: "#excelalt-" + item.id};
-  (R.mode === "raid" ? renderRaid : R.mode === "raidrot" ? renderRaidRot : R.mode === "raidcd" ? renderRaidCd : render)(R);
+  (R.mode === "raid" ? renderRaid : R.mode === "raidrot" ? renderRaidRot : R.mode === "raidcd" ? renderRaidCd
+    : R.mode === "saves" ? renderSaves : render)(R);
 }
 async function trimHistory(){
   const all = await hist.all();
@@ -1289,6 +1296,42 @@ function ilvlCell(p){
   return `<span class="${d!=null && d <= -5 ? "worse" : ""}">${num(p.item_level,1)}</span>`
     + (p.ref_item_level != null ? `<div style="font-size:12.5px;color:var(--muted)">топ ${num(p.ref_item_level,1)}</div>` : "");
 }
+/* Сейвы на всех боссов: вкладка на каждого босса — план и заметка MRT */
+function renderSaves(R){
+  charts.splice(0).forEach(c => c.destroy());
+  const I = R.info, B = R.bosses || [];
+  const el = $("#result");
+  el.innerHTML = `
+    ${I.demo?'<div class="demo-flag">Демо: в демо-отчёте один босс — на настоящем отчёте вкладка будет на каждого</div>':""}
+    <div class="hero"><div>
+        <div class="who"><strong>Рейдовые сейвы на всех боссов</strong>${esc(I.title || I.zone)}${I.zone && I.title ? " · " + esc(I.zone) : ""}.
+          Героическая и эпохальная сложность. На каждого босса — последний килл, а если киллов не было — лучший пулл.</div>
+        <div class="dps">${B.length} <small>${plural(B.length,"босс","босса","боссов")} · ${esc(I.difficulty)}</small></div>
+        ${(R.skipped||[]).length ? `<div class="gapline">Пропущено: ${R.skipped.map(x=>esc(x.boss)).join(", ")}</div>` : ""}
+      </div>
+      <div class="side"><a class="btn you" href="${R.excel}" download>Скачать Excel</a>
+        <a href="${esc(I.url)}" target="_blank" rel="noopener" style="color:#B8C2D9;font-size:14px">Открыть отчёт на WCL</a></div>
+    </div>
+    <div class="tabs" role="tablist">${B.map((b,i)=>`<button role="tab" aria-selected="${i==0}" id="t-sv${i}" aria-controls="p-sv${i}">${esc(b.boss)}${new Set(B.map(x=>x.difficulty)).size>1?` <span class="tag none">${esc(b.difficulty==="эпохальный"?"эпох.":b.difficulty==="героический"?"гер.":b.difficulty)}</span>`:""}${b.kill?"":' <span class="tag MEDIUM">вайп</span>'}</button>`).join("")}</div>
+    ${B.map((b,i)=>`<div class="panel ${i==0?"on":""}" role="tabpanel" id="p-sv${i}" aria-labelledby="t-sv${i}">
+      <div class="box">
+        <h3>${esc(b.boss)} — ${esc(b.difficulty)}</h3>
+        <p class="sub">${b.kill ? `Килл за ${esc(b.duration)}` : `Лучший пулл: босс на ${num(b.boss_pct,1)}%, ${esc(b.duration)}`}
+          · пуллов за вечер: ${b.pulls} · кулдауны состава: ${b.roster} ${plural(b.roster,"игрок","игрока","игроков")}
+          · <a href="${esc(b.url)}" target="_blank" rel="noopener">бой на WCL</a>
+          ${(b.top_kills||[]).length ? ` · сравнение: ${b.top_kills.length} ${plural(b.top_kills.length,"лучший килл","лучших килла","лучших киллов")}` : ""}</p>
+        ${(b.saves_brief||[]).length ? `<ul class="lines">${b.saves_brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : ""}
+        ${(b.plan||[]).length ? planTable(b.plan, b.boss, b.phases) : '<p class="empty">Пиков урона по рейду, на которые нужны сейвы, не найдено.</p>'}
+      </div></div>`).join("")}
+    ${(R.skipped||[]).length ? box("Не получилось", "", `<ul class="lines">${R.skipped.map(x=>`<li>${esc(x.boss)} (${esc(x.difficulty)}): ${esc(x.reason)}</li>`).join("")}</ul>`) : ""}`;
+  el.hidden = false;
+  el.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+    el.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
+    el.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "p-"+b.id.slice(2)));
+  });
+  el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+}
+
 function renderRaidRot(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, P = R.players.filter(p=>!p.error).sort((a,b)=>a.gap-b.gap), E = R.players.filter(p=>p.error);

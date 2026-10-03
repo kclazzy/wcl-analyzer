@@ -466,3 +466,51 @@ def _vs_top(wb, R, demo):
         s.table(["Механика"] + [f"Пулл {n}" for n in T["pulls"]] + ["Всего"],
                 [[r["name"]] + r["counts"] + [r["total"]] for r in T["rows"]],
                 [None] + [F_INT] * (len(T["pulls"]) + 1))
+
+
+# ============================================================ сейвы на всех боссов
+def write_saves_workbook(R: dict, path: str | Path) -> Path:
+    """План сейвов на каждого босса: лист на босса (план + заметка MRT) и общий лист с заметками."""
+    from .compare import _fmt_t
+    wb = Workbook()
+    wb.remove(wb.active)
+    demo = R["info"]["demo"]
+    s = Sheet(wb, "Все боссы", demo, {"A": 34, "B": 14, "C": 16, "D": 12, "E": 60})
+    s.title(f"Рейдовые сейвы: {R['info']['title'] or R['info']['zone']}",
+            "На каждого босса — последний килл, а без киллов — лучший пулл. Подробный план — на листе босса.")
+    s.table(["Босс", "Сложность", "Бой", "Пиков в плане", "Заметка MRT — скопировать целиком (ячейки ниже)"],
+            [[b["boss"], b["difficulty"], ("килл " if b["kill"] else "вайп ") + b["duration"], len(b["plan"]),
+              "есть" if b["mrt"] else "нет назначенных кулдаунов"] for b in R["bosses"]], [None, None, None, F_INT, None])
+    for b in R["bosses"]:
+        if not b["mrt"]:
+            continue
+        s.section(f"MRT: {b['boss']} ({b['difficulty']})")
+        for line in b["mrt"].split("\n"):
+            s.cell(s.row, 1, line)
+            s.row += 1
+    if R.get("skipped"):
+        s.section("Пропущены")
+        for x in R["skipped"]:
+            s.cell(s.row, 1, f"{x['boss']} ({x['difficulty']}): {x['reason']}")
+            s.row += 1
+    used = set()
+    for b in R["bosses"]:
+        name = (b["boss"][:24] or "Босс").replace("/", "-").replace(":", " ")
+        while name in used:
+            name += " "
+        used.add(name)
+        t = Sheet(wb, name, demo, {"A": 26, "B": 30, "C": 80, "D": 30})
+        t.title(f"{b['boss']} — {b['difficulty']}",
+                ("Килл" if b["kill"] else "Лучший пулл") + f" {b['duration']}, пуллов за вечер: {b['pulls']}. " +
+                ("Фазы: " + " · ".join(f"{p['name']} с {_fmt_t(p['t'])}" for p in b["phases"]) if len(b["phases"]) > 1 else ""))
+        t.table(["Нажать в", "Пик", "Кулдауны и кто", "У топа здесь"],
+                [[r["time"] + (f" ({r['phase_name']} +{r['phase_time']})" if (r.get("phase") or 0) > 1 and r.get("phase_time") else ""),
+                  r["mechanic"], _plan_text(r), r.get("top") or "—"] for r in b["plan"]])
+        if b["mrt"]:
+            t.section("Заметка для MRT", "В игре: /mrt → Заметки → вставить → Отправить.")
+            for line in b["mrt"].split("\n"):
+                t.cell(t.row, 1, line)
+                t.row += 1
+    path = Path(path)
+    wb.save(path)
+    return path

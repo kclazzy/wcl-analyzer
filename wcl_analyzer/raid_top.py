@@ -310,7 +310,8 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                           "cooldown": _fmt_t(cds[k]["cd"]), "ready": _fmt_t(at + cds[k]["cd"]), "at": _fmt_t(at),
                           "id": cds[k]["id"], "cls": cds[k].get("cls") or game_data.class_of(cds[k]["id"])}
                          for k, at in picks]}
-        row["mrt"] = mrt_line(t0, ev["mechanic"], row["picks"], n if (n or 0) > 1 else None, rel)
+        row["mrt"] = mrt_line(t0, ev["mechanic"], row["picks"], n if (n or 0) > 1 else None, rel,
+                              mech_id=(ev.get("key") or (None,))[0])
         if picks:
             f = row["picks"][0]
             row.update({"cd": f["cd"], "player": f["player"], "like_top": any(x["like_top"] for x in row["picks"])})
@@ -349,9 +350,11 @@ def _mrt_time(t: float) -> str:
     return f"{t // 60}:{t % 60:02d}"
 
 
-def mrt_line(t: float, mechanic: str, picks: list[dict], phase: int | None = None, phase_t: float | None = None) -> str:
+def mrt_line(t: float, mechanic: str, picks: list[dict], phase: int | None = None, phase_t: float | None = None,
+             mech_id: int | None = None) -> str:
     """Строка заметки Method Raid Tools: {time:м:сс} — таймер от пулла, {time:м:сс,p2} — от начала 2-й фазы,
-    {spell:id} — иконка способности. Пустая строка, если на пик нет кулдауна."""
+    {spell:id} — иконка способности: и механика босса, и кулдауны показаны иконками — так строка короче.
+    Название механики — только если её id неизвестен. Пустая строка, если на пик нет кулдауна."""
     if not picks:
         return ""
     who = []
@@ -360,7 +363,8 @@ def mrt_line(t: float, mechanic: str, picks: list[dict], phase: int | None = Non
         name = f"|cff{color}{p['player']}|r" if color else p["player"]
         who.append(f"{name} {{spell:{p['id']}}}" if p.get("id") else f"{name} {p['cd']}")
     tm = f"{_mrt_time(phase_t)},p{phase}" if phase and phase_t is not None else _mrt_time(t)
-    return f"{{time:{tm}}}{mechanic.replace('«', '').replace('»', '')} - " + "  ".join(who)
+    mech = f"{{spell:{mech_id}}}" if mech_id and int(mech_id) > 0 else mechanic.replace("«", "").replace("»", "")
+    return f"{{time:{tm}}}{mech} - " + "  ".join(who)
 
 
 def mrt_note(plan: list[dict], title: str = "") -> str:

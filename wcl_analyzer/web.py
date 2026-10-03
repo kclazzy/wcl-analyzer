@@ -260,8 +260,12 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
     from .excel_report import write_player_all_workbook
     from .logs import parse_report_url
 
+    from .collect import shared_cache
     client = _client(creds, job, log)
-    client.max_wait_s = 0  # не ждём сброса лимита — останавливаемся и предлагаем продолжить
+    wait = bool(params.get("wait"))
+    if not wait:
+        client.max_wait_s = 0  # не ждём сброса лимита — останавливаемся и предлагаем продолжить
+    shared = shared_cache(client)  # общие данные боя — один раз на всех игроков этого боя
     code, _, _ = parse_report_url(params["url"])
     report = client.report(code)
     everyone = str(params.get("actor")) == "all"
@@ -278,7 +282,9 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
         units = [(fid, aid) for fid in fights]
     p1 = {**params, "ref": "top1", "mythic": False}
     log(f"Боссов: {len(fights)}{f', разборов «босс — игрок»: {len(units)}' if everyone else ''}. "
-        "Эталон — топ-1 на каждом (экономия запросов WCL).")
+        "Эталон — топ-1 на каждом; общие данные боя качаются один раз на всех игроков (экономия запросов WCL).")
+    if wait:
+        log("Если лимит кончится — жду сброса и продолжаю сам.")
     rows, skipped, pending = [], [], []
     per_unit: list[float] = []
     for i, (fid, aid) in enumerate(units):
@@ -286,13 +292,14 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
         label = f"{f.get('name')} ({DIFFICULTY_NAMES.get(int(f.get('difficulty') or 0), '')})"
         left = client.points_left() if hasattr(client, "points_left") else None
         need = (sum(per_unit) / len(per_unit)) if per_unit else ALL_BOSSES_POINTS
-        if left is not None and left < need * 1.2:
+        if not wait and left is not None and left < need * 1.2:
             pending = units[i:]
             log(f"Лимита WCL не хватит на следующий разбор: осталось {left:.0f} очков, на один уходит ≈ {need:.0f}.")
             break
         log(f"[{i + 1}/{len(units)}] {label}{f', игрок #{aid}' if everyone else ''}…")
         try:
-            me = load_my_log(client, params["url"], fid, actor_id=aid)
+            # без событий нанесённого урона: экономия лимита (нет только оценки прироста от кулдаунов)
+            me = load_my_log(client, params["url"], fid, actor_id=aid, shared=shared, damage_events=False)
             tops, ref_label = _player_ref(client, me, me.difficulty, p1, lambda m: log("    " + m), {})
             res = _player_result(job, p1, client, me, tops, ref_label, {}, me.difficulty, lambda m: log("    " + m), alt=False)
             res.pop("ref", None)
@@ -873,7 +880,7 @@ class Handler(BaseHTTPRequestHandler):
                 cl.max_wait_s = 0  # поиск боя не ждёт сброса лимита: сразу объясняем, что случилось
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
             if path == "/api/analyze":
-                params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "units", "prev",
+                params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "units", "prev", "wait",
                                                    "refresh", "max_age_days", "pick", "mythic")}
                 if params["mode"] not in (None, "raid", "raidrot", "saves", "allbosses"):
                     params["mode"] = None

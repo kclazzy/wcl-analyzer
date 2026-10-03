@@ -371,6 +371,7 @@ dialog label.check input{width:auto;margin:0}
         <button class="btn" id="raidBtn" type="button" title="Весь бой целиком: игроки, механики, смерти, пуллы, полученный урон и сейвы">Разобрать бой рейда</button>
         <button class="btn" id="raidRotBtn" type="button" title="Каждый DPS боя (или только отобранные) против топа своего спека">Ротация всего рейда</button>
         <button class="btn" id="allBtn" type="button" title="Выбранный игрок (или все DPS) на каждом боссе отчёта: последний килл, без киллов — лучший пулл. Сравнение с топ-1 ради экономии запросов WCL; если лимита не хватит — «Продолжить» после сброса">Разобрать всех боссов</button>
+        <label class="chk" title="Для «Разобрать всех боссов»: когда часовой лимит WCL кончится, не останавливаться, а дождаться сброса и продолжить (можно оставить на ночь)"><input type="checkbox" id="waitLimit"> Кончится лимит — ждать и продолжать</label>
         <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
       </div>
@@ -658,7 +659,7 @@ $("#pickBy").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
 $("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: $("#ref").value, pick: pickValue() || null, mythic: $("#mythicToo").checked});
 $("#demoRaidRotBtn").onclick = () => run({mode:"raidrot", demo:true});
-$("#allBtn").onclick = () => run({mode:"allbosses", url:$("#url").value.trim(), actor:$("#player").value});
+$("#allBtn").onclick = () => run({mode:"allbosses", url:$("#url").value.trim(), actor:$("#player").value, wait: $("#waitLimit").checked});
 const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn", "#allBtn"];
 
 /* ---------- анализ ---------- */
@@ -1318,7 +1319,8 @@ function renderPlayerAll(R){
   el.innerHTML = `
     <div class="hero"><div>
         <div class="who"><strong>${R.everyone ? "Все игроки (DPS)" : esc(I.name || "Игрок") + (I.cls ? ", " + esc(who(I.cls, I.spec)) : "")} — все боссы</strong>${esc(I.title || "")}.
-          На каждом боссе — последний килл (без киллов — лучший пулл), сравнение с топ-1 ради экономии запросов WCL.</div>
+          На каждом боссе — последний килл (без киллов — лучший пулл), сравнение с топ-1 ради экономии запросов WCL.
+          Облегчённый разбор: без оценки прироста DPS от кулдаунов — полная оценка в обычном «Разобрать игрока».</div>
         <div class="dps">${B.length} <small>${R.everyone ? plural(B.length,"разбор","разбора","разборов") + " «босс — игрок»" : plural(B.length,"босс разобран","босса разобрано","боссов разобрано")}${P.length?` · ещё ${P.length} ждут лимита`:""}</small></div>
       </div>
       <div class="side"><a class="btn you" href="${R.excel}" download>Скачать Excel</a>
@@ -1343,7 +1345,7 @@ function renderPlayerAll(R){
   if ($("#contAll")) $("#contAll").onclick = () => {
     CONTINUE_ALL = R._hid || null;
     const prev = B.map(b => ({boss: b.boss, difficulty: b.difficulty, kill: b.kill, dps: b.dps, ref_dps: b.ref_dps, actions: b.actions, player: b.player}));
-    run({mode: "allbosses", url: R.params.url, actor: R.params.actor, units: P.map(p=>[p.fight_id, p.actor]), prev});
+    run({mode: "allbosses", url: R.params.url, actor: R.params.actor, units: P.map(p=>[p.fight_id, p.actor]), prev, wait: $("#waitLimit") && $("#waitLimit").checked});
   };
   el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
 }

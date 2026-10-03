@@ -280,6 +280,29 @@ def test_player_all_bosses():
     print("OK игрок на всех боссах: топ-1, остановка по лимиту WCL и продолжение с оставшихся")
 
 
+def test_shared_fight_data():
+    """Много игроков одного боя: общие данные боя (смерти, касты босса, экипировка, дебаффы на боссе)
+    качаются один раз, а не для каждого игрока; без событий урона — меньше запросов."""
+    from collections import Counter
+    from wcl_analyzer.collect import shared_cache
+    client = FakeClient()
+    calls = Counter()
+    orig = client.events
+
+    def counting(code, fight_id, start, end, data_type, **kw):
+        calls[(data_type, kw.get("hostility"))] += 1
+        return orig(code, fight_id, start, end, data_type, **kw)
+    client.events = counting
+    url = "https://www.warcraftlogs.com/reports/MYREPORT0001"
+    shared = shared_cache(client)
+    a = load_my_log(client, url, None, actor_id=7, shared=shared, damage_events=False)
+    b = load_my_log(client, url, None, actor_id=7, shared=shared, damage_events=False)
+    assert calls[("Deaths", None)] == 1 and calls[("CombatantInfo", None)] == 1 and calls[("Casts", "Enemies")] == 1, calls
+    assert calls[("DamageDone", None)] == 0 and calls[("Casts", None)] == 2, calls
+    assert a.gear and a.boss_positions and a.casts and b.casts and not a.dmg_timeline
+    print("OK общие данные боя — один раз на всех игроков, без событий урона в облегчённом режиме")
+
+
 def test_saves_all_bosses():
     from wcl_analyzer.excel_raid import write_saves_workbook
     from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
@@ -303,6 +326,7 @@ def test_saves_all_bosses():
 
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
+    test_shared_fight_data()
     test_player_all_bosses()
     test_plan_long_fight()
     test_saves_all_bosses()

@@ -191,9 +191,12 @@ def run_raid_rotation(client, url: str, fight=None, top_n: int = 10, log=print, 
 
     from .collect import parallel_workers
 
+    from .collect import shared_cache
+    shared = shared_cache(client)  # общие данные боя — один раз на всех игроков
+
     def load(p):
         try:
-            return {**p, "log": load_my_log(client, url, insp["fight"], actor_id=p["id"])}
+            return {**p, "log": load_my_log(client, url, insp["fight"], actor_id=p["id"], shared=shared)}
         except Exception as e:  # noqa: BLE001
             return {**p, "log": None, "error": str(e)}
 

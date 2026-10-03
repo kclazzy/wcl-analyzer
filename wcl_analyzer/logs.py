@@ -441,46 +441,82 @@ def gear_from_details(pl: PlayerLog, details: dict) -> None:
 
 
 # ----------------------------------------------------------- API loading
+SHARED_KEYS = ("deaths", "boss_casts", "combatant", "boss_debuffs")  # одинаковы для всех игроков боя
+
+
+def fetch_shared(client, report: dict, fight: dict) -> dict:
+    """Общие для всех игроков данные боя: смерти, касты босса, экипировка и таланты, дебаффы на боссе.
+    При разборе многих игроков одного боя их качаем один раз, а не для каждого игрока заново."""
+    code, fid = report["code"], int(fight["id"])
+    s, e = float(fight["startTime"]), float(fight["endTime"])
+    bosses = boss_actor_ids(report, fight)[:3]
+    if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
+        from .api import WCLError
+        specs = {"deaths": {"data_type": "Deaths"},
+                 "boss_casts": {"data_type": "Casts", "hostility": "Enemies", "include_resources": True},
+                 "combatant": {"data_type": "CombatantInfo"}}
+        for i, bid in enumerate(bosses):
+            specs[f"boss_debuffs_{i}"] = {"data_type": "Debuffs", "target_id": bid, "hostility": "Enemies"}
+        try:
+            got = client.events_multi(code, fid, s, e, specs, {})
+            return {"deaths": got["deaths"], "boss_casts": got["boss_casts"], "combatant": got["combatant"],
+                    "boss_debuffs": [ev for i in range(len(bosses)) for ev in got[f"boss_debuffs_{i}"]]}
+        except WCLError:
+            client._no_batch = True
+    out = {"deaths": client.events(code, fid, s, e, "Deaths"),
+           "boss_casts": client.events(code, fid, s, e, "Casts", hostility="Enemies", include_resources=True),
+           "combatant": client.events(code, fid, s, e, "CombatantInfo"), "boss_debuffs": []}
+    for bid in bosses:
+        out["boss_debuffs"] += client.events(code, fid, s, e, "Debuffs", target_id=bid, hostility="Enemies")
+    return out
+
+
 def fetch_raw(client, report: dict, fight: dict, actor_id: int,
-              with_damage_events: bool = False) -> dict:
-    """Скачивает всё, что нужно для одного игрока в одном бою."""
+              with_damage_events: bool = False, shared: dict | None = None) -> dict:
+    """Скачивает всё, что нужно для одного игрока в одном бою.
+    shared — общие данные боя (fetch_shared): тогда качаются только данные самого игрока."""
     code, fid = report["code"], int(fight["id"])
     s, e = float(fight["startTime"]), float(fight["endTime"])
     if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
         from .api import WCLError
         try:
-            return _fetch_raw_batched(client, report, fight, actor_id, with_damage_events)
+            return _fetch_raw_batched(client, report, fight, actor_id, with_damage_events, shared)
         except WCLError:
             client._no_batch = True  # сервер не принял общий запрос — дальше качаем по одному
     raw: dict = {}
+    if shared:
+        raw.update({k: shared[k] for k in SHARED_KEYS})
     raw["casts"] = client.events(code, fid, s, e, "Casts", source_id=actor_id,
                                  include_resources=True)
     raw["buffs"] = client.events(code, fid, s, e, "Buffs", target_id=actor_id)
     raw["debuffs"] = client.events(code, fid, s, e, "Debuffs", source_id=actor_id,
                                    hostility="Enemies")
     # Дебаффы на боссе от всех источников: рейдовые, свои и окна уязвимости
-    raw["boss_debuffs"] = []
-    for bid in boss_actor_ids(report, fight)[:3]:
-        raw["boss_debuffs"] += client.events(code, fid, s, e, "Debuffs", target_id=bid,
-                                             hostility="Enemies")
+    if not shared:
+        raw["boss_debuffs"] = []
+        for bid in boss_actor_ids(report, fight)[:3]:
+            raw["boss_debuffs"] += client.events(code, fid, s, e, "Debuffs", target_id=bid,
+                                                 hostility="Enemies")
     try:
         raw["resources"] = client.events(code, fid, s, e, "Resources", target_id=actor_id)
     except Exception:  # noqa: BLE001 — потери ресурса не обязательны
         raw["resources"] = []
     raw["dmg_taken"] = client.events(code, fid, s, e, "DamageTaken", target_id=actor_id,
                                      include_resources=True)
-    raw["deaths"] = client.events(code, fid, s, e, "Deaths")
-    raw["boss_casts"] = client.events(code, fid, s, e, "Casts", hostility="Enemies", include_resources=True)
-    # Таланты и экипировка (CombatantInfo): событие бывает не ровно в начале боя — берём весь бой,
-    # событий этого типа всего по одному на игрока
-    raw["combatant"] = client.events(code, fid, s, e, "CombatantInfo")
+    if not shared:
+        raw["deaths"] = client.events(code, fid, s, e, "Deaths")
+        raw["boss_casts"] = client.events(code, fid, s, e, "Casts", hostility="Enemies", include_resources=True)
+        # Таланты и экипировка (CombatantInfo): событие бывает не ровно в начале боя — берём весь бой,
+        # событий этого типа всего по одному на игрока
+        raw["combatant"] = client.events(code, fid, s, e, "CombatantInfo")
     raw["dmg_table"] = client.damage_table(code, fid, actor_id)
     if with_damage_events:
         raw["dmg_done"] = client.events(code, fid, s, e, "DamageDone", source_id=actor_id)
     return raw
 
 
-def _fetch_raw_batched(client, report: dict, fight: dict, actor_id: int, with_damage_events: bool) -> dict:
+def _fetch_raw_batched(client, report: dict, fight: dict, actor_id: int, with_damage_events: bool,
+                       shared: dict | None = None) -> dict:
     """То же, что fetch_raw, но одним запросом к API вместо десяти."""
     code, fid = report["code"], int(fight["id"])
     s, e = float(fight["startTime"]), float(fight["endTime"])
@@ -499,9 +535,16 @@ def _fetch_raw_batched(client, report: dict, fight: dict, actor_id: int, with_da
         specs[f"boss_debuffs_{i}"] = {"data_type": "Debuffs", "target_id": bid, "hostility": "Enemies"}
     if with_damage_events:
         specs["dmg_done"] = {"data_type": "DamageDone", "source_id": actor_id}
+    if shared:  # общие данные боя уже скачаны — в запросе только данные игрока
+        for k in list(specs):
+            if k in SHARED_KEYS or k.startswith("boss_debuffs_"):
+                del specs[k]
     got = client.events_multi(code, fid, s, e, specs, {"dmg_table": {"data_type": "DamageDone", "source_id": actor_id}})
     raw = {k: got[k] for k in specs if not k.startswith("boss_debuffs_")}
-    raw["boss_debuffs"] = [ev for i in range(len(bosses)) for ev in got[f"boss_debuffs_{i}"]]
+    if shared:
+        raw.update({k: shared[k] for k in SHARED_KEYS})
+    else:
+        raw["boss_debuffs"] = [ev for i in range(len(bosses)) for ev in got[f"boss_debuffs_{i}"]]
     raw["dmg_table"] = got["dmg_table"]
     return raw
 

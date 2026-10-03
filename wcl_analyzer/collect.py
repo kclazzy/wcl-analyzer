@@ -28,15 +28,37 @@ def _pick_fight(report: dict, fight_arg: str | int | None) -> dict:
     return (kills or fights)[-1]
 
 
+def shared_cache(client):
+    """Общие данные боя (смерти, касты босса, экипировка, дебаффы на боссе) — один раз на бой,
+    сколько бы игроков этого боя ни разбиралось. Безопасно для потоков."""
+    import threading
+    from .logs import fetch_shared
+    store: dict = {}
+    lock = threading.Lock()
+
+    def get(report: dict, fight: dict) -> dict:
+        key = (report["code"], int(fight["id"]))
+        with lock:
+            if key not in store:
+                store[key] = fetch_shared(client, report, fight)
+            return store[key]
+    return get
+
+
 def load_my_log(client: WCLClient, url: str, fight: str | int | None = None,
-                player: str | None = None, actor_id: int | None = None) -> PlayerLog:
+                player: str | None = None, actor_id: int | None = None,
+                shared: dict | None = None, damage_events: bool = True) -> PlayerLog:
+    """Лог игрока. shared — общие данные боя (logs.fetch_shared), когда разбираются многие игроки одного боя;
+    damage_events=False — без событий нанесённого урона (экономия лимита: нет оценки прироста от кулдаунов)."""
     code, url_fight, url_source = parse_report_url(url)
     report = client.report(code)
     f = _pick_fight(report, fight if fight is not None else url_fight)
     if actor_id is None and not player:
         actor_id = url_source
     actor, cls, spec = find_player(client, report, f, name=player, actor_id=actor_id)
-    raw = fetch_raw(client, report, f, int(actor["id"]), with_damage_events=True)
+    if callable(shared):  # общие данные боя: функция бой → данные (кэш на стороне вызывающего)
+        shared = shared(report, f)
+    raw = fetch_raw(client, report, f, int(actor["id"]), with_damage_events=damage_events, shared=shared)
     return ensure_talents(client, build_player_log(report, f, actor, raw, spec=spec, cls=cls), gear_names=True)
 
 

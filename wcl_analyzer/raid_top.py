@@ -259,40 +259,51 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                        "phase": r.get("phase"), "phase_start": (r["t"] - r["phase_t"]) if r.get("phase_t") is not None else None})
     med = median([e["prio"] for e in events]) if events else 0
     assigned: dict = defaultdict(list)
-    plan = []
-    for ev in sorted(events, key=lambda e: e["t"]):
+    states = []
+    for ev in events:
         r = ref.get(ev["key"])
         pref = [i for i, _ in r["cds"].most_common()] if r else []
-        # Сколько кулдаунов: по тяжести пика и по тому, сколько на него жмёт топ (медиана по киллам)
+        # Сколько кулдаунов: по тяжести пика и по тому, сколько на него жмёт топ (медиана по киллам).
+        # Пики, которых у топа нет (ваш бой длиннее — топ убил босса раньше), — только по тяжести
         sev = (1 + (bool(med) and ev["prio"] >= HEAVY_PEAK * med) + (bool(med) and ev["prio"] >= DANGER_PEAK * med)
                + (ev.get("deaths", 0) > 0))  # в этот пик в вашем бою кто-то умер
         top_need = int(round(median(r["n_cds"]))) if r and r.get("n_cds") else 0
         need = max(1, min(MAX_PER_PEAK, max(sev, top_need), len({c["player"] for c in cds.values()})))
+        states.append({"ev": ev, "r": r, "pref": pref, "top_need": top_need, "need": need, "picks": [], "players": set()})
+
+    def add_one(st) -> bool:
+        ev, pref, picks, players = st["ev"], st["pref"], st["picks"], st["players"]
+        # Сначала кулдаун, который здесь жмёт топ; затем — реже назначенный и более сильный
+        order = sorted(cds, key=lambda k: (pref.index(k[1]) if k[1] in pref else 99, len(assigned[k]),
+                                           -game_data.power(k[1]), cds[k]["cd"]))
+        for k in order:
+            # на один пик — разные игроки и разные способности: два одинаковых кулдауна
+            # одного класса (два «Ободряющих клича», два гимна) не складываются в пользу рейда
+            if any(k == p[0] or k[1] == p[0][1] for p in picks) or cds[k]["player"] in players:
+                continue
+            for lead in range(PRESS_WINDOW_S[1], PRESS_WINDOW_S[0] - 1, -1):
+                at = max(0.0, ev["t"] - lead)
+                if free(k, at):
+                    assigned[k].append(at)
+                    players.add(cds[k]["player"])
+                    picks.append((k, at))
+                    return True
+        return False
+
+    # Сначала — по одному сейву на каждый пик, от самых тяжёлых к лёгким: иначе кулдауны уходят на ранние
+    # лёгкие пики, а сильный урон в конце длинного боя (у топа его нет — они убивают раньше) остаётся без сейва.
+    # Потом — добираем второй и третий сейв на тяжёлые пики.
+    by_weight = sorted(states, key=lambda st: (-st["ev"]["prio"], -st["need"], st["ev"]["t"]))
+    for st in by_weight:
+        add_one(st)
+    for st in by_weight:
+        while len(st["picks"]) < st["need"] and add_one(st):
+            pass
+    plan = []
+    for st in sorted(states, key=lambda st: st["ev"]["t"]):
+        ev, r, pref, top_need, need = st["ev"], st["r"], st["pref"], st["top_need"], st["need"]
         heavy = need >= 2
-        picks, players = [], set()
-        for _ in range(need):
-            best = None
-            # Сначала кулдаун, который здесь жмёт топ; затем — реже назначенный и более сильный
-            order = sorted(cds, key=lambda k: (pref.index(k[1]) if k[1] in pref else 99, len(assigned[k]),
-                                               -game_data.power(k[1]), cds[k]["cd"]))
-            for k in order:
-                # на один пик — разные игроки и разные способности: два одинаковых кулдауна
-                # одного класса (два «Ободряющих клича», два гимна) не складываются в пользу рейда
-                if any(k == p[0] or k[1] == p[0][1] for p in picks) or cds[k]["player"] in players:
-                    continue
-                for lead in range(PRESS_WINDOW_S[1], PRESS_WINDOW_S[0] - 1, -1):
-                    at = max(0.0, ev["t"] - lead)
-                    if free(k, at):
-                        best = (k, at)
-                        break
-                if best:
-                    break
-            if not best:
-                break
-            k, at = best
-            assigned[k].append(at)
-            players.add(cds[k]["player"])
-            picks.append((k, at))
+        picks = sorted(st["picks"], key=lambda p: p[1])
         t0 = picks[0][1] if picks else max(0.0, ev["t"] - PRESS_LEAD_S)
         # фаза: из вашего боя; пики, до которых вы не дошли, — из лучших киллов
         n = ev.get("phase") or ph_n(t0)
@@ -306,6 +317,7 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                "intermission": bool((pinfo or {}).get("intermission")),
                "phase_time": _fmt_t(rel) if rel is not None else None, "phase_t": rel,
                "deaths": ev.get("deaths", 0),
+               "beyond_top": bool(ref) and r is None,  # у лучших киллов такого пика нет (бой у них короче)
                "top_n": top_need,
                "top": ", ".join(names.get(i, f"#{i}") for i in pref[:2]),
                "picks": [{"cd": cds[k]["name"], "player": cds[k]["player"], "like_top": k[1] in pref[:2],

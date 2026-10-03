@@ -207,8 +207,29 @@ def test_plan_no_duplicate_ability():
                     {"t": 120, "peak_t": 122, "ability": "Волна", "ability_id": 5, "k": 2, "damage": 30}]}
     plan = make_plan(X, {}, [], {})
     assert [p["cd"] for p in plan[0]["picks"]] == ["Божественный гимн", "Ободряющий клич"], plan[0]["picks"]
-    assert plan[1]["picks"][0]["player"] == "Брам"  # второй клич — на следующий пик, а не вдогонку первому
+    # второй клич — на следующий пик (от другого воина), а не вдогонку первому
+    first_warrior = next(p["player"] for p in plan[0]["picks"] if p["cd"] == "Ободряющий клич")
+    assert plan[1]["picks"][0]["cd"] == "Ободряющий клич" and plan[1]["picks"][0]["player"] != first_warrior
     print("OK план сейвов: одна способность на пик не дублируется (два воина — клич на разные пики)")
+
+
+def test_plan_long_fight():
+    """Бой длиннее, чем у топа: сильные пики в конце, которых у топа нет, тоже получают сейвы."""
+    from collections import Counter
+    from wcl_analyzer.raid_top import make_plan
+    X = {"roster_cds": [{"pid": 1, "player": "Торвин", "name": "Ободряющий клич", "id": 97462, "cd": 180, "cls": "Warrior"},
+                        {"pid": 3, "player": "Элария", "name": "Божественный гимн", "id": 64843, "cd": 180, "cls": "Priest"},
+                        {"pid": 4, "player": "Таргун", "name": "Тотем целительного потока", "id": 108280, "cd": 180, "cls": "Shaman"}],
+         "spikes": [{"t": t, "peak_t": t + 2, "ability": "Волна", "ability_id": 5, "k": i + 1, "damage": 100}
+                    for i, t in enumerate((60, 120, 200))]
+                   + [{"t": t, "peak_t": t + 2, "ability": "Ярость", "ability_id": 6, "k": i + 1, "damage": 300}
+                      for i, t in enumerate((400, 410))]}
+    ref = {(5, i): {"cds": Counter({c: 5}), "n_cds": [1]} for i, c in ((1, 64843), (2, 108280), (3, 97462))}
+    plan = make_plan(X, ref, [], {})
+    late = [r for r in plan if r["mechanic"].startswith("«Ярость»")]
+    assert all(r["picks"] and r["beyond_top"] for r in late), late
+    assert all(r["picks"] for r in plan), [r["mechanic"] for r in plan if not r["picks"]]
+    print("OK план сейвов: сильные пики в конце длинного боя (у топа их нет) тоже закрыты")
 
 
 def test_saves_all_bosses():
@@ -234,6 +255,7 @@ def test_saves_all_bosses():
 
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
+    test_plan_long_fight()
     test_saves_all_bosses()
     test_battle_analysis()
     test_gear_and_trinkets()

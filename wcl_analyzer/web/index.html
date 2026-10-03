@@ -345,7 +345,7 @@ dialog label.check input{width:auto;margin:0}
       <input id="url" type="text" inputmode="url" placeholder="https://www.warcraftlogs.com/reports/…" aria-label="Ссылка на отчёт Warcraft Logs" autocomplete="off">
       <button class="btn" id="findBtn" type="submit">Найти бой</button>
     </form>
-    <div class="hint">Нет ключа или лога под рукой? Посмотрите на демо-данных: <button class="linkbtn" id="demoBtn" type="button">разбор игрока</button>, <button class="linkbtn" id="demoRaidBtn" type="button">разбор рейда</button> или <button class="linkbtn" id="demoRaidRotBtn" type="button">ротация всего рейда</button> или <button class="linkbtn" id="demoSavesBtn" type="button">сейвы на всех боссов</button>.</div>
+    <div class="hint">Нет ключа или лога под рукой? Посмотрите на демо-данных: <button class="linkbtn" id="demoBtn" type="button">разбор игрока</button>, <button class="linkbtn" id="demoRaidBtn" type="button">разбор рейда</button> или <button class="linkbtn" id="demoRaidRotBtn" type="button">ротация всего рейда</button>.</div>
 
     <div class="picks" id="picks" hidden>
       <div><label for="fight">Бой</label><select id="fight"></select></div>
@@ -370,7 +370,6 @@ dialog label.check input{width:auto;margin:0}
         <button class="btn you" id="runBtn" type="button">Разобрать игрока</button>
         <button class="btn" id="raidBtn" type="button" title="Весь бой целиком: игроки, механики, смерти, пуллы, полученный урон и сейвы">Разобрать бой рейда</button>
         <button class="btn" id="raidRotBtn" type="button" title="Каждый DPS боя (или только отобранные) против топа своего спека">Ротация всего рейда</button>
-        <button class="btn" id="savesBtn" type="button" title="План рейдовых кулдаунов и заметка MRT на каждого босса из отчёта (героическая и эпохальная сложность): по последнему киллу или лучшему пуллу">Сейвы на всех боссов</button>
         <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
       </div>
@@ -634,7 +633,7 @@ try { if (localStorage.getItem("wclMythicToo") === "0") $("#mythicToo").checked 
 $("#mythicToo").addEventListener("change", () => { try { localStorage.setItem("wclMythicToo", $("#mythicToo").checked ? "1" : "0"); } catch(e){} });
 $("#runBtn").onclick = () => run({url:$("#url").value.trim(), fight:$("#fight").value, actor:$("#player").value, ref:$("#ref").value, mythic: $("#mythicToo").checked});
 $("#demoBtn").onclick = () => run({demo:true});
-const ALL_ONLY_PLAYER = "«Все боссы» — для кнопки «Разобрать игрока». Разбор рейда — по одному бою; сейвы на всех боссов — кнопка «Сейвы на всех боссов».";
+const ALL_ONLY_PLAYER = "«Все боссы» — для кнопки «Разобрать игрока». Разбор рейда и ротация рейда — по одному бою: выберите его в списке «Бой».";
 $("#raidBtn").onclick = () => $("#fight").value === "all" ? showErr(ALL_ONLY_PLAYER) : run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value, mythic: $("#mythicToo").checked});
 $("#demoRaidBtn").onclick = () => run({mode:"raid", demo:true});
 /* Отбор игроков по рейтингу с учётом экипировки (WCL bracketPercent): место среди игроков спека с тем же уровнем предметов */
@@ -659,11 +658,7 @@ $("#pickBy").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
 $("#raidRotBtn").onclick = () => $("#fight").value === "all" ? showErr(ALL_ONLY_PLAYER) : run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: $("#ref").value, pick: pickValue() || null, mythic: $("#mythicToo").checked});
 $("#demoRaidRotBtn").onclick = () => run({mode:"raidrot", demo:true});
-$("#savesBtn").onclick = () => { const url = $("#url").value.trim();
-  if (!url) { showErr("Вставьте ссылку на отчёт Warcraft Logs — бой выбирать не нужно, план составится на каждого босса."); return; }
-  run({mode:"saves", url}); };
-$("#demoSavesBtn").onclick = () => run({mode:"saves", demo:true});
-const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn", "#savesBtn"];
+const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn"];
 
 /* ---------- анализ ---------- */
 async function run(params, path="/api/analyze"){
@@ -1312,7 +1307,7 @@ function ilvlCell(p){
   return `<span class="${d!=null && d <= -5 ? "worse" : ""}">${num(p.item_level,1)}</span>`
     + (p.ref_item_level != null ? `<div style="font-size:12.5px;color:var(--muted)">топ ${num(p.ref_item_level,1)}</div>` : "");
 }
-/* Сейвы на всех боссов: вкладка на каждого босса — план и заметка MRT */
+/* Сейвы на всех боссов (кнопка убрана; открываются только сохранённые в истории разборы) */
 /* Игрок на всех боссах отчёта: таблица по боссам, «Подробно» — полный разбор, «Продолжить» — после лимита */
 let CONTINUE_ALL = null;
 function renderPlayerAll(R){

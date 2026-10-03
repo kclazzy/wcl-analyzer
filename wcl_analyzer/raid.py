@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import re
 from collections import Counter, defaultdict
 from statistics import median
 
@@ -13,7 +14,6 @@ import numpy as np
 from .collect import _pick_fight
 from .compare import _fmt_t, _n
 from .config import DIFFICULTY_NAMES, SITE_URL
-import re
 
 from .logs import boss_actor_ids, merge_intervals, parse_report_url
 from .metrics import HEALTHSTONE_RE, LUST_IDS, LUST_RE, POTION_RE, RACIAL_RE
@@ -53,6 +53,8 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
     fid, s, e = int(f["id"]), float(f["startTime"]), float(f["endTime"])
     log(f"Бой: {f['name']}, {'килл' if f.get('kill') else 'вайп'}, {_fmt_t((e - s) / 1000)}")
     raw = {"report": report, "fight": f}
+    if f.get("phaseTransitions") and hasattr(client, "report_phases"):
+        raw["phase_meta"] = client.report_phases(code)
     log("Состав рейда, урон и лечение…")
     raw["details"] = client.player_details(code, fid)
     pulls = sorted([x for x in report["fights"]
@@ -162,6 +164,37 @@ def _r(x, nd=1):
 
 
 # --------------------------------------------------------------- анализ
+def fight_phases(f: dict, meta: list | None, dur: float) -> list[dict]:
+    """Фазы боя: [{n, id, t, end, name, intermission}] — n — порядковый номер фазы в бою (как в MRT: p2, p3…).
+    Нет переходов — пустой список (одна фаза на весь бой)."""
+    f0 = float(f["startTime"])
+    tr = sorted(((float(p["startTime"]) - f0) / 1000.0, int(p.get("id", 0)))
+                for p in f.get("phaseTransitions") or [] if p.get("startTime") is not None)
+    if not tr:
+        return []
+    names = {}
+    for enc in meta or []:
+        if not enc.get("encounterID") or int(enc["encounterID"]) == int(f.get("encounterID") or 0):
+            for ph in enc.get("phases") or []:
+                names[int(ph["id"])] = (ph.get("name") or "", bool(ph.get("isIntermission")))
+    out = []
+    for i, (t, pid) in enumerate(tr):
+        name, inter = names.get(pid, ("", False))
+        inter = inter or bool(re.search(r"intermission|интерм|переход", name, re.I))
+        out.append({"n": i + 1, "id": pid, "t": round(max(0.0, t), 1),
+                    "end": round(tr[i + 1][0] if i + 1 < len(tr) else dur, 1),
+                    "name": name or (f"Интермиссия" if inter else f"Фаза {pid}"), "intermission": inter})
+    return out
+
+
+def phase_at(phases: list[dict], t: float) -> dict | None:
+    cur = None
+    for ph in phases or []:
+        if ph["t"] <= t + 1e-6:
+            cur = ph
+    return cur
+
+
 def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
     """avoidable — id или названия механик, урон от которых считается ошибкой (spell_meta.json: _avoidable)."""
     avoidable = {str(x).lower() for x in (avoidable or set())}
@@ -467,7 +500,12 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
         "kills": sum(1 for p in pulls if p["kill"]),
         "best_pct": min((p["boss_pct"] for p in pulls if p["boss_pct"] is not None), default=None),
     }
-    info = {"code": code, "title": report.get("title", ""), "boss": f.get("name", ""),
+    phases = fight_phases(f, raw.get("phase_meta"), dur)
+    for sp in extras.get("spikes", []):  # фаза пика и время от её начала: следующая фаза может прийти раньше или позже
+        ph = phase_at(phases, sp["t"])
+        sp["phase"] = ph["n"] if ph else None
+        sp["phase_t"] = round(sp["t"] - ph["t"], 1) if ph else None
+    info = {"code": code, "title": report.get("title", ""), "boss": f.get("name", ""), "phases": phases,
             "difficulty": DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), str(f.get("difficulty"))),
             "kill": kill, "duration_s": _r(dur), "duration": _fmt_t(dur), "fight_id": fid,
             "boss_pct": None if kill else next((p["boss_pct"] for p in pulls if p["selected"]), None),
@@ -573,7 +611,7 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
     from .raid_top import _roster_lines, brief_lines as _bl, make_plan
     X = R["extras"]
     vs = X.get("vs_top")
-    X["plan"] = vs["plan"] if vs else make_plan(X, {}, [], {})
+    X["plan"] = vs["plan"] if vs else make_plan(X, {}, [], {}, R["info"].get("phases"))
     X["saves_brief"] = _bl(vs) + _roster_lines(X.get("roster_cds") or [], X["plan"])
     if X.get("vs_top_alt"):
         X["saves_brief_alt"] = _bl(X["vs_top_alt"]) + _roster_lines(X.get("roster_cds") or [], X["vs_top_alt"]["plan"])

@@ -316,7 +316,14 @@ def test_analysis_quality():
     second = V["rows"][1]
     assert second["top_self"] == ["Перерождение"] and "Перерождение" not in second["top_raid"], second
     third = [r for r in V["plan"] if r["mechanic"].endswith("№3")][0]
-    assert third["cd"] == "Божественный гимн" and third["like_top"], third
+    # Гимн нажат на волну №1 (фаза 1); волна №3 — уже в фазе 2, ровно через 180 с отката. Если фаза 2 в
+    # следующем пулле начнётся раньше, гимн не успеет откатиться: план берёт другой кулдаун (запас на смещение фазы)
+    assert third["picks"] and third["cd"] != "Божественный гимн" and third["top"].startswith("Божественный гимн"), third
+    assert third["phase"] == 3 and third["phase_name"] == "Фаза 2" and third["phase_time"] == "0:45", third
+    second = [r for r in V["plan"] if r["mechanic"].endswith("№2")][0]
+    assert second["intermission"] and second["phase_name"] == "Ледяной шторм", second
+    assert "{time:0:45,p3}" in third["mrt"] and "{time:1:05}" in V["plan"][0]["mrt"], (third["mrt"], V["plan"][0]["mrt"])
+    assert [p["n"] for p in R["info"]["phases"]] == [1, 2, 3]
     assert X["pull_trend"]["rows"][0]["name"] == "Ледяная волна", X["pull_trend"]
     # Вайп: план покрывает и пики, до которых рейд не дошёл
     Rw = run_raid(FakeRaidClient(), DEMO_URL, 1, log=lambda m: None)

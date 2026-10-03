@@ -1156,7 +1156,7 @@ function renderRaidPeaks(P, el){
     ${box("Урон по рейду и рейдовые кулдауны", "Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники — рейдовые кулдауны вашего рейда (красная обводка — нажат вне пиков)" + (V ? ", полые бирюзовые — что жмут лучшие киллы." : "."),
       '<div class="chart" style="height:300px"><canvas id="cRaidDmg"></canvas></div>')}
     ${(R => R.length ? box("План сейвов на следующий пулл", "Кулдауны всего состава — классы и спеки, взятые таланты — расставлены на пики с учётом перезарядки: нажать за 1–5 с до пика. Сколько сейвов на пик — по тому, сколько жмут лучшие гильдии, и по тяжести пика (до трёх, разных игроков). «Запасные» — что ещё откатано к этому моменту и не сломает остальной план. «Как у топа» — тот же кулдаун на этот пик жмут лучшие гильдии.",
-      planTable(R, (P.info||{}).boss)) : "")(X.plan || (V && V.plan) || [])}
+      planTable(R, (P.info||{}).boss, (P.info||{}).phases)) : "")(X.plan || (V && V.plan) || [])}
     ${V ? `<div class="box"><h3>Пики урона: что нажал ваш рейд и что жмёт топ</h3>
       <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы${V.difficulty?` той же сложности (${esc(V.difficulty)})`:""}: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${esc(k.duration)})`).join(", ")}.
       Кулдауном закрыто: у топа ${pct(V.top_cover,0)}, у вашего рейда ${pct(V.my_cover,0)}.</p>` +
@@ -1196,7 +1196,7 @@ function mrtBlock(plan, title){
   if (!note) return "";
   return `<div class="mrt" style="margin-top:12px">
     <button type="button" class="mini" data-mrt>Скопировать для MRT</button>
-    <span class="hint" style="margin-left:8px">В игре: /mrt → Заметки → вставить (Ctrl+V) → Отправить. Время — от пулла, имена в цветах классов, у кулдаунов — иконки.</span>
+    <span class="hint" style="margin-left:8px">В игре: /mrt → Заметки → вставить (Ctrl+V) → Отправить. Время — от пулла, а со 2-й фазы — от начала фазы (p2, p3…). Номера фаз сверьте с вашим босс-модом.</span>
     <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:13.5px">Текст заметки</summary>
       <textarea readonly rows="${Math.min(14, note.split("\n").length + 1)}" style="width:100%;margin-top:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;box-sizing:border-box">${esc(note)}</textarea></details></div>`;
 }
@@ -1218,13 +1218,19 @@ document.addEventListener("click", async ev => {
   setTimeout(() => b.textContent = old, 2500);
 });
 
-function planTable(plan, title){
-  return planRows(plan) + mrtBlock(plan, title);
+function planTable(plan, title, phases){
+  const ph = (phases||[]).length > 1 ? `<p class="hint" style="margin:0 0 8px">Фазы этого боя: ${phases.map(p=>`<b>${esc(p.name)}</b>${p.intermission?' <span class="tag MEDIUM">переход</span>':""} с ${btT(p.t)}`).join(" · ")}.
+    Время от начала фазы показано под «Нажать в» — по нему и ставятся таймеры MRT: если фаза придёт раньше или позже, сейвы сдвинутся вместе с ней.
+    Кулдаун, который жмётся в разных фазах, планируется с запасом 10 с на смещение фазы.</p>` : "";
+  return ph + planRows(plan) + mrtBlock(plan, title);
 }
 function planRows(plan){
   return table(["Нажать в","Пик","Кулдауны и кто"], plan.map(r=>{
     const picks = r.picks || (r.cd ? [{cd:r.cd, player:r.player, like_top:r.like_top}] : []);
-    return [r.time, esc(r.mechanic) + (r.heavy ? ` <span class="tag LOW">опасный: ${r.need} ${plural(r.need,"сейв","сейва","сейвов")}</span>` : "")
+    const phc = r.phase && r.phase_time != null && (r.phase > 1 || r.intermission)
+      ? `<div style="font-size:12.5px;color:var(--muted);white-space:nowrap">${esc(r.phase_name||"Фаза "+r.phase)} +${esc(r.phase_time)}</div>`
+        + (r.intermission ? '<span class="tag MEDIUM">переход</span>' : "") : "";
+    return [r.time + phc, esc(r.mechanic) + (r.heavy ? ` <span class="tag LOW">опасный: ${r.need} ${plural(r.need,"сейв","сейва","сейвов")}</span>` : "")
         + (r.top_n || r.deaths ? `<div style="font-size:12.5px;color:var(--muted)">${[r.top_n ? `топ жмёт: ${r.top_n}` : "", r.deaths ? `смертей в этот пик: ${r.deaths}` : ""].filter(Boolean).join(", ")}</div>` : ""),
       (picks.length ? picks.map(p=>`<div><b>${esc(p.cd)}</b> — ${esc(p.player)}${p.like_top?' <span class="tag HIGH">как у топа</span>':""}`
           + (p.cooldown ? `<span style="color:var(--muted);font-size:12.5px"> · откат ${esc(p.cooldown)}, снова готов в ${esc(p.ready)}</span>` : "") + "</div>").join("")

@@ -262,6 +262,16 @@ class WCLClient:
             raise WCLError(f"Отчёт {code} не найден или закрыт")
         return rep
 
+    def report_phases(self, code: str) -> list[dict]:
+        """Названия фаз боссов отчёта: [{encounterID, phases: [{id, name, isIntermission}]}].
+        Необязательные данные: при любой ошибке — пустой список, разбор идёт без названий фаз."""
+        q = """query($code: String!) { reportData { report(code: $code) {
+                 phases { encounterID phases { id name isIntermission } } } } }"""
+        try:
+            return (self.query(q, {"code": code})["reportData"]["report"] or {}).get("phases") or []
+        except Exception:  # noqa: BLE001
+            return []
+
     def player_details(self, code: str, fight_id: int, combatant: bool = False) -> dict:
         """Состав боя. combatant=True — ещё и CombatantInfo каждого игрока (таланты, экипировка)."""
         q = """query($code: String!, $fid: [Int]) { reportData { report(code: $code) {

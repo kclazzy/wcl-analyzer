@@ -78,6 +78,14 @@ ROLE_SPELLS = {"dps": [800001, 800002, 800003], "healer": [800011, 800012, 80001
                "tank": [800021, 800022, 800023]}
 
 
+PHASES = ((1, 0.0), (2, 140.0), (3, 200.0))  # фаза 1, интермиссия «Ледяной шторм», фаза 2
+
+
+def _phases(start_ms: float, dur: float, shift: float) -> list[dict]:
+    return [{"id": pid, "startTime": start_ms + max(0.0, t + (shift if t else 0.0)) * 1000}
+            for pid, t in PHASES if t < dur]
+
+
 class FakeRaidClient:
     """Те же методы, что у WCLClient, но данные генерируются локально."""
 
@@ -101,7 +109,7 @@ class FakeRaidClient:
         for i, (dur, kill, pct, _) in enumerate(PULLS):
             self.fights.append({"id": i + 1, "encounterID": ENCOUNTER, "name": "Демо-босс", "difficulty": 5,
                                 "kill": kill, "startTime": t, "endTime": t + dur * 1000, "size": 20,
-                                "fightPercentage": pct})
+                                "fightPercentage": pct, "phaseTransitions": _phases(t, dur, 0.0)})
             t += dur * 1000 + 240_000
         self._cache: dict[int, dict] = {}
 
@@ -111,7 +119,13 @@ class FakeRaidClient:
         start = self.base + 50_000_000 * i
         dur = 296.0 + 7 * i
         return {"id": 1, "encounterID": ENCOUNTER, "name": "Демо-босс", "difficulty": 5, "kill": True,
-                "startTime": start, "endTime": start + dur * 1000, "size": 20, "fightPercentage": 0}
+                "startTime": start, "endTime": start + dur * 1000, "size": 20, "fightPercentage": 0,
+                "phaseTransitions": _phases(start, dur, -6.0)}  # топ быстрее сносит босса: фазы раньше
+
+    def report_phases(self, code):
+        return [{"encounterID": ENCOUNTER, "phases": [{"id": 1, "name": "Фаза 1", "isIntermission": False},
+                                                      {"id": 2, "name": "Ледяной шторм", "isIntermission": True},
+                                                      {"id": 3, "name": "Фаза 2", "isIntermission": False}]}]
 
     def fight_rankings(self, encounter_id, difficulty, metric="speed", page=1, max_age_s=None):
         return [{"report": {"code": c, "fightID": 1}, "guild": {"name": f"Топ-гильдия {i + 1}"},

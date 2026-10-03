@@ -411,14 +411,16 @@ def _vs_top(wb, R, demo):
     V, T = X.get("vs_top"), X.get("pull_trend") or {}
     if not V and not T.get("rows") and not X.get("roster_cds"):
         return
-    s = Sheet(wb, "Против топа", demo, {"A": 12, "B": 30, "C": 36, "D": 22, "E": 30, "F": 10, "G": 10, "H": 10})
+    s = Sheet(wb, "Против топа", demo, {"A": 26, "B": 30, "C": 36, "D": 22, "E": 30, "F": 10, "G": 10, "H": 10})
     s.title("Рейд против лучших киллов этого босса",
             "Пики урона сопоставлены по механике и её номеру в бою; кулдауны — по номеру способности.")
     if V:
         s.section("План рейдовых кулдаунов на следующий пулл",
                   "Кулдауны состава (классы, спеки, взятые таланты) расставлены на пики с учётом перезарядки.")
         f, l = s.table(["Нажать в", "Пик", "Кулдауны и кто", "", "У топа здесь"],
-                       [[r["time"], r["mechanic"], _plan_text(r), "", r["top"] or "—"] for r in V["plan"]])
+                       [[r["time"] + (f" ({r['phase_name']} +{r['phase_time']})" if (r.get("phase") or 0) > 1
+                                      and r.get("phase_time") else ""),
+                         r["mechanic"], _plan_text(r), "", r["top"] or "—"] for r in V["plan"]])
         s.ws.column_dimensions["C"].width = 70
         if V["plan"]:
             s.ws.conditional_formatting.add(f"C{f}:C{l}", CellIsRule(operator="equal", formula=['"нет свободного кулдауна"'], fill=RED))

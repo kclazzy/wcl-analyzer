@@ -17,6 +17,7 @@ TOP_KILLS = 5
 MIN_SHARE = 0.4          # пик учитывается, если он есть хотя бы у 40% лучших киллов
 PRESS_LEAD_S = 2.0       # время нажатия по умолчанию — за 2 с до начала пика
 PRESS_WINDOW_S = (1, 5)  # в плане кулдаун жмётся за 1–5 с до пика
+PHASE_SHIFT_S = 10.0     # запас к перезарядке, если два нажатия в разных фазах: фаза может начаться раньше
 
 DEFAULT_CD_S = 180
 
@@ -101,12 +102,14 @@ def _roster_lines(roster: list[dict], plan: list[dict]) -> list[str]:
 
 def _aggregate(kills: list[dict]) -> dict:
     ref: dict = defaultdict(lambda: {"times": [], "peaks": [], "covered": 0, "kills": 0, "cds": Counter(),
-                                     "name": None, "damage": [], "n_cds": []})
+                                     "name": None, "damage": [], "n_cds": [], "ph": []})
     for k in kills:
         for sp in k["spikes"]:
             r = ref[(sp.get("ability_id"), sp.get("k", 1))]
             r["times"].append(sp["t"])
             r["peaks"].append(sp.get("peak_t", sp["t"] + 2))
+            if sp.get("phase"):
+                r["ph"].append((sp["phase"], sp.get("phase_t") or 0.0, sp.get("peak_t", sp["t"] + 2) - sp["t"]))
             r["kills"] += 1
             r["damage"].append(sp["damage"])
             r["name"] = r["name"] or sp["ability"]
@@ -162,7 +165,13 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
         t = median(r["times"])
         if t <= (R["info"].get("duration_s") or 0):
             continue  # такой пик у топа есть, но в вашем бою он прошёл тихо — не повод для плана
-        late.append({"t": t, "peak_t": median(r["peaks"]), "time": _fmt_t(t), "mechanic": f"«{r['name']}» №{key[1]}", "my": None,
+        peak_t = median(r["peaks"])
+        ph_n, ph_t = _top_phase(r)
+        mine = next((p for p in R["info"].get("phases") or [] if p["n"] == ph_n), None)
+        if mine and ph_t is not None:  # ваш бой дошёл до этой фазы: время — от её начала у вас
+            t = mine["t"] + ph_t
+            peak_t = t + median(x[2] for x in r["ph"] if x[0] == ph_n)
+        late.append({"t": t, "peak_t": peak_t, "phase": ph_n, "phase_t": ph_t, "time": _fmt_t(t), "mechanic": f"«{r['name']}» №{key[1]}", "my": None,
                      "top_share": r["covered"] / r["kills"],
                      "top_cds": [names.get(i, f"#{i}") for i, _ in r["cds"].most_common(2)],
                      "top_time": _fmt_t(t), "_key": key, "_k": key, "my_self": None, "my_raid": None})
@@ -174,7 +183,7 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
     my_cover = (sum(1 for s in X.get("spikes", []) if s.get("covered_by")) / len(X["spikes"])) if X.get("spikes") else None
     tot = sum(r["kills"] for r in ref.values())
     top_cover = (sum(r["covered"] for r in ref.values()) / tot) if tot else None
-    plan = make_plan(X, ref, late, names)
+    plan = make_plan(X, ref, late, names, R["info"].get("phases"))
     marks = [{"t": median(r["times"]), "name": ", ".join(names.get(i, f"#{i}") for i, _ in r["cds"].most_common(2))}
              for r in ref.values() if r["kills"] and r["covered"] / r["kills"] >= 0.5]
     return {"kills": [{"guild": k["guild"], "duration": _fmt_t(k["duration"]),
@@ -193,14 +202,38 @@ MAX_PER_PEAK = 3
 MAX_SPARE = 3        # запасных вариантов на пик
 
 
-def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
+def _top_phase(r: dict) -> tuple[int | None, float | None]:
+    """В какой фазе этот пик у топа и через сколько секунд от её начала (медиана по киллам)."""
+    if not r.get("ph"):
+        return None, None
+    n = Counter(x[0] for x in r["ph"]).most_common(1)[0][0]
+    return n, median(x[1] for x in r["ph"] if x[0] == n)
+
+
+def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[dict] | None = None) -> list[dict]:
     """Кто какой кулдаун жмёт на каждый пик следующего пулла.
 
     Доступные кулдауны — из состава рейда (X["roster_cds"]: класс, спек, взятые таланты, перезарядка);
     без данных о составе — те, что рейд нажимал в этом бою. Пики идут по ходу боя; на каждый — кулдаун,
     нажатый как можно раньше в окне 1–5 с до пика, чтобы следующий раз он откатился раньше. Сначала —
     кулдаун, который на этот пик жмёт топ; на лёгкие пики — короткие кулдауны, длинные бережём для
-    тяжёлых. На самые тяжёлые пики — два кулдауна разных игроков. Перезарядка не нарушается."""
+    тяжёлых. На самые тяжёлые пики — два кулдауна разных игроков. Перезарядка не нарушается.
+
+    Фазы: если два нажатия одного кулдауна в разных фазах, к перезарядке добавляется запас PHASE_SHIFT_S —
+    в следующем пулле фаза может начаться раньше (больше урона по боссу), и интервал между нажатиями сократится.
+    Время в плане и в заметке MRT для второй фазы и дальше — от начала фазы."""
+    phases = phases or []
+
+    def ph_n(t: float) -> int | None:
+        cur = None
+        for p in phases:
+            if p["t"] <= t + 1e-6:
+                cur = p["n"]
+        return cur
+
+    def free(k, at: float) -> bool:
+        return all(abs(at - t) >= cds[k]["cd"] + (PHASE_SHIFT_S if ph_n(at) != ph_n(t) else 0.0)
+                   for t in assigned[k])
     cds: dict = {}
     pool = X.get("roster_cds")
     if pool:
@@ -219,10 +252,11 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
             seen = min(gaps) if gaps else None
             cds[key]["cd"] = min(v for v in (known, seen) if v) if (known or seen) else DEFAULT_CD_S
     events = [{"t": s.get("peak_t", s["t"]), "mechanic": f"«{s['ability']}» №{s.get('k', 1)}", "key": (s.get("ability_id"), s.get("k", 1)),
-               "prio": s["damage"], "deaths": s.get("deaths", 0)} for s in X.get("spikes", [])]
+               "prio": s["damage"], "deaths": s.get("deaths", 0), "phase": s.get("phase")} for s in X.get("spikes", [])]
     top_dmg = max((e["prio"] for e in events), default=1.0)
     for r in late:
-        events.append({"t": r["peak_t"], "mechanic": r["mechanic"], "key": r["_key"], "prio": top_dmg * 0.5 * (r["top_share"] or 0.5)})
+        events.append({"t": r["peak_t"], "mechanic": r["mechanic"], "key": r["_key"], "prio": top_dmg * 0.5 * (r["top_share"] or 0.5),
+                       "phase": r.get("phase"), "phase_start": (r["t"] - r["phase_t"]) if r.get("phase_t") is not None else None})
     med = median([e["prio"] for e in events]) if events else 0
     assigned: dict = defaultdict(list)
     plan = []
@@ -246,7 +280,7 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
                     continue
                 for lead in range(PRESS_WINDOW_S[1], PRESS_WINDOW_S[0] - 1, -1):
                     at = max(0.0, ev["t"] - lead)
-                    if all(abs(at - t) >= cds[k]["cd"] for t in assigned[k]):
+                    if free(k, at):
                         best = (k, at)
                         break
                 if best:
@@ -258,7 +292,17 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
             players.add(cds[k]["player"])
             picks.append((k, at))
         t0 = picks[0][1] if picks else max(0.0, ev["t"] - PRESS_LEAD_S)
+        # фаза: из вашего боя; пики, до которых вы не дошли, — из лучших киллов
+        n = ev.get("phase") or ph_n(t0)
+        pinfo = next((p for p in phases if p["n"] == n), None)
+        start = pinfo["t"] if pinfo else ev.get("phase_start")
+        if n and start is None and n == 1:
+            start = 0.0
+        rel = max(0.0, t0 - start) if start is not None else None
         row = {"time": _fmt_t(t0), "t": t0, "mechanic": ev["mechanic"], "heavy": bool(heavy), "need": need,
+               "phase": n, "phase_name": (pinfo or {}).get("name") or (f"Фаза {n}" if n else ""),
+               "intermission": bool((pinfo or {}).get("intermission")),
+               "phase_time": _fmt_t(rel) if rel is not None else None, "phase_t": rel,
                "deaths": ev.get("deaths", 0),
                "top_n": top_need,
                "top": ", ".join(names.get(i, f"#{i}") for i in pref[:2]),
@@ -266,7 +310,7 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
                           "cooldown": _fmt_t(cds[k]["cd"]), "ready": _fmt_t(at + cds[k]["cd"]), "at": _fmt_t(at),
                           "id": cds[k]["id"], "cls": cds[k].get("cls") or game_data.class_of(cds[k]["id"])}
                          for k, at in picks]}
-        row["mrt"] = mrt_line(t0, ev["mechanic"], row["picks"])
+        row["mrt"] = mrt_line(t0, ev["mechanic"], row["picks"], n if (n or 0) > 1 else None, rel)
         if picks:
             f = row["picks"][0]
             row.update({"cd": f["cd"], "player": f["player"], "like_top": any(x["like_top"] for x in row["picks"])})
@@ -278,8 +322,7 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict) -> list[dict]:
     # Запасные варианты: кулдауны, которые к этому пику откатаны и не мешают остальному плану
     for row in plan:
         at = max(0.0, row["_t"] - PRESS_LEAD_S)
-        spare = [k for k in cds if k not in row["_keys"]
-                 and all(abs(at - t) >= cds[k]["cd"] for t in assigned[k])]
+        spare = [k for k in cds if k not in row["_keys"] and free(k, at)]
         busy = {cds[k]["player"] for k in row["_keys"]}  # сначала — другие игроки, не те, кто уже жмёт
         spare.sort(key=lambda k: (cds[k]["player"] in busy, -game_data.power(k[1]), cds[k]["cd"]))
         seen, out = set(), []
@@ -306,9 +349,9 @@ def _mrt_time(t: float) -> str:
     return f"{t // 60}:{t % 60:02d}"
 
 
-def mrt_line(t: float, mechanic: str, picks: list[dict]) -> str:
-    """Строка заметки Method Raid Tools: {time:м:сс} — таймер от пулла, {spell:id} — иконка способности.
-    Пустая строка, если на пик нет кулдауна."""
+def mrt_line(t: float, mechanic: str, picks: list[dict], phase: int | None = None, phase_t: float | None = None) -> str:
+    """Строка заметки Method Raid Tools: {time:м:сс} — таймер от пулла, {time:м:сс,p2} — от начала 2-й фазы,
+    {spell:id} — иконка способности. Пустая строка, если на пик нет кулдауна."""
     if not picks:
         return ""
     who = []
@@ -316,7 +359,8 @@ def mrt_line(t: float, mechanic: str, picks: list[dict]) -> str:
         color = CLASS_COLOR.get(p.get("cls") or "")
         name = f"|cff{color}{p['player']}|r" if color else p["player"]
         who.append(f"{name} {{spell:{p['id']}}}" if p.get("id") else f"{name} {p['cd']}")
-    return f"{{time:{_mrt_time(t)}}}{mechanic.replace('«', '').replace('»', '')} - " + "  ".join(who)
+    tm = f"{_mrt_time(phase_t)},p{phase}" if phase and phase_t is not None else _mrt_time(t)
+    return f"{{time:{tm}}}{mechanic.replace('«', '').replace('»', '')} - " + "  ".join(who)
 
 
 def mrt_note(plan: list[dict], title: str = "") -> str:

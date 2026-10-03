@@ -171,7 +171,9 @@ td .tag{font-size:13px}
 td .imp{font-size:13.5px}
 .allnav{position:sticky;top:0;z-index:6;background:var(--paper);padding:4px 0 2px;margin-bottom:12px}
 .allnav .tabs{margin:0}.allnav .tabs button{font-size:14px}
-.allnav-pl{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;color:var(--muted);margin-top:6px}
+.allnav-row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin-top:8px}
+.allnav-row .mini{font-size:14px;padding:5px 12px}
+.allnav-pl{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;color:var(--muted)}
 .allnav-pl select{max-width:100%}
 .mini.mrtbtn{background:var(--good);border-color:var(--good);color:#fff;font-weight:700;font-size:15.5px;padding:10px 20px;border-radius:var(--r-sm)}
 .mini.mrtbtn:hover{background:#277A42;border-color:#277A42}
@@ -781,7 +783,7 @@ function render(R){
       gain: f.impact ? "≈ +"+pct(f.impact)+" DPS" : "влияние на DPS не оценено"})), good:[], context:[]};
   const el = $("#result");
   el.innerHTML = `
-    ${R._back && R._back.mode==="playerall" ? allNav(R._back, R._navFid, R._navActor)
+    ${R._back && R._back.mode==="playerall" ? allNav(R._back, R._navFid, R._navActor, true)
       : R._back ? '<button class="mini" id="backRaid" type="button" style="margin-bottom:12px">← К разбору ротации рейда</button> ' : ""}${I.demo?'<div class="demo-flag">Демо: синтетические данные, не реальный лог</div>':""}
     <div class="hero">
       <div>
@@ -1094,7 +1096,7 @@ function allBosses(R){  // боссы в порядке отчёта: [{fid, bos
   return [...m.values()];
 }
 /* Панель над результатом: «Сводка» и вкладка на каждого босса; в разборе «все игроки» — ещё выбор игрока */
-function allNav(R, curFid, curActor){
+function allNav(R, curFid, curActor, inDetail){
   const BS = allBosses(R), multiDiff = new Set(BS.map(x=>x.difficulty)).size > 1;
   const tab = (key, label, on) => `<button role="tab" type="button" data-nav="${key}" aria-selected="${on}">${label}</button>`;
   const bossLabel = x => {
@@ -1107,7 +1109,10 @@ function allNav(R, curFid, curActor){
     const x = BS.find(x=>x.fid==curFid);
     if (x) players = `<label class="allnav-pl">Игрок: <select data-navpl>${x.rows.map(r=>`<option value="${r.actor}" ${r.actor==curActor?"selected":""}>${esc(r.player)} — ${esc(who(r.cls, r.spec))}</option>`).join("")}</select></label>`;
   }
-  return `<div class="allnav"><div class="tabs" role="tablist" style="margin-top:0">${tab("sum", "Сводка", curFid == null)}${BS.map(x=>tab(x.fid, bossLabel(x), x.fid==curFid)).join("")}</div>${players}</div>`;
+  const cur = BS.find(x=>x.fid==curFid);
+  const back = inDetail && cur ? `<button type="button" class="mini" data-navback="${cur.fid}">← К таблице босса «${esc(cur.boss)}»</button>` : "";
+  return `<div class="allnav"><div class="tabs" role="tablist" style="margin-top:0">${tab("sum", "Сводка", curFid == null)}${BS.map(x=>tab(x.fid, bossLabel(x), x.fid==curFid)).join("")}</div>`
+    + (back || players ? `<div class="allnav-row">${back}${players}</div>` : "") + `</div>`;
 }
 function bindAllNav(el, R, curFid){
   el.querySelectorAll(".allnav [data-nav]").forEach(b => b.onclick = () => {
@@ -1117,6 +1122,8 @@ function bindAllNav(el, R, curFid){
     if (!x) return;
     renderPlayerAll(R, x.fid);                               // вкладка босса — его игроки, «Подробно» — полный разбор
   });
+  const bk = el.querySelector(".allnav [data-navback]");
+  if (bk) bk.onclick = () => renderPlayerAll(R, +bk.dataset.navback);
   const sel = el.querySelector(".allnav [data-navpl]");
   if (sel) sel.onchange = () => { const r = (R.bosses||[]).find(b=>b.fight_id==curFid && String(b.actor)===sel.value); if (r) openAllDetail(R, r); };
 }
@@ -1141,7 +1148,7 @@ function renderPlayerAll(R, bossFid){
   } else if (R.everyone) {  // сводка: игроки × боссы, в ячейке — разница с топ-1; клик — полный разбор
     const players = [...new Map(B.map(b=>[b.actor, b])).values()].sort((a,b)=>a.player.localeCompare(b.player));
     body = box("Сводка: игроки × боссы", "В ячейке — разница DPS с топ-1 своего спека на этом боссе. Нажмите на ячейку — откроется полный разбор; вкладки боссов — сверху.",
-      table(["Игрок", ...BS.map(x=>esc(x.boss))], players.map(pl => [
+      table(["Игрок", ...BS.map(x=>x.boss)], players.map(pl => [
         `<b>${esc(pl.player)}</b><div class="gsub">${esc(who(pl.cls, pl.spec))}</div>`,
         ...BS.map(x => { const r = x.rows.find(r=>r.actor===pl.actor);
           return r ? `<button class="linkbtn ${gapCls(gapOf(r))}" type="button" data-b="${B.indexOf(r)}" style="font-weight:600">${gapOf(r)==null?"—":sgn(gapOf(r),v=>pct(v,0))}</button>` : '<span class="gsub">—</span>'; })]),

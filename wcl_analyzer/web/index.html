@@ -167,6 +167,10 @@ tr.flag td{background:var(--bad-soft)}
 .tag.k-trinket{background:#EDE4FA;color:#4B2A82}.tag.k-spell{background:var(--soft);color:var(--ink,inherit)}
 .tag.k-potion{background:var(--good-soft);color:#17542B}.tag.k-racial{background:var(--warn-soft);color:#6B4A05}
 .gsub{font-size:12.5px;color:var(--muted)}
+.allnav{position:sticky;top:0;z-index:6;background:var(--paper);padding:4px 0 2px;margin-bottom:12px}
+.allnav .tabs{margin:0}.allnav .tabs button{font-size:14px}
+.allnav-pl{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;color:var(--muted);margin-top:6px}
+.allnav-pl select{max-width:100%}
 .mini.mrtbtn{background:var(--good);border-color:var(--good);color:#fff;font-weight:700;font-size:15.5px;padding:10px 20px;border-radius:var(--r-sm)}
 .mini.mrtbtn:hover{background:#277A42;border-color:#277A42}
 /* ---------- Бой по шагам ---------- */
@@ -813,7 +817,7 @@ function render(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, gap = R.info.ref_dps - R.info.dps;
   /* Два эталона: топ вашей сложности (основной) и эпохальный топ (R.alt). Переключатель перерисовывает разбор */
-  const pair = R.alt ? {main:R, alt:{...R.alt, _main:R, _back:R._back}} : R._main ? {main:R._main, alt:R} : null;
+  const pair = R.alt ? {main:R, alt:{...R.alt, _main:R, _back:R._back, _navFid:R._navFid, _navActor:R._navActor}} : R._main ? {main:R._main, alt:R} : null;
   /* Только три вкладки: остальные подробности — в Excel */
   const tabs = [["battle","Бой по шагам"],["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["tal","Таланты"],["gear","Экипировка"]];
   const B = R.brief || {  // разборы, сохранённые до появления выжимки
@@ -822,7 +826,8 @@ function render(R){
       gain: f.impact ? "≈ +"+pct(f.impact)+" DPS" : "влияние на DPS не оценено"})), good:[], context:[]};
   const el = $("#result");
   el.innerHTML = `
-    ${R._back?`<button class="mini" id="backRaid" type="button" style="margin-bottom:12px">← ${R._back.mode==="playerall"?"Ко всем боссам":"К ротации всего рейда"}</button> `:""}${I.demo?'<div class="demo-flag">Демо: синтетические данные, не реальный лог</div>':""}
+    ${R._back && R._back.mode==="playerall" ? allNav(R._back, R._navFid, R._navActor)
+      : R._back ? '<button class="mini" id="backRaid" type="button" style="margin-bottom:12px">← К ротации всего рейда</button> ' : ""}${I.demo?'<div class="demo-flag">Демо: синтетические данные, не реальный лог</div>':""}
     <div class="hero">
       <div>
         ${pair ? `<div class="diffsw" role="group" aria-label="С каким топом сравнивать">
@@ -864,7 +869,8 @@ function render(R){
     </details>`;
   el.hidden = false;
   $("#more").addEventListener("toggle", () => charts.forEach(c => c.resize()));
-  if (R._back) $("#backRaid").onclick = () => (R._back.mode === "playerall" ? renderPlayerAll : renderRaidRot)(R._back);
+  if (R._back && R._back.mode === "playerall") bindAllNav(el, R._back, R._navFid);
+  else if (R._back) $("#backRaid").onclick = () => renderRaidRot(R._back);
   el.querySelectorAll(".diffsw button").forEach(b => b.onclick = () => render(b.dataset.sw === "alt" ? pair.alt : pair.main));
   showProgress(R);
   renderBattle(R.battle, $("#p-battle"), I);
@@ -1310,38 +1316,100 @@ function ilvlCell(p){
     + (p.ref_item_level != null ? `<div style="font-size:12.5px;color:var(--muted)">топ ${num(p.ref_item_level,1)}</div>` : "");
 }
 /* Сейвы на всех боссов (кнопка убрана; открываются только сохранённые в истории разборы) */
-/* Игрок на всех боссах отчёта: таблица по боссам, «Подробно» — полный разбор, «Продолжить» — после лимита */
+/* Разбор всех боссов: панель переключения (сводка / боссы), «Подробно» — полный разбор с той же панелью,
+   «Продолжить» — после лимита WCL */
 let CONTINUE_ALL = null;
-function renderPlayerAll(R){
+const gapOf = b => b.ref_dps ? (b.dps - b.ref_dps) / b.ref_dps : null;
+const gapCls = g => g == null ? "" : g < -0.1 ? "worse" : g >= 0 ? "better" : "";
+function allBosses(R){  // боссы в порядке отчёта: [{fid, boss, difficulty, rows}]
+  const m = new Map();
+  for (const b of R.bosses || []) {
+    if (!m.has(b.fight_id)) m.set(b.fight_id, {fid: b.fight_id, boss: b.boss, difficulty: b.difficulty, kill: b.kill, rows: []});
+    m.get(b.fight_id).rows.push(b);
+  }
+  return [...m.values()];
+}
+/* Панель над результатом: «Сводка» и вкладка на каждого босса; в разборе «все игроки» — ещё выбор игрока */
+function allNav(R, curFid, curActor){
+  const BS = allBosses(R), multiDiff = new Set(BS.map(x=>x.difficulty)).size > 1;
+  const tab = (key, label, on) => `<button role="tab" type="button" data-nav="${key}" aria-selected="${on}">${label}</button>`;
+  const bossLabel = x => {
+    const r = R.everyone ? null : x.rows[0], g = r ? gapOf(r) : null;
+    return `${esc(x.boss)}${multiDiff?` <span class="tag none">${esc(x.difficulty==="эпохальный"?"эпох.":x.difficulty==="героический"?"гер.":x.difficulty)}</span>`:""}`
+      + (g != null ? ` <span class="${gapCls(g)}" style="font-size:12.5px">${sgn(g,v=>pct(v,0))}</span>` : "") + (x.kill ? "" : ' <span class="tag MEDIUM">вайп</span>');
+  };
+  let players = "";
+  if (R.everyone && curFid != null && curActor != null) {
+    const x = BS.find(x=>x.fid==curFid);
+    if (x) players = `<label class="allnav-pl">Игрок: <select data-navpl>${x.rows.map(r=>`<option value="${r.actor}" ${r.actor==curActor?"selected":""}>${esc(r.player)} — ${esc(who(r.cls, r.spec))}</option>`).join("")}</select></label>`;
+  }
+  return `<div class="allnav"><div class="tabs" role="tablist" style="margin-top:0">${tab("sum", "Сводка", curFid == null)}${BS.map(x=>tab(x.fid, bossLabel(x), x.fid==curFid)).join("")}</div>${players}</div>`;
+}
+function bindAllNav(el, R, curFid){
+  el.querySelectorAll(".allnav [data-nav]").forEach(b => b.onclick = () => {
+    const k = b.dataset.nav;
+    if (k === "sum") return renderPlayerAll(R);
+    const x = allBosses(R).find(x=>String(x.fid)===k);
+    if (!x) return;
+    if (R.everyone) return renderPlayerAll(R, x.fid);       // все игроки этого босса
+    openAllDetail(R, x.rows[0]);                             // один игрок — сразу полный разбор
+  });
+  const sel = el.querySelector(".allnav [data-navpl]");
+  if (sel) sel.onchange = () => { const r = (R.bosses||[]).find(b=>b.fight_id==curFid && String(b.actor)===sel.value); if (r) openAllDetail(R, r); };
+}
+function openAllDetail(R, b){ render({...b.detail, excel: R.excel, _back: R, _navFid: b.fight_id, _navActor: b.actor}); }
+
+function renderPlayerAll(R, bossFid){
   charts.splice(0).forEach(c => c.destroy());
-  const I = R.info, B = R.bosses || [], P = R.pending || [];
+  const I = R.info, B = R.bosses || [], P = R.pending || [], BS = allBosses(R);
   const el = $("#result");
+  const det = (b) => `<button class="mini" type="button" data-b="${B.indexOf(b)}">Подробно</button>`;
+  const gapCell = b => { const g = gapOf(b); return g==null ? "—" : `<span class="${gapCls(g)}">${sgn(g,v=>pct(v))}</span>`; };
+  const act = b => { const a = (b.actions||[])[0]; return a ? `${esc(a.do)} <span class="imp ${a.level}">${esc(a.gain)}</span>` : "существенных отличий нет"; };
+  let body;
+  if (bossFid != null) {  // вкладка босса (все игроки): игроки по отставанию от топ-1
+    const x = BS.find(x=>x.fid==bossFid) || {rows: []};
+    const rows = [...x.rows].sort((a,b)=>(gapOf(a)??0)-(gapOf(b)??0));
+    body = box(`${x.boss} — ${x.difficulty}`, `${x.kill?"Килл":"Лучший пулл"}${rows[0]?", "+rows[0].duration:""}. Игроки — от самого большого отставания от топ-1 своего спека.`,
+      table(["Игрок","DPS","Топ-1","Разница","Главное действие",""], rows.map(b=>[
+        `<b>${esc(b.player)}</b><div class="gsub">${esc(who(b.cls, b.spec))}</div>`, num(b.dps), b.ref_dps==null?"—":num(b.ref_dps), gapCell(b), act(b), det(b)]),
+        {num:[1,2,3], cls:"wide"}));
+  } else if (R.everyone) {  // сводка: игроки × боссы, в ячейке — разница с топ-1; клик — полный разбор
+    const players = [...new Map(B.map(b=>[b.actor, b])).values()].sort((a,b)=>a.player.localeCompare(b.player));
+    body = box("Сводка: игроки × боссы", "В ячейке — разница DPS с топ-1 своего спека на этом боссе. Нажмите на ячейку — откроется полный разбор; вкладки боссов — сверху.",
+      table(["Игрок", ...BS.map(x=>esc(x.boss))], players.map(pl => [
+        `<b>${esc(pl.player)}</b><div class="gsub">${esc(who(pl.cls, pl.spec))}</div>`,
+        ...BS.map(x => { const r = x.rows.find(r=>r.actor===pl.actor);
+          return r ? `<button class="linkbtn ${gapCls(gapOf(r))}" type="button" data-b="${B.indexOf(r)}" style="font-weight:600">${gapOf(r)==null?"—":sgn(gapOf(r),v=>pct(v,0))}</button>` : '<span class="gsub">—</span>'; })]),
+        {num: BS.map((_,i)=>i+1), cls:"wide", empty:"Пока ничего не разобрано."}));
+  } else {
+    body = box("Сводка по боссам", "Разница — к DPS топ-1 на этом боссе. Вкладки сверху или «Подробно» — полный разбор: выжимка, бой по шагам, ротация, кулдауны, таланты, экипировка.",
+      table(["Босс","Бой","DPS","Топ-1","Разница","Главное действие",""], B.map(b=>[
+        `<b>${esc(b.boss)}</b><div class="gsub">${esc(b.difficulty)}</div>`, `${b.kill?"килл":"вайп"}, ${esc(b.duration)}`,
+        num(b.dps), b.ref_dps==null?"—":num(b.ref_dps), gapCell(b), act(b), det(b)]),
+        {num:[2,3,4], cls:"wide", empty:"Пока ни один босс не разобран."}));
+  }
   el.innerHTML = `
     <div class="hero"><div>
         <div class="who"><strong>${R.everyone ? "Все игроки (DPS)" : esc(I.name || "Игрок") + (I.cls ? ", " + esc(who(I.cls, I.spec)) : "")} — все боссы</strong>${esc(I.title || "")}.
           На каждом боссе — последний килл (без киллов — лучший пулл), сравнение с топ-1 ради экономии запросов WCL.
           Облегчённый разбор: без оценки прироста DPS от кулдаунов — полная оценка в обычном «Разобрать игрока».</div>
-        <div class="dps">${B.length} <small>${R.everyone ? plural(B.length,"разбор","разбора","разборов") + " «босс — игрок»" : plural(B.length,"босс разобран","босса разобрано","боссов разобрано")}${P.length?` · ещё ${P.length} ждут лимита`:""}</small></div>
+        <div class="dps">${BS.length} <small>${plural(BS.length,"босс","босса","боссов")}${R.everyone?` · ${B.length} ${plural(B.length,"разбор","разбора","разборов")}`:""}${P.length?` · ещё ${P.length} ждут лимита`:""}</small></div>
       </div>
       <div class="side"><a class="btn you" href="${R.excel}" download>Скачать Excel</a>
         <a href="${esc(I.url)}" target="_blank" rel="noopener" style="color:#B8C2D9;font-size:14px">Открыть отчёт на WCL</a></div>
     </div>
+    ${allNav(R, bossFid ?? null, null)}
     ${P.length ? `<div class="box" style="border-color:var(--warn)"><h3>Не хватило часового лимита Warcraft Logs</h3>
       <p class="sub">Не разобраны: ${R.everyone ? `${P.length} ${plural(P.length,"разбор","разбора","разборов")} — боссы ${[...new Set(P.map(p=>p.boss))].map(esc).join(", ")}` : P.map(p=>esc(p.boss)+" ("+esc(p.difficulty)+")").join(", ")}.
         ${R.reset_in ? `Лимит восстановится примерно через ${Math.max(1, Math.round(R.reset_in/60))} мин.` : ""}
-        Разобранные боссы сохранены; уже скачанные данные повторно не тратят лимит.</p>
+        Разобранное сохранено; уже скачанные данные повторно не тратят лимит.</p>
       <button type="button" class="btn you" id="contAll">Продолжить разбор (${P.length})</button></div>` : ""}
-    ${box("Каждый босс", "Разница — к DPS топ-1 на этом боссе. «Подробно» — полный разбор: выжимка, бой по шагам, ротация, кулдауны, таланты, экипировка.",
-      table([...(R.everyone?["Игрок"]:[]),"Босс","Бой","DPS","Топ-1","Разница","Главное действие",""], B.map((b,i)=>{
-        const gap = b.ref_dps ? (b.dps - b.ref_dps) / b.ref_dps : null, a = (b.actions||[])[0];
-        return [...(R.everyone?[`<b>${esc(b.player)}</b><div class="gsub">${esc(who(b.cls, b.spec))}</div>`]:[]), `<b>${esc(b.boss)}</b><div class="gsub">${esc(b.difficulty)}</div>`, `${b.kill?"килл":"вайп"}, ${esc(b.duration)}`,
-          num(b.dps), b.ref_dps==null?"—":num(b.ref_dps), gap==null?"—":`<span class="${gap<-0.1?"worse":gap>=0?"better":""}">${sgn(gap,v=>pct(v))}</span>`,
-          a ? `${esc(a.do)} <span class="imp ${a.level}">${esc(a.gain)}</span>` : "существенных отличий нет",
-          `<button class="mini" type="button" data-b="${i}">Подробно</button>`];
-      }), {num:R.everyone?[3,4,5]:[2,3,4], cls:"wide", empty:"Пока ни один босс не разобран."}))}
-    ${(R.skipped||[]).length ? box("Пропущены", "", `<ul class="lines">${R.skipped.map(x=>`<li>${esc(x.boss)}: ${esc(x.reason)}</li>`).join("")}</ul>`) : ""}`;
+    ${body}
+    ${(R.skipped||[]).length && bossFid == null ? box("Пропущены", "", `<ul class="lines">${R.skipped.map(x=>`<li>${esc(x.boss)}: ${esc(x.reason)}</li>`).join("")}</ul>`) : ""}`;
   el.hidden = false;
-  el.querySelectorAll("[data-b]").forEach(b => b.onclick = () => render({...B[+b.dataset.b].detail, excel: R.excel, _back: R}));
+  bindAllNav(el, R, bossFid);
+  el.querySelectorAll("[data-b]").forEach(b => b.onclick = () => openAllDetail(R, B[+b.dataset.b]));
   if ($("#contAll")) $("#contAll").onclick = () => {
     CONTINUE_ALL = R._hid || null;
     const prev = B.map(b => ({boss: b.boss, difficulty: b.difficulty, kill: b.kill, dps: b.dps, ref_dps: b.ref_dps, actions: b.actions, player: b.player}));

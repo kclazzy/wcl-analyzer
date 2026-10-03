@@ -276,7 +276,9 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
             order = sorted(cds, key=lambda k: (pref.index(k[1]) if k[1] in pref else 99, len(assigned[k]),
                                                -game_data.power(k[1]), cds[k]["cd"]))
             for k in order:
-                if any(k == p[0] for p in picks) or cds[k]["player"] in players:
+                # на один пик — разные игроки и разные способности: два одинаковых кулдауна
+                # одного класса (два «Ободряющих клича», два гимна) не складываются в пользу рейда
+                if any(k == p[0] or k[1] == p[0][1] for p in picks) or cds[k]["player"] in players:
                     continue
                 for lead in range(PRESS_WINDOW_S[1], PRESS_WINDOW_S[0] - 1, -1):
                     at = max(0.0, ev["t"] - lead)
@@ -326,11 +328,11 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
         spare = [k for k in cds if k not in row["_keys"] and free(k, at)]
         busy = {cds[k]["player"] for k in row["_keys"]}  # сначала — другие игроки, не те, кто уже жмёт
         spare.sort(key=lambda k: (cds[k]["player"] in busy, -game_data.power(k[1]), cds[k]["cd"]))
-        seen, out = set(), []
+        seen, out = {k[1] for k in row["_keys"]}, []  # запасные — без повторов уже назначенной способности
         for k in spare:
-            if (cds[k]["player"], cds[k]["name"]) in seen:
+            if k[1] in seen:
                 continue
-            seen.add((cds[k]["player"], cds[k]["name"]))
+            seen.add(k[1])
             out.append({"cd": cds[k]["name"], "player": cds[k]["player"], "cooldown": _fmt_t(cds[k]["cd"])})
             if len(out) >= MAX_SPARE:
                 break

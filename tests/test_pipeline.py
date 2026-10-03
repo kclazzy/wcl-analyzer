@@ -198,6 +198,19 @@ def test_battle_analysis():
     print("OK бой по шагам: 10–20 событий, движение с причиной только по данным, смена цели и бурст против топа")
 
 
+def test_plan_no_duplicate_ability():
+    from wcl_analyzer.raid_top import make_plan
+    X = {"roster_cds": [{"pid": 1, "player": "Торвин", "name": "Ободряющий клич", "id": 97462, "cd": 180, "cls": "Warrior"},
+                        {"pid": 2, "player": "Брам", "name": "Ободряющий клич", "id": 97462, "cd": 180, "cls": "Warrior"},
+                        {"pid": 3, "player": "Элария", "name": "Божественный гимн", "id": 64843, "cd": 180, "cls": "Priest"}],
+         "spikes": [{"t": 60, "peak_t": 62, "ability": "Волна", "ability_id": 5, "k": 1, "damage": 100, "deaths": 2},
+                    {"t": 120, "peak_t": 122, "ability": "Волна", "ability_id": 5, "k": 2, "damage": 30}]}
+    plan = make_plan(X, {}, [], {})
+    assert [p["cd"] for p in plan[0]["picks"]] == ["Божественный гимн", "Ободряющий клич"], plan[0]["picks"]
+    assert plan[1]["picks"][0]["player"] == "Брам"  # второй клич — на следующий пик, а не вдогонку первому
+    print("OK план сейвов: одна способность на пик не дублируется (два воина — клич на разные пики)")
+
+
 def test_saves_all_bosses():
     from wcl_analyzer.excel_raid import write_saves_workbook
     from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
@@ -220,6 +233,7 @@ def test_saves_all_bosses():
 
 
 if __name__ == "__main__":
+    test_plan_no_duplicate_ability()
     test_saves_all_bosses()
     test_battle_analysis()
     test_gear_and_trinkets()
@@ -239,6 +253,9 @@ def test_raid():
     danger = [r for r in Xs["plan"] if r["deaths"]]
     assert danger and all(len(r["picks"]) >= 2 and len({p["player"] for p in r["picks"]}) == len(r["picks"]) for r in danger)
     assert all(r["spare"] for r in Xs["plan"]), "нет запасных вариантов"
+    for r in Xs["plan"]:  # одна и та же способность на пик не повторяется — ни в назначенных, ни в запасных
+        cds_on_peak = [p["cd"] for p in r["picks"]] + [x["cd"] for x in r["spare"]]
+        assert len(cds_on_peak) == len(set(cds_on_peak)), r
     # Заметка для MRT: таймер от пулла, имя в цвете класса, иконка способности
     from wcl_analyzer.raid_top import mrt_note
     note = mrt_note(Xs["plan"], "Демо")

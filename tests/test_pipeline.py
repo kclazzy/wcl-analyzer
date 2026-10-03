@@ -232,6 +232,47 @@ def test_plan_long_fight():
     print("OK план сейвов: сильные пики в конце длинного боя (у топа их нет) тоже закрыты")
 
 
+def test_player_all_bosses():
+    """Игрок на всех боссах: эталон топ-1; не хватило лимита — оставшиеся боссы в «pending», потом «Продолжить»."""
+    import copy
+    from wcl_analyzer import web
+    client = FakeClient()
+    rep = client.reports["MYREPORT0001"]
+    f1 = rep["fights"][0]
+    f2 = {**copy.deepcopy(f1), "id": 2, "encounterID": int(f1.get("encounterID") or 1) + 1, "name": "Второй босс"}
+    f3 = {**copy.deepcopy(f1), "id": 3, "encounterID": int(f1.get("encounterID") or 1) + 2, "name": "Третий босс"}
+    rep["fights"] = [f1, f2, f3]
+    points = iter([1000, 960, 960, 30, 30, 30, 30])
+    client.points_left = lambda: next(points)
+    client.rate_limit = lambda: {"pointsResetIn": 1500}
+    web.CLIENT_FACTORY = lambda creds: client
+    # в тестовом клиенте логи топа есть только для первого босса — для остальных берём тот же эталон
+    orig_ref, cache = web._player_ref, {}
+
+    def ref_any_boss(client_, me, difficulty, params_, log, meta):
+        assert params_["ref"] == "top1" and params_["mythic"] is False
+        if "r" not in cache:
+            cache["r"] = orig_ref(client_, me, difficulty, params_, log, meta)
+        return cache["r"]
+    web._player_ref = ref_any_boss
+    job = {"id": "t" * 32, "progress": 0.0}
+    params = {"url": "https://www.warcraftlogs.com/reports/MYREPORT0001", "fight": "all", "actor": "7"}
+    web._run_player(job, params, None, lambda *_: None)
+    R = job["result"]
+    assert R["mode"] == "playerall" and len(R["bosses"]) == 1 and R["bosses"][0]["detail"]["info"]["ref_n"] == 1, R["bosses"]
+    assert [p["fight_id"] for p in R["pending"]] == [2, 3] and R["reset_in"] == 1500, R["pending"]
+    assert job["xlsx"][:2] == b"PK"
+    # «Продолжить»: только оставшиеся боссы, краткие строки уже разобранных — для общего Excel
+    client.points_left = lambda: 1000
+    job2 = {"id": "u" * 32, "progress": 0.0}
+    prev = [{k: R["bosses"][0][k] for k in ("boss", "difficulty", "kill", "dps", "ref_dps", "actions")}]
+    web._run_player(job2, {**params, "fights": [2, 3], "prev": prev}, None, lambda *_: None)
+    R2 = job2["result"]
+    assert [b["fight_id"] for b in R2["bosses"]] == [2, 3] and not R2["pending"], (R2["bosses"], R2["pending"])
+    web._player_ref = orig_ref
+    print("OK игрок на всех боссах: топ-1, остановка по лимиту WCL и продолжение с оставшихся")
+
+
 def test_saves_all_bosses():
     from wcl_analyzer.excel_raid import write_saves_workbook
     from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
@@ -255,6 +296,7 @@ def test_saves_all_bosses():
 
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
+    test_player_all_bosses()
     test_plan_long_fight()
     test_saves_all_bosses()
     test_battle_analysis()

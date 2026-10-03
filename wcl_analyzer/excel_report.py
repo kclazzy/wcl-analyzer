@@ -957,3 +957,33 @@ def write_raid_rotation_workbook(R: dict, path: str | Path) -> Path:
     path = Path(path)
     wb.save(path)
     return path
+
+
+def write_player_all_workbook(R: dict, path: str | Path) -> Path:
+    """Игрок на всех боссах: строка на босса — DPS против топ-1 и три главных действия.
+    prev — боссы, разобранные до «Продолжить» (их краткие строки присылает браузер)."""
+    wb = Workbook()
+    wb.remove(wb.active)
+    s = Sheet(wb, "Все боссы", False, {"A": 30, "B": 14, "C": 12, "D": 12, "E": 12, "F": 10, "G": 70})
+    I = R["info"]
+    s.title(f"{I.get('name') or 'Игрок'} — все боссы отчёта",
+            "Эталон на каждом боссе — топ-1 (ради экономии запросов WCL). Полный разбор босса — в приложении: «Подробно».")
+    rows = []
+    for b in list(R.get("prev") or []) + list(R.get("bosses") or []):
+        if not isinstance(b, dict):
+            continue
+        top = b.get("ref_dps")
+        gap = (b["dps"] - top) / top if top and b.get("dps") is not None else None
+        acts = "; ".join(str(a.get("do", "")) for a in (b.get("actions") or [])[:3] if isinstance(a, dict))
+        rows.append([str(b.get("boss", "")), str(b.get("difficulty", "")), "килл" if b.get("kill") else "вайп",
+                     b.get("dps"), top, gap, acts])
+    s.table(["Босс", "Сложность", "Бой", "Ваш DPS", "DPS топ-1", "Разница", "Что сделать в следующем бою"],
+            rows, [None, None, None, F_INT, F_INT, F_SIGNED_PCT, None])
+    if R.get("pending"):
+        s.section("Не разобраны (не хватило лимита WCL)", "Нажмите «Продолжить» в приложении после сброса лимита.")
+        for p in R["pending"]:
+            s.cell(s.row, 1, f"{p['boss']} ({p['difficulty']})")
+            s.row += 1
+    path = Path(path)
+    wb.save(path)
+    return path

@@ -205,6 +205,8 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
     """Разбор игрока: эталон — топ той же сложности, что и ваш бой; если бой не эпохальный —
     дополнительно эпохальный топ (переключатель в шапке результата)."""
     from .collect import collect_reference, load_my_log
+    if str(params.get("fight")) == "all" and not params.get("demo"):
+        return _run_player_all(job, params, creds, log)
 
     client = None
     ref_meta: dict = {}
@@ -242,6 +244,101 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
             log(f"Эпохальный эталон не собран: {e}")
     job["result"] = main
     log("Готово.")
+
+
+ALL_BOSSES_POINTS = 25.0   # оценка очков WCL на одного босса до первого замера (свой лог + лог топ-1)
+
+
+def _run_player_all(job: dict, params: dict, creds, log) -> None:
+    """Разбор игрока на всех боссах отчёта. Эталон — топ-1 (ради экономии запросов), без эпохального
+    второго эталона. Если часового лимита WCL не хватает — разбор останавливается, а оставшиеся боссы
+    возвращаются списком «pending»: браузер покажет кнопку «Продолжить» (уже скачанное берётся из кэша)."""
+    from .api import WCLError
+    from .collect import load_my_log
+    from .config import DIFFICULTY_NAMES
+    from .excel_report import write_player_all_workbook
+    from .logs import parse_report_url
+
+    client = _client(creds, job, log)
+    client.max_wait_s = 0  # не ждём сброса лимита — останавливаемся и предлагаем продолжить
+    code, _, _ = parse_report_url(params["url"])
+    report = client.report(code)
+    actor = int(params["actor"]) if params.get("actor") not in (None, "") else None
+    only = {int(x) for x in params.get("fights") or []}
+    fights = _boss_fights(report)
+    if only:
+        fights = [f for f in fights if int(f["id"]) in only]
+    if not fights:
+        raise LookupError("В отчёте нет боёв с боссами")
+    p1 = {**params, "ref": "top1", "mythic": False}
+    log(f"Боссов: {len(fights)}. Эталон — топ-1 на каждом (экономия запросов WCL).")
+    bosses, skipped, pending = [], [], []
+    per_boss: list[float] = []
+    for i, f in enumerate(fights):
+        label = f"{f.get('name')} ({DIFFICULTY_NAMES.get(int(f.get('difficulty') or 0), '')})"
+        left = client.points_left() if hasattr(client, "points_left") else None
+        need = (sum(per_boss) / len(per_boss)) if per_boss else ALL_BOSSES_POINTS
+        if left is not None and left < need * 1.2:
+            pending = fights[i:]
+            log(f"Лимита WCL не хватит на следующих боссов: осталось {left:.0f} очков, на босса уходит ≈ {need:.0f}.")
+            break
+        log(f"[{i + 1}/{len(fights)}] {label}…")
+        try:
+            me = load_my_log(client, params["url"], int(f["id"]), actor_id=actor)
+            tops, ref_label = _player_ref(client, me, me.difficulty, p1, lambda m: log("    " + m), {})
+            res = _player_result(job, p1, client, me, tops, ref_label, {}, me.difficulty, lambda m: log("    " + m), alt=False)
+            res.pop("ref", None)
+            bosses.append({"fight_id": int(f["id"]), "boss": me.encounter_name, "difficulty": me.difficulty_name,
+                           "kill": me.kill, "duration": _fmt_t(me.duration), "dps": round(me.dps),
+                           "ref_dps": res["info"].get("ref_dps"), "ref_label": ref_label,
+                           "actions": (res.get("brief") or {}).get("actions", [])[:3], "detail": res})
+        except WCLError as e:
+            if "лимит" in str(e).lower():
+                pending = fights[i:]
+                log(f"    Закончился часовой лимит WCL — остановился на «{f.get('name')}».")
+                break
+            skipped.append({"boss": label, "reason": str(e)})
+            log(f"    пропущен: {e}")
+        except Exception as e:  # noqa: BLE001 — один босс не должен ронять остальные
+            skipped.append({"boss": label, "reason": str(e)})
+            log(f"    пропущен: {e}")
+        after = client.points_left() if hasattr(client, "points_left") else None
+        if left is not None and after is not None and left - after > 0:
+            per_boss.append(left - after)
+        job["progress"] = max(job["progress"], min(0.95, (i + 1) / len(fights)))
+    reset_in = None
+    if pending:
+        try:
+            reset_in = float(client.rate_limit().get("pointsResetIn") or 0)
+        except Exception:  # noqa: BLE001
+            pass
+    first = next((b["detail"]["info"] for b in bosses), {})
+    R = {"mode": "playerall",
+         "info": {"name": first.get("name", ""), "cls": first.get("cls", ""), "spec": first.get("spec", ""),
+                  "title": report.get("title", ""), "code": code, "url": f"https://www.warcraftlogs.com/reports/{code}",
+                  "demo": False},
+         "bosses": bosses, "skipped": skipped,
+         "pending": [{"fight_id": int(f["id"]), "boss": f.get("name", ""),
+                      "difficulty": DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), "")} for f in pending],
+         "reset_in": reset_in, "params": {"url": params["url"], "actor": params.get("actor")}}
+    _excel_bytes(job, f"Все_боссы_{R['info']['name'] or code}", write_player_all_workbook,
+                 {**R, "prev": params.get("prev") or []})
+    job["result"] = {**R, "excel": f"/api/report/{job['id']}"}
+    log("Готово." if not pending else f"Готово частично: осталось боссов — {len(pending)}. Нажмите «Продолжить», когда лимит восстановится.")
+
+
+def _boss_fights(report: dict) -> list[dict]:
+    """По одному бою на босса и сложность: последний килл, а без киллов — лучший пулл."""
+    groups: dict = {}
+    for f in sorted(report.get("fights") or [], key=lambda x: float(x.get("startTime") or 0)):
+        if int(f.get("encounterID") or 0):
+            groups.setdefault((int(f["encounterID"]), int(f.get("difficulty") or 0)), []).append(f)
+    out = []
+    for fs in groups.values():
+        kills = [f for f in fs if f.get("kill")]
+        out.append(kills[-1] if kills else min(fs, key=lambda f: (f.get("fightPercentage") is None,
+                                                                   f.get("fightPercentage") or 100.0)))
+    return out
 
 
 def _player_ref(client, me, difficulty: int, params: dict, log, meta: dict):
@@ -758,7 +855,7 @@ class Handler(BaseHTTPRequestHandler):
                 cl.max_wait_s = 0  # поиск боя не ждёт сброса лимита: сразу объясняем, что случилось
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
             if path == "/api/analyze":
-                params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against",
+                params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "fights", "prev",
                                                    "refresh", "max_age_days", "pick", "mythic")}
                 if params["mode"] not in (None, "raid", "raidrot", "saves"):
                     params["mode"] = None

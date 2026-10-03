@@ -616,7 +616,8 @@ async function inspect(fight){
   try {
     inspected = await api("/api/inspect", {url, fight});
     const fs = $("#fight");
-    fs.innerHTML = inspected.fights.map(f => `<option value="${f.id}" ${f.id==inspected.fight?"selected":""}>${esc(f.name)}, ${esc(f.difficulty)} — ${f.kill?"килл":"вайп"}, ${mmss(f.duration)}</option>`).join("");
+    fs.innerHTML = inspected.fights.map(f => `<option value="${f.id}" ${f.id==inspected.fight?"selected":""}>${esc(f.name)}, ${esc(f.difficulty)} — ${f.kill?"килл":"вайп"}, ${mmss(f.duration)}</option>`).join("")
+      + (new Set(inspected.fights.map(f=>f.name)).size > 1 ? '<option value="all">Все боссы — разобрать игрока, сравнение с топ-1</option>' : "");
     const ps = $("#player");
     const dps = inspected.players;
     ps.innerHTML = dps.map(p => `<option value="${p.id}" ${p.id==inspected.source?"selected":""}>${esc(p.name)} — ${esc(who(p.cls, p.spec))}, ${esc(p.role)}${p.rank!=null?` · проц. ${Math.floor(p.rank)}%`:""}${p.ilvl!=null?` · с учётом экип. ${Math.floor(p.ilvl)}%`:""}</option>`).join("");
@@ -628,12 +629,13 @@ async function inspect(fight){
 $("#findForm").onsubmit = ev => { ev.preventDefault(); inspect(); };
 /* Вставили ссылку — сразу ищем бой, без нажатия кнопки */
 $("#url").addEventListener("paste", () => setTimeout(() => inspect(), 50));
-$("#fight").onchange = () => inspect($("#fight").value);
+$("#fight").onchange = () => { if ($("#fight").value !== "all") inspect($("#fight").value); };
 try { if (localStorage.getItem("wclMythicToo") === "0") $("#mythicToo").checked = false; } catch(e){}
 $("#mythicToo").addEventListener("change", () => { try { localStorage.setItem("wclMythicToo", $("#mythicToo").checked ? "1" : "0"); } catch(e){} });
 $("#runBtn").onclick = () => run({url:$("#url").value.trim(), fight:$("#fight").value, actor:$("#player").value, ref:$("#ref").value, mythic: $("#mythicToo").checked});
 $("#demoBtn").onclick = () => run({demo:true});
-$("#raidBtn").onclick = () => run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value, mythic: $("#mythicToo").checked});
+const ALL_ONLY_PLAYER = "«Все боссы» — для кнопки «Разобрать игрока». Разбор рейда — по одному бою; сейвы на всех боссов — кнопка «Сейвы на всех боссов».";
+$("#raidBtn").onclick = () => $("#fight").value === "all" ? showErr(ALL_ONLY_PLAYER) : run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value, mythic: $("#mythicToo").checked});
 $("#demoRaidBtn").onclick = () => run({mode:"raid", demo:true});
 /* Отбор игроков по рейтингу с учётом экипировки (WCL bracketPercent): место среди игроков спека с тем же уровнем предметов */
 function pickValue(){
@@ -655,7 +657,7 @@ function updatePickInfo(){
 }
 $("#pickBy").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
-$("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: $("#ref").value, pick: pickValue() || null, mythic: $("#mythicToo").checked});
+$("#raidRotBtn").onclick = () => $("#fight").value === "all" ? showErr(ALL_ONLY_PLAYER) : run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: $("#ref").value, pick: pickValue() || null, mythic: $("#mythicToo").checked});
 $("#demoRaidRotBtn").onclick = () => run({mode:"raidrot", demo:true});
 $("#savesBtn").onclick = () => { const url = $("#url").value.trim();
   if (!url) { showErr("Вставьте ссылку на отчёт Warcraft Logs — бой выбирать не нужно, план составится на каждого босса."); return; }
@@ -735,7 +737,17 @@ async function onDone(job, R){
         }
       } catch(e){}
     }
-    const item = {id: job, created: Date.now(), mode: R.mode, title: histTitle(R), result: R, filename, blob, filenameAlt, blobAlt};
+    let item = {id: job, created: Date.now(), mode: R.mode, title: histTitle(R), result: R, filename, blob, filenameAlt, blobAlt};
+    if (R.mode === "playerall" && CONTINUE_ALL) {  // «Продолжить»: дописываем боссов в тот же разбор
+      const old = await hist.get(CONTINUE_ALL);
+      if (old) {
+        const done = new Set(R.bosses.map(b=>b.fight_id));
+        const merged = {...old.result, bosses: [...old.result.bosses.filter(b=>!done.has(b.fight_id)), ...R.bosses],
+                        skipped: [...(old.result.skipped||[]), ...(R.skipped||[])], pending: R.pending, reset_in: R.reset_in};
+        item = {...old, created: Date.now(), result: merged, title: histTitle(merged), filename, blob: blob || old.blob};
+      }
+      CONTINUE_ALL = null;
+    }
     await hist.put(item);
     await trimHistory();
     openResult(item);
@@ -747,6 +759,7 @@ function histTitle(R){
   const I = R.info;
   if (R.mode === "raidcd") return `Полученный урон и сейвы: ${I.boss}, ${I.difficulty}`;
   if (R.mode === "raidrot") return `Ротация рейда: ${I.boss}, ${I.difficulty} (${R.players.length} DPS)`;
+  if (R.mode === "playerall") return `${I.name || "Игрок"} — все боссы (${R.bosses.length}${(R.pending||[]).length?`, ещё ${R.pending.length} ждут лимита`:""})`;
   if (R.mode === "saves") return `Сейвы на всех боссов: ${I.boss || I.title} (${R.bosses.length} ${plural(R.bosses.length,"босс","босса","боссов")})`;
   return R.mode === "raid" ? `Рейд: ${I.boss}, ${I.difficulty}, пулл ${R.summary.pull_n} (${I.kill?"килл":"вайп"})`
                            : `${I.name}, ${who(I.cls, I.spec)} — ${I.boss}, ${I.difficulty}`;
@@ -755,7 +768,7 @@ function openResult(item){
   const R = {...item.result, excel: "#excel-" + item.id, _hid: item.id, _created: item.created};
   if (R.alt && R.mode !== "raidcd") R.alt = {...R.alt, excel: "#excelalt-" + item.id};
   (R.mode === "raid" ? renderRaid : R.mode === "raidrot" ? renderRaidRot : R.mode === "raidcd" ? renderRaidCd
-    : R.mode === "saves" ? renderSaves : render)(R);
+    : R.mode === "saves" ? renderSaves : R.mode === "playerall" ? renderPlayerAll : render)(R);
 }
 async function trimHistory(){
   const all = await hist.all();
@@ -812,7 +825,7 @@ function render(R){
       gain: f.impact ? "≈ +"+pct(f.impact)+" DPS" : "влияние на DPS не оценено"})), good:[], context:[]};
   const el = $("#result");
   el.innerHTML = `
-    ${R._back?'<button class="mini" id="backRaid" type="button" style="margin-bottom:12px">← К ротации всего рейда</button> ':""}${I.demo?'<div class="demo-flag">Демо: синтетические данные, не реальный лог</div>':""}
+    ${R._back?`<button class="mini" id="backRaid" type="button" style="margin-bottom:12px">← ${R._back.mode==="playerall"?"Ко всем боссам":"К ротации всего рейда"}</button> `:""}${I.demo?'<div class="demo-flag">Демо: синтетические данные, не реальный лог</div>':""}
     <div class="hero">
       <div>
         ${pair ? `<div class="diffsw" role="group" aria-label="С каким топом сравнивать">
@@ -854,7 +867,7 @@ function render(R){
     </details>`;
   el.hidden = false;
   $("#more").addEventListener("toggle", () => charts.forEach(c => c.resize()));
-  if (R._back) $("#backRaid").onclick = () => renderRaidRot(R._back);
+  if (R._back) $("#backRaid").onclick = () => (R._back.mode === "playerall" ? renderPlayerAll : renderRaidRot)(R._back);
   el.querySelectorAll(".diffsw button").forEach(b => b.onclick = () => render(b.dataset.sw === "alt" ? pair.alt : pair.main));
   showProgress(R);
   renderBattle(R.battle, $("#p-battle"), I);
@@ -1300,6 +1313,45 @@ function ilvlCell(p){
     + (p.ref_item_level != null ? `<div style="font-size:12.5px;color:var(--muted)">топ ${num(p.ref_item_level,1)}</div>` : "");
 }
 /* Сейвы на всех боссов: вкладка на каждого босса — план и заметка MRT */
+/* Игрок на всех боссах отчёта: таблица по боссам, «Подробно» — полный разбор, «Продолжить» — после лимита */
+let CONTINUE_ALL = null;
+function renderPlayerAll(R){
+  charts.splice(0).forEach(c => c.destroy());
+  const I = R.info, B = R.bosses || [], P = R.pending || [];
+  const el = $("#result");
+  el.innerHTML = `
+    <div class="hero"><div>
+        <div class="who"><strong>${esc(I.name || "Игрок")}${I.cls ? ", " + esc(who(I.cls, I.spec)) : ""} — все боссы</strong>${esc(I.title || "")}.
+          На каждом боссе — последний килл (без киллов — лучший пулл), сравнение с топ-1 ради экономии запросов WCL.</div>
+        <div class="dps">${B.length} <small>${plural(B.length,"босс разобран","босса разобрано","боссов разобрано")}${P.length?` · ещё ${P.length} ждут лимита`:""}</small></div>
+      </div>
+      <div class="side"><a class="btn you" href="${R.excel}" download>Скачать Excel</a>
+        <a href="${esc(I.url)}" target="_blank" rel="noopener" style="color:#B8C2D9;font-size:14px">Открыть отчёт на WCL</a></div>
+    </div>
+    ${P.length ? `<div class="box" style="border-color:var(--warn)"><h3>Не хватило часового лимита Warcraft Logs</h3>
+      <p class="sub">Не разобраны: ${P.map(p=>esc(p.boss)+" ("+esc(p.difficulty)+")").join(", ")}.
+        ${R.reset_in ? `Лимит восстановится примерно через ${Math.max(1, Math.round(R.reset_in/60))} мин.` : ""}
+        Разобранные боссы сохранены; уже скачанные данные повторно не тратят лимит.</p>
+      <button type="button" class="btn you" id="contAll">Продолжить разбор (${P.length})</button></div>` : ""}
+    ${box("Каждый босс", "Разница — к DPS топ-1 на этом боссе. «Подробно» — полный разбор: выжимка, бой по шагам, ротация, кулдауны, таланты, экипировка.",
+      table(["Босс","Бой","DPS","Топ-1","Разница","Главное действие",""], B.map((b,i)=>{
+        const gap = b.ref_dps ? (b.dps - b.ref_dps) / b.ref_dps : null, a = (b.actions||[])[0];
+        return [`<b>${esc(b.boss)}</b><div class="gsub">${esc(b.difficulty)}</div>`, `${b.kill?"килл":"вайп"}, ${esc(b.duration)}`,
+          num(b.dps), b.ref_dps==null?"—":num(b.ref_dps), gap==null?"—":`<span class="${gap<-0.1?"worse":gap>=0?"better":""}">${sgn(gap,v=>pct(v))}</span>`,
+          a ? `${esc(a.do)} <span class="imp ${a.level}">${esc(a.gain)}</span>` : "существенных отличий нет",
+          `<button class="mini" type="button" data-b="${i}">Подробно</button>`];
+      }), {num:[2,3,4], cls:"wide", empty:"Пока ни один босс не разобран."}))}
+    ${(R.skipped||[]).length ? box("Пропущены", "", `<ul class="lines">${R.skipped.map(x=>`<li>${esc(x.boss)}: ${esc(x.reason)}</li>`).join("")}</ul>`) : ""}`;
+  el.hidden = false;
+  el.querySelectorAll("[data-b]").forEach(b => b.onclick = () => render({...B[+b.dataset.b].detail, excel: R.excel, _back: R}));
+  if ($("#contAll")) $("#contAll").onclick = () => {
+    CONTINUE_ALL = R._hid || null;
+    const prev = B.map(b => ({boss: b.boss, difficulty: b.difficulty, kill: b.kill, dps: b.dps, ref_dps: b.ref_dps, actions: b.actions}));
+    run({url: R.params.url, fight: "all", actor: R.params.actor, fights: P.map(p=>p.fight_id), prev});
+  };
+  el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+}
+
 function renderSaves(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, B = R.bosses || [];

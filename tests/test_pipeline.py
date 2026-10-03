@@ -152,52 +152,6 @@ def test_gear_and_trinkets():
     print("OK экипировка: зачарования и камни против топа, тип действий в окне бурста (тринкет/способность)")
 
 
-def test_battle_analysis():
-    from wcl_analyzer.battle import build_battle
-    from wcl_analyzer.battle import positions as P
-    from wcl_analyzer.demo import demo_logs
-    # координаты: шум убирается, движения склеиваются, мелкие отбрасываются
-    pts = [(t, 0.2 * (t % 2), 0.0) for t in range(0, 10)]            # стоит на месте с дрожанием
-    pts += [(10.0, 4.0, 0.0), (11.0, 9.0, 0.0), (12.0, 12.0, 0.0)]    # пробежал 12 ярдов
-    pts += [(t, 12.0, 0.1 * (t % 3)) for t in range(13, 20)]
-    pts += [(20.0, 13.5, 0.0), (21.0, 12.0, 0.0)]                     # шаг на месте — не движение
-    segs = P.segments(P.denoise(pts))
-    assert len(segs) == 1 and abs(segs[0]["dist"] - 12) < 1 and 9 <= segs[0]["start"] <= 10, segs
-    assert P.rdp([(0, 0, 0), (1, 1, 0.01), (2, 2, 0)], 0.5) == [(0, 0, 0), (2, 2, 0)]
-    rel, origin = P.relative([(0, 105, 210)], [(0, 100, 200)])
-    assert origin == "boss" and rel == [(0, 5, 10)]
-
-    tops, me = demo_logs()
-    r = compare(me, build_reference(tops))
-    B = build_battle(r)
-    ev = B["events"]
-    assert 10 <= len(ev) <= 20, len(ev)
-    types = {t for e in ev for t in e["types"]}
-    assert {"opener", "phase", "end", "burst", "defensive", "movement", "switch"} <= types, types
-    assert ev[0]["t"] == 0 and ev[-1]["type"] == "end" and all(a["t"] <= b["t"] for a, b in zip(ev, ev[1:]))
-    assert all(1 <= len(e["lines"]) <= 4 for e in ev if e["type"] not in ("phase",)), [e for e in ev if len(e["lines"]) > 4]
-    M = B["movement"]
-    assert M["available"] and M["top_n"] >= 20 and M["total"] > M["top_total"], (M["total"], M["top_total"])
-    reasons = {m["reason"] for m in M["moves"]}
-    assert "mechanic" in reasons and "unknown" in reasons
-    extra = [m for m in M["moves"] if 118 <= m["start"] <= 123][0]   # лишнее перемещение: топ здесь стоит
-    assert extra["reason"] == "unknown" and extra["top_share"] < 0.3, extra
-    sw = [e for e in ev if e["type"] == "switch" or "switch" in e["types"]][0]
-    assert sw["diff"]["t_s"] > 1 and "Ледяной элементаль" in sw["title"], sw
-    assert 3 <= len(B["differences"]) <= 5 and all(d["level"] in ("high", "medium") for d in B["differences"])
-    assert 1 <= len(B["summary"]) <= 5 and B["dps"]["gap"] < 0
-    json.dumps(B)
-    # лог без координат: лента есть, карта честно недоступна
-    me.positions, me.boss_positions = [], []
-    B2 = build_battle(compare(me, build_reference(tops)))
-    assert not B2["movement"]["available"] and len(B2["events"]) >= 10
-    assert any("Координат" in x for x in B2["summary"])
-    with tempfile.TemporaryDirectory() as d:
-        from openpyxl import load_workbook
-        assert "Бой по шагам" in load_workbook(write_compare_workbook(r, Path(d) / "b.xlsx")).sheetnames
-    print("OK бой по шагам: 10–20 событий, движение с причиной только по данным, смена цели и бурст против топа")
-
-
 def test_plan_no_duplicate_ability():
     from wcl_analyzer.raid_top import make_plan
     X = {"roster_cds": [{"pid": 1, "player": "Торвин", "name": "Ободряющий клич", "id": 97462, "cd": 180, "cls": "Warrior"},
@@ -275,7 +229,6 @@ def test_player_all_bosses():
     web._run_player_all(job3, {**params, "actor": "all"}, None, lambda *_: None)
     R3 = job3["result"]
     assert R3["everyone"] and len(R3["bosses"]) == 3 and {b["player"] for b in R3["bosses"]} == {"Me"}, R3["bosses"]
-    assert "all_events" not in R3["bosses"][0]["detail"]["battle"]
     web._player_ref = orig_ref
     print("OK игрок на всех боссах: топ-1, остановка по лимиту WCL и продолжение с оставшихся")
 
@@ -330,7 +283,6 @@ if __name__ == "__main__":
     test_player_all_bosses()
     test_plan_long_fight()
     test_saves_all_bosses()
-    test_battle_analysis()
     test_gear_and_trinkets()
     main()
 

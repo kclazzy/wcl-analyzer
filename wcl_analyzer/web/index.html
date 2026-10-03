@@ -155,72 +155,26 @@ tr.noise td{color:var(--muted)}
 
 /* Таблицы */
 .tw{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:14px}
-th{text-align:left;font-weight:600;color:var(--muted);font-size:13px;padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+table{border-collapse:collapse;width:100%;font-size:15.5px}
+th{text-align:left;font-weight:600;color:var(--muted);font-size:14.5px;padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
 td{padding:8px 10px;border-bottom:1px solid var(--soft);vertical-align:top}
 td.num,th.num{text-align:right;white-space:nowrap}
 table.wide th{white-space:normal;vertical-align:bottom}table.wide th,table.wide td{padding-left:8px;padding-right:8px}
 tr.flag td{background:var(--bad-soft)}
-.tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12.5px;font-weight:600}
+.tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:13.5px;font-weight:600}
 .tag.HIGH{background:var(--good-soft);color:#17542B}.tag.MEDIUM{background:var(--warn-soft);color:#6B4A05}
 .tag.LOW{background:var(--bad-soft);color:#7A1F19}.tag.none{background:var(--soft);color:var(--muted)}
 .tag.k-trinket{background:#EDE4FA;color:#4B2A82}.tag.k-spell{background:var(--soft);color:var(--ink,inherit)}
 .tag.k-potion{background:var(--good-soft);color:#17542B}.tag.k-racial{background:var(--warn-soft);color:#6B4A05}
-.gsub{font-size:12.5px;color:var(--muted)}
+.gsub{font-size:13.5px;color:var(--muted)}
+td .tag{font-size:13px}
+td .imp{font-size:13.5px}
 .allnav{position:sticky;top:0;z-index:6;background:var(--paper);padding:4px 0 2px;margin-bottom:12px}
 .allnav .tabs{margin:0}.allnav .tabs button{font-size:14px}
 .allnav-pl{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;color:var(--muted);margin-top:6px}
 .allnav-pl select{max-width:100%}
 .mini.mrtbtn{background:var(--good);border-color:var(--good);color:#fff;font-weight:700;font-size:15.5px;padding:10px 20px;border-radius:var(--r-sm)}
 .mini.mrtbtn:hover{background:#277A42;border-color:#277A42}
-/* ---------- Бой по шагам ---------- */
-.bt-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin-bottom:10px}
-.bt-head h3{margin:0}.bt-head .meta{color:var(--muted);font-size:14px}
-.bt-filters{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px}
-.bt-filters button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 11px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted)}
-.bt-filters button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
-.bt-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
-.bt-tl{max-height:680px;overflow:auto;padding-right:4px}
-.bt-ph{font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px;padding-top:4px;border-top:1px dashed var(--line)}
-.bt-ph:first-child{border-top:0;margin-top:0}
-.bt-ev{display:grid;grid-template-columns:52px 1fr;gap:4px 10px;padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent}
-.bt-ev:hover{background:var(--soft)}.bt-ev.on{background:var(--you-soft);border-color:var(--you)}
-.bt-ev.now{box-shadow:inset 3px 0 0 var(--you)}
-.bt-t{font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;padding-top:1px}
-.bt-ti{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-weight:600}
-.bt-type{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 7px;border-radius:6px;background:var(--soft);color:var(--muted)}
-.ty-burst,.ty-opener,.ty-cooldown,.ty-potion{background:#EDE4FA;color:#4B2A82}.ty-mechanic,.ty-death{background:var(--bad-soft);color:#7A1F19}
-.ty-defensive{background:var(--top-soft);color:#145C54}.ty-movement{background:#E1ECFA;color:#1D4E89}.ty-switch{background:var(--warn-soft);color:#6B4A05}
-.bt-sev{font-size:11.5px;font-weight:700;border-radius:6px;padding:1px 7px}.bt-sev.high{background:var(--bad);color:#fff}.bt-sev.medium{background:var(--warn-soft);color:#6B4A05}
-.bt-ln{grid-column:2;font-size:13.5px;line-height:1.4}.bt-ln .ic{display:inline-block;width:20px}
-.bt-ln.top{color:var(--top)}.bt-ln.bad{color:var(--bad)}.bt-hidetop .bt-ln.top{display:none}
-.bt-map{position:sticky;top:64px;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel)}
-.bt-map svg{width:100%;height:auto;display:block;touch-action:none}
-.bt-mapbar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:8px;font-size:13px}
-.bt-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.bt-seg button{border:0;background:var(--panel);padding:4px 9px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted)}
-.bt-seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
-.bt-cap{font-size:13px;color:var(--muted);margin-top:6px;min-height:20px}
-.bt-cap b{color:var(--ink)}
-.bt-play{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px}
-.bt-play input[type=range]{flex:1;min-width:0}
-.bt-play .mini{padding:4px 10px}
-.bt-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted);margin-top:6px}
-.bt-legend i{display:inline-block;width:18px;height:0;border-top:3px solid var(--you);vertical-align:middle;margin-right:5px}
-.bt-legend i.top{border-top:3px dashed var(--top)}
-.bt-bottom{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;margin-top:18px}
-.bt-diff{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--soft);cursor:pointer}
-.bt-diff:last-child{border-bottom:0}.bt-diff .dot{width:10px;height:10px;border-radius:50%;background:var(--warn);align-self:center}
-.bt-diff .dot.high{background:var(--bad)}.bt-diff .v{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
-.bt-diff .do{grid-column:2/4;font-size:13px;color:var(--muted)}
-.bt-sum li{margin-bottom:4px}.bt-gap{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0}
-.bt-gap div{font-size:13px;color:var(--muted)}.bt-gap b{display:block;font-size:20px;color:var(--ink)}
-@media (max-width:900px){
-  .bt-grid,.bt-bottom{grid-template-columns:1fr}
-  .bt-map{order:-1;position:static}
-  .bt-map svg{max-height:50vh}
-  .bt-tl{max-height:none}
-}
 
 .tag{white-space:nowrap}.box td,.box th{overflow-wrap:normal}
 .gear td:first-child{min-width:120px}
@@ -242,8 +196,8 @@ dialog .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
 .issue{display:grid;grid-template-columns:150px 1fr auto;gap:12px;padding:10px 0;border-top:1px solid var(--soft);align-items:baseline}
 .issue:first-of-type{border-top:0}
 .issue .who b{font-weight:600}
-.issue .who span{display:block;font-size:12.5px;color:var(--muted)}
-.sev{border-radius:6px;padding:2px 8px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.issue .who span{display:block;font-size:13.5px;color:var(--muted)}
+.sev{border-radius:6px;padding:2px 8px;font-size:13.5px;font-weight:600;white-space:nowrap}
 .sev.s5,.sev.s4{background:var(--bad-soft);color:#7A1F19}.sev.s3{background:var(--warn-soft);color:#6B4A05}
 .sev.s2,.sev.s1{background:var(--soft);color:var(--muted)}
 .raidleg span::before{display:none}
@@ -254,7 +208,7 @@ dialog .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
 .heat td.h small{display:block;font-weight:400;font-size:11.5px;opacity:.8}
 .mini{border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 9px;font-size:13px;cursor:pointer;white-space:nowrap}
 .mini:hover{border-color:var(--ink)}
-.cat{font-size:12.5px;border-radius:6px;padding:1px 8px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.cat{font-size:13.5px;border-radius:6px;padding:1px 8px;background:var(--soft);color:var(--muted);white-space:nowrap}
 .cat.sel{background:var(--warn-soft);color:#6B4A05}
 
 .pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
@@ -294,7 +248,7 @@ dialog label.check input{width:auto;margin:0}
 .qr{display:flex;gap:20px;align-items:flex-start;margin:14px 0}
 .qr svg,.qr img{max-width:100%;height:auto;flex:none;border:1px solid var(--line);border-radius:10px}
 .qr .steps{font-size:14px;color:var(--muted)}
-.qr code{display:block;word-break:break-all;background:var(--soft);border-radius:6px;padding:6px 8px;margin-top:8px;font-size:12.5px;color:var(--ink)}
+.qr code{display:block;word-break:break-all;background:var(--soft);border-radius:6px;padding:6px 8px;margin-top:8px;font-size:13.5px;color:var(--ink)}
 .tabs{position:sticky;top:0;z-index:5;background:var(--paper)}
 
 @media (max-width:820px){
@@ -819,7 +773,7 @@ function render(R){
   /* Два эталона: топ вашей сложности (основной) и эпохальный топ (R.alt). Переключатель перерисовывает разбор */
   const pair = R.alt ? {main:R, alt:{...R.alt, _main:R, _back:R._back, _navFid:R._navFid, _navActor:R._navActor}} : R._main ? {main:R._main, alt:R} : null;
   /* Только три вкладки: остальные подробности — в Excel */
-  const tabs = [["battle","Бой по шагам"],["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["tal","Таланты"],["gear","Экипировка"]];
+  const tabs = [["rot","Сравнение ротации"],["cd","Кулдауны и бурст"],["tal","Таланты"],["gear","Экипировка"]];
   const B = R.brief || {  // разборы, сохранённые до появления выжимки
     verdict: `${num(I.dps)} DPS против ${num(I.ref_dps)} у медианы топа`, reliability: R.reliability.overall, reliability_note: "",
     actions: (R.top5||[]).slice(0,3).map(f=>({do:f.focus||f.title, title:f.title, why:"", level:f.level,
@@ -844,7 +798,6 @@ function render(R){
       </div>
       <div class="side">
         <span class="rel ${R.reliability.overall}">Надёжность сравнения: ${REL_RU[R.reliability.overall]||R.reliability.overall}</span>
-        ${R.battle && !R.battle.error ? '<button type="button" class="btn" id="toBattle" style="background:#fff;color:var(--ink)">Бой по шагам</button>' : ""}
         <a class="btn you" href="${R.excel}" download>Скачать Excel</a>
         <a href="${esc(I.url)}" target="_blank" rel="noopener" style="color:#B8C2D9;font-size:14px">Открыть лог на WCL</a>
       </div>
@@ -862,7 +815,7 @@ function render(R){
       ${R.talents && (R.talents.summary||[]).length ? `<p class="hint" style="margin:10px 0 0">${R.talents.summary.map(esc).join(". ")}. Подробно — во вкладке «Таланты».</p>` : ""}
       ${B.noise_hidden?`<p class="hint" style="margin:10px 0 0">Скрыто отличий, которые так же часто встречаются у самих игроков топа: ${B.noise_hidden}. Они есть в подробностях.</p>`:""}
     </div>
-    <details class="more" id="more"><summary>Подробности: бой по шагам, ротация, кулдауны и бурст, таланты, экипировка</summary>
+    <details class="more" id="more"><summary>Подробности: ротация, кулдауны и бурст, таланты, экипировка</summary>
     <div class="legend"><span class="l-you">Вы</span><span class="l-top">Медиана топа</span><span class="l-bad">Отличие не в вашу пользу</span></div>
     <div class="tabs" role="tablist">${tabs.map(([k,t],i)=>`<button role="tab" aria-selected="${i==0}" aria-controls="p-${k}" id="t-${k}">${t}</button>`).join("")}</div>
     ${tabs.map(([k],i)=>`<div class="panel ${i==0?"on":""}" role="tabpanel" id="p-${k}" aria-labelledby="t-${k}"></div>`).join("")}
@@ -873,12 +826,10 @@ function render(R){
   else if (R._back) $("#backRaid").onclick = () => renderRaidRot(R._back);
   el.querySelectorAll(".diffsw button").forEach(b => b.onclick = () => render(b.dataset.sw === "alt" ? pair.alt : pair.main));
   showProgress(R);
-  renderBattle(R.battle, $("#p-battle"), I);
-  // кнопка в шапке: раскрыть подробности и открыть вкладку «Бой по шагам»
-  if ($("#toBattle")) $("#toBattle").onclick = () => { $("#more").open = true; $("#t-battle").click();
-    $("#more").scrollIntoView({behavior:"smooth"}); };
-  el.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
-    el.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
+  // вкладки подробностей (не панель боссов «Разобрать всех боссов» — у неё свои обработчики)
+  const detTabs = [...el.querySelectorAll(".tabs button")].filter(b => !b.closest(".allnav"));
+  detTabs.forEach(b => b.onclick = () => {
+    detTabs.forEach(x => x.setAttribute("aria-selected", x===b));
     el.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "p-"+b.id.slice(2)));
   });
   if ($("#refAgain")) $("#refAgain").onclick = () => { window.scrollTo({top:0, behavior:"smooth"}); run({...R.params, refresh:true}); };
@@ -931,195 +882,7 @@ function render(R){
 }
 
 
-/* ================= Бой по шагам (модуль battle) =================
-   Время → ключевое событие → действие игрока → карта → сравнение с топом. */
-const BT_FILTERS = [["mechanics","Механики"],["movement","Движение"],["burst","Бурст"],["cooldowns","Кулдауны"],
-  ["defensives","Защита"],["switch","Смена цели"],["errors","Ошибки"],["top","Сравнение с топом"]];
-const BT_REASON = {mechanic:"механика", target:"к цели", unknown:"причина неизвестна"};
-const SEV_RU = {high:"сильное отличие", medium:"заметное"};
-const btTitle = e => { const t = (e.title||"").startsWith(e.type_ru) ? e.title.slice(e.type_ru.length).trim() : (e.title||""); return t; };
-function btT(t){ if (t==null) return "—"; t=Math.max(0,t); const m=Math.floor(t/60), s=Math.floor(t-m*60); return m+":"+(s<10?"0":"")+s; }
-
-function renderBattle(B, el, I){
-  if (!el) return;
-  if (!B) { el.innerHTML = box("Бой по шагам", "", '<p class="empty">Этот разбор сохранён до появления пошагового разбора. Запустите разбор заново — вкладка заполнится.</p>'); return; }
-  if (B.error) { el.innerHTML = box("Бой по шагам", "", `<p class="empty">${esc(B.error)}</p>`); return; }
-  const M = B.movement || {}, has = !!M.available;
-  const st = {sel:null, mode:"both", heat:false, all:false, f:new Set(BT_FILTERS.map(x=>x[0])), t:null, playing:false, speed:1, raf:0};
-  el.innerHTML = `<div class="box bt">
-    <div class="bt-head"><h3>Бой по шагам</h3><span class="meta">${esc(B.boss)} · ${esc(who(I.cls, I.spec))} · ${btT(B.duration)} · ${B.kill?"килл":"вайп"}
-      · сравнение: медиана ${esc(B.ref_label)} (${B.ref_n})</span>
-      ${B.reliability?`<span class="rel ${B.reliability}" title="${esc((B.reliability_reasons||[]).join("\n"))}">Надёжность: ${esc(REL_RU[B.reliability]||B.reliability)}</span>`:""}</div>
-    ${(B.reliability_reasons||[]).length && B.reliability!=="HIGH" ? `<p class="hint" style="margin:0 0 6px">${B.reliability_reasons.map(esc).join(" · ")}</p>`:""}
-    <div class="bt-filters" role="group" aria-label="Что показывать">${BT_FILTERS.map(([k,t])=>`<button type="button" data-f="${k}" aria-pressed="true">${t}</button>`).join("")}</div>
-    <div class="bt-grid">
-      <div><div class="bt-tl" id="btTl"></div>
-        <button type="button" class="mini" id="btAll" style="margin-top:8px">Показать все события (${(B.all_events||[]).length})</button></div>
-      <div class="bt-map">
-        ${has ? `<div class="bt-mapbar"><span class="bt-seg" role="group" aria-label="Чья траектория">
-            <button type="button" data-m="me" aria-pressed="false">Мой бой</button><button type="button" data-m="top" aria-pressed="false">Топ</button>
-            <button type="button" data-m="both" aria-pressed="true">Вместе</button></span>
-          <label class="chk"><input type="checkbox" id="btHeat"> Тепловая карта</label></div>
-          <svg id="btSvg" role="img" aria-label="Карта движения относительно босса"></svg>
-          <div class="bt-legend"><span><i></i>вы</span><span><i class="top"></i>топ: ${M.top_log ? (I.demo ? esc(M.top_log.name) : `<a href="${esc(M.top_log.url)}" target="_blank" rel="noopener">${esc(M.top_log.name)}</a>`) : "лог"} — движение ближе всех к медиане</span><span>● босс в центре, кольца — 10 ярдов</span></div>
-          <div class="bt-cap" id="btCap"></div>
-          <div class="bt-play"><button type="button" class="mini" id="btPlay">▶ Повтор</button>
-            <select id="btSpeed" aria-label="Скорость">${[0.5,1,2,4].map(v=>`<option value="${v}" ${v==1?"selected":""}>${String(v).replace(".",",")}×</option>`).join("")}</select>
-            <input type="range" id="btScrub" min="0" max="${B.duration}" step="0.5" value="0" aria-label="Момент боя"><span id="btNow" style="font-variant-numeric:tabular-nums">0:00</span></div>
-          <div class="bt-cap" style="margin-top:8px">Движение за бой: <b>${num(M.total,1)} с</b>${M.top_total!=null?` · топ <b>${num(M.top_total,1)} с</b> · ${sgn(M.diff,v=>num(v,1)+" с")}`:""}
-            · значимых перемещений: <b>${(M.moves||[]).length}</b></div>`
-        : `<p class="empty">В этом логе нет координат игрока — карту движения построить нельзя. Остальная лента — по событиям боя.</p>`}
-      </div>
-    </div>
-    <div class="bt-bottom">
-      <div><h4 style="margin:0 0 4px">Главные отличия от топа</h4><div id="btDiff"></div></div>
-      <div><h4 style="margin:0 0 4px">Коротко</h4>
-        ${B.dps && B.dps.top ? `<div class="bt-gap"><div>Ваш DPS<b>${num(B.dps.my)}</b></div><div>Медиана топа<b>${num(B.dps.top)}</b></div>
-          <div>Разрыв<b class="${B.dps.gap<0?"worse":"better"}">${sgn(B.dps.gap,v=>pct(v))}</b></div></div>
-          ${(B.dps.contributors||[]).length?`<p class="hint" style="margin:0 0 6px">Возможные факторы: ${B.dps.contributors.map(esc).join(", ")}</p>`:""}` : ""}
-        <ul class="bt-sum">${(B.summary||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
-        <button type="button" class="mini" id="btMore">Подробный анализ ↓</button></div>
-    </div></div>`;
-
-  const tl = $("#btTl");
-  const evs = () => st.all ? (B.all_events||[]) : (B.events||[]);
-  const visible = e => e.type==="end" || e.type==="phase" || e.filters.some(f=>st.f.has(f))
-    || (st.f.has("errors") && (e.severity==="high"||e.severity==="medium"));
-  function drawList(){
-    const list = evs().filter(visible);
-    let ph = null, html = "";
-    for (const e of list){
-      if (e.phase!=null && e.phase!==ph && (B.phases||[]).length>1){
-        ph = e.phase; const i = B.phases.findIndex(p=>p.id===ph), a = B.phases[i], b = B.phases[i+1];
-        html += `<div class="bt-ph">Фаза ${ph} · ${btT(a?a.t:0)}–${btT(b?b.t:B.duration)}</div>`;
-      }
-      const k = evs().indexOf(e);
-      html += `<div class="bt-ev ${st.sel===k?"on":""}" data-k="${k}" tabindex="0" role="button">
-        <div class="bt-t">${btT(e.t)}</div>
-        <div class="bt-ti"><span class="bt-type ty-${e.type}">${esc(e.type_ru)}</span>${esc(btTitle(e))}
-          ${SEV_RU[e.severity]?`<span class="bt-sev ${e.severity}">${SEV_RU[e.severity]}</span>`:""}</div>
-        ${e.lines.map(l=>`<div class="bt-ln ${l.kind||""}"><span class="ic">${esc(l.icon)}</span>${esc(l.text)}</div>`).join("")}</div>`;
-    }
-    tl.innerHTML = html || '<p class="empty">Под выбранные фильтры событий нет.</p>';
-    tl.classList.toggle("bt-hidetop", !st.f.has("top"));
-    tl.querySelectorAll(".bt-ev").forEach(d => { const go = () => select(+d.dataset.k); d.onclick = go;
-      d.onkeydown = ev => { if (ev.key==="Enter"||ev.key===" ") { ev.preventDefault(); go(); } }; });
-  }
-  function select(k){
-    st.sel = (st.sel===k) ? null : k; stop();
-    tl.querySelectorAll(".bt-ev").forEach(d => d.classList.toggle("on", +d.dataset.k===st.sel));
-    const e = st.sel==null ? null : evs()[st.sel];
-    if (e) { st.t = e.t; const sc=$("#btScrub"); if (sc) { sc.value = e.t; $("#btNow").textContent = btT(e.t); } }
-    drawMap();
-    if (e && matchMedia("(max-width:900px)").matches && $("#btSvg")) $(".bt-map").scrollIntoView({block:"nearest", behavior:"smooth"});
-  }
-
-  // ---------- карта
-  const R = Math.max(20, ...[...(M.path||[]), ...(M.top_path||[])].map(p=>Math.max(Math.abs(p[1]),Math.abs(p[2]))*1.12+3));
-  const sx = x => x, sy = y => -y;   // y вверх
-  // участок траектории [a, b] с точками на краях (интерполяция): между редкими точками линия не пропадает
-  const slice = (path, a, b) => { if (!path.length || b < path[0][0]) return [];
-    const inner = path.filter(p => p[0] > a && p[0] < b);
-    return [at(path, a), ...inner, at(path, b)]; };
-  function at(path, t){ if (!path.length) return null; if (t<=path[0][0]) return path[0];
-    for (let i=1;i<path.length;i++) if (path[i][0]>=t){ const a=path[i-1], b=path[i], k=(t-a[0])/Math.max(1e-6,b[0]-a[0]); return [t, a[1]+(b[1]-a[1])*k, a[2]+(b[2]-a[2])*k]; }
-    return path[path.length-1]; }
-  const line = (pts, cls) => pts.length>1 ? `<polyline points="${pts.map(p=>sx(p[1]).toFixed(2)+","+sy(p[2]).toFixed(2)).join(" ")}" class="${cls}"/>` : "";
-  function heat(){
-    const P = M.path||[], cell = Math.max(2, R/14), acc = {}; let mx = 0;
-    for (let i=0;i<P.length-1;i++){ const w = Math.min(10, P[i+1][0]-P[i][0]); const kx=Math.floor(P[i][1]/cell), ky=Math.floor(P[i][2]/cell);
-      const key=kx+","+ky; acc[key]=(acc[key]||0)+w; mx=Math.max(mx,acc[key]); }
-    return Object.entries(acc).map(([k,v])=>{ const [kx,ky]=k.split(",").map(Number);
-      return `<rect x="${(kx*cell).toFixed(2)}" y="${(-(ky+1)*cell).toFixed(2)}" width="${cell}" height="${cell}" fill="#E39B2F" opacity="${(0.12+0.7*v/mx).toFixed(2)}"/>`; }).join("");
-  }
-  function drawMap(){
-    const svg = $("#btSvg"); if (!svg) return;
-    const e = st.sel==null ? null : evs()[st.sel];
-    const showMe = st.mode!=="top", showTop = st.mode!=="me";
-    const rings = [10,20,30,40,50,60].filter(r=>r<R);
-    let body = rings.map(r=>`<circle r="${r}" class="ring"/><text x="${r*0.71+0.6}" y="${-r*0.71-0.6}" class="rl">${r}</text>`).join("");
-    if (st.heat) body += heat();
-    const P = M.path||[], TP = M.top_path||[];
-    let a = 0, b = B.duration, cap = "";
-    if (e && e.window) { [a,b] = e.window; }
-    if (st.t!=null && st.playing) { a = Math.max(0, st.t-8); b = st.t; }
-    if (!e && !st.playing) {
-      // общий вид: вся траектория бледно, значимые движения — пронумерованы
-      if (showMe) body += line(P, "full");
-      const labels = [];
-      if (showMe) (M.moves||[]).forEach(m=>{ const s = slice(P, m.start, m.end); if (s.length>1){ body += line(s, "me");
-        const q = s[s.length-1]; let lx = sx(q[1])+R/40, ly = sy(q[2])-R/40;
-        while (labels.some(([x,y])=>Math.hypot(x-lx,y-ly) < R/14)) ly -= R/14;   // номера в одной точке — столбиком
-        labels.push([lx,ly]);
-        body += `<circle cx="${sx(q[1])}" cy="${sy(q[2])}" r="${R/55}" class="end"/><text x="${lx}" y="${ly}" class="num">${m.i+1}</text>`; }});
-      if (showTop && !showMe) body += line(TP, "topfull");
-      cap = `Вся траектория боя. Выберите событие в ленте — карта покажет этот момент. Или нажмите «▶ Повтор».`;
-    } else {
-      if (showMe) body += line(P, "full");
-      const sm = slice(P, a, b), stp = slice(TP, a, b);
-      if (showTop && stp.length>1) { body += line(stp, "top"); const q = stp[stp.length-1]; body += `<circle cx="${sx(q[1])}" cy="${sy(q[2])}" r="${R/60}" class="tend"/>`; }
-      if (showMe && sm.length>1) { body += line(sm, "me"); const s0 = sm[0], q = sm[sm.length-1];
-        body += `<circle cx="${sx(s0[1])}" cy="${sy(s0[2])}" r="${R/60}" class="start"/><circle cx="${sx(q[1])}" cy="${sy(q[2])}" r="${R/55}" class="end"/>`; }
-      const now = st.playing ? st.t : b;
-      const pm = showMe ? at(P, now) : null, pt = showTop ? at(TP, now) : null;
-      if (pt) body += `<circle cx="${sx(pt[1])}" cy="${sy(pt[2])}" r="${R/38}" class="tdot"/>`;
-      if (pm) body += `<circle cx="${sx(pm[1])}" cy="${sy(pm[2])}" r="${R/34}" class="mdot"/>`;
-      if (e) {
-        const mv = e.movement!=null ? (M.moves||[])[e.movement] : null;
-        cap = `<b>${btT(e.t)} — ${esc(e.type_ru)} ${esc(btTitle(e))}</b>`;
-        if (mv) cap += ` · вы двигались ${num(mv.moving,1)} с (${num(mv.dist,0)} ярд.), ${BT_REASON[mv.reason]}${mv.mechanic?" «"+esc(mv.mechanic)+"»":""}`
-          + (mv.top_window!=null ? ` · топ: ${num(mv.top_window,1)} с` : "");
-        else { let len = 0; for (let i=1;i<sm.length;i++) len += Math.hypot(sm[i][1]-sm[i-1][1], sm[i][2]-sm[i-1][2]);
-          cap += len < 2 ? " · вы стояли на месте" : ` · вы прошли ${num(len,0)} ярд.`; }
-      } else cap = `Повтор: ${btT(st.t)}`;
-    }
-    body += `<circle r="${R/30}" class="boss"/><text y="${-R/30-1}" class="bl">Босс</text>`;
-    svg.setAttribute("viewBox", `${-R} ${-R} ${2*R} ${2*R}`);
-    svg.innerHTML = `<style>
-      .ring{fill:none;stroke:#D5DBE4;stroke-width:${R/250}} .rl{font-size:${R/22}px;fill:#9AA3B5}
-      .full{fill:none;stroke:#E39B2F;stroke-opacity:.18;stroke-width:${R/160}} .topfull{fill:none;stroke:#1F8A7E;stroke-opacity:.35;stroke-width:${R/160};stroke-dasharray:${R/60} ${R/80}}
-      .me{fill:none;stroke:#E39B2F;stroke-width:${R/80};stroke-linecap:round;stroke-linejoin:round}
-      .top{fill:none;stroke:#1F8A7E;stroke-width:${R/110};stroke-dasharray:${R/45} ${R/70};stroke-linecap:round}
-      .start{fill:#fff;stroke:#E39B2F;stroke-width:${R/150}} .end{fill:#E39B2F} .tend{fill:#1F8A7E}
-      .mdot{fill:#E39B2F;stroke:#fff;stroke-width:${R/200}} .tdot{fill:#1F8A7E;stroke:#fff;stroke-width:${R/200};opacity:.85}
-      .boss{fill:#C9423A} .bl{font-size:${R/18}px;fill:#C9423A;text-anchor:middle;font-weight:700}
-      .num{font-size:${R/16}px;fill:#16213A;font-weight:700}</style>${body}`;
-    $("#btCap").innerHTML = cap;
-  }
-
-  // ---------- повтор
-  function frame(prev){ return now => { if (!st.playing) return; const dt = prev ? (now-prev)/1000 : 0;
-      st.t = Math.min(B.duration, (st.t||0) + dt*st.speed*4);  // 1× = 4 секунды боя в секунду: 5-минутный бой — за минуту с небольшим
-      $("#btScrub").value = st.t; $("#btNow").textContent = btT(st.t); markNow(); drawMap();
-      if (st.t >= B.duration) { stop(); return; } st.raf = requestAnimationFrame(frame(now)); }; }
-  function markNow(){ let k = -1; evs().forEach((e,i)=>{ if (e.t <= (st.t||0)) k = i; });
-    tl.querySelectorAll(".bt-ev").forEach(d => d.classList.toggle("now", +d.dataset.k===k)); }
-  function stop(){ st.playing = false; cancelAnimationFrame(st.raf); const b = $("#btPlay"); if (b) b.textContent = "▶ Повтор"; }
-  if (has){
-    $("#btPlay").onclick = () => { if (st.playing) { stop(); return; }
-      if (st.sel!=null) { st.sel = null; tl.querySelectorAll(".bt-ev").forEach(d=>d.classList.remove("on")); }
-      if ((st.t||0) >= B.duration) st.t = 0; st.playing = true; $("#btPlay").textContent = "❚❚ Пауза"; st.raf = requestAnimationFrame(frame(0)); };
-    $("#btSpeed").onchange = ev => st.speed = +ev.target.value;
-    $("#btScrub").oninput = ev => { st.t = +ev.target.value; $("#btNow").textContent = btT(st.t); const was = st.playing; st.playing = true; markNow(); drawMap(); st.playing = was; };
-    el.querySelectorAll("[data-m]").forEach(b => b.onclick = () => { st.mode = b.dataset.m;
-      el.querySelectorAll("[data-m]").forEach(x=>x.setAttribute("aria-pressed", x===b)); drawMap(); });
-    $("#btHeat").onchange = ev => { st.heat = ev.target.checked; drawMap(); };
-  }
-  el.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { const k = b.dataset.f;
-    st.f.has(k) ? st.f.delete(k) : st.f.add(k); b.setAttribute("aria-pressed", st.f.has(k)); drawList(); });
-  $("#btAll").onclick = () => { st.all = !st.all; st.sel = null;
-    $("#btAll").textContent = st.all ? `Только ключевые (${(B.events||[]).length})` : `Показать все события (${(B.all_events||[]).length})`; drawList(); drawMap(); };
-  $("#btMore").onclick = () => { const m = $("#more"); if (m) { m.open = true; m.scrollIntoView({behavior:"smooth"}); } };
-  $("#btDiff").innerHTML = (B.differences||[]).length ? B.differences.map((d,i)=>`<div class="bt-diff" data-i="${i}" title="Показать в ленте только это">
-      <span class="dot ${d.level}"></span><span>${esc(d.section)}: ${esc(d.text)}</span><span class="v">${esc(d.value||d.gain||"")}</span>
-      ${d.do?`<span class="do">${esc(d.do)}</span>`:""}</div>`).join("") : '<p class="empty">Существенных отличий от топа не найдено.</p>';
-  $("#btDiff").querySelectorAll(".bt-diff").forEach(d => d.onclick = () => {
-    const f = B.differences[+d.dataset.i].filter; st.f = new Set([f, "top"]);
-    el.querySelectorAll("[data-f]").forEach(b=>b.setAttribute("aria-pressed", st.f.has(b.dataset.f))); drawList();
-    tl.scrollIntoView({behavior:"smooth", block:"nearest"}); });
-  drawList(); drawMap();
-}
-
+function btT(t){ if (t==null) return "—"; t=Math.max(0,t); const m=Math.floor(t/60), s=Math.floor(t-m*60); return m+":"+(s<10?"0":"")+s; }  // м:сс без долей
 const KIND_CLS = {"Тринкет":"k-trinket","Зелье":"k-potion","Расовая":"k-racial"};
 const kindTag = k => k ? `<span class="tag ${KIND_CLS[k]||"k-spell"}">${esc(k)}</span>` : "";
 
@@ -1160,14 +923,14 @@ function renderGear(G, el, demo){
 const TAL_KIND = {missing:"У топа почти у всех, у вас нет", choice:"Другой выбор в узле", extra:"У вас есть, у топа редко", rank:"Меньше рангов, чем у топа"};
 function renderTalents(T, el){
   if (!T || T.error) { el.innerHTML = box("Таланты", "", `<p class="empty">${esc(T && T.error ? T.error : "Нет данных о талантах. Разборы, сохранённые до этой версии, — без этой вкладки.")}</p>`); return; }
-  const dpsCell = (v, n) => v==null ? "—" : `${num(v)} <span style="color:var(--muted);font-size:12.5px">(${n})</span>`;
+  const dpsCell = (v, n) => v==null ? "—" : `${num(v)} <span style="color:var(--muted);font-size:13.5px">(${n})</span>`;
   el.innerHTML = `
     <div class="box brief"><ul class="lines">${T.summary.map(l=>`<li>${esc(l)}</li>`).join("")}
       <li>С вашим билдом (таланты совпадают на 85%+) — ${T.same_build} из ${T.n} логов топа; самый похожий совпадает на ${pct(T.closest,0)}</li></ul></div>
     ${T.hero ? box("Героическая ветка", "Какую героическую ветку берут игроки топа и их медианный DPS." + (T.hero.my ? ` Таланты внутри вашей ветки сравниваются только с игроками топа той же ветки (${T.hero_same_n||0}).` : " В вашем логе героическая ветка не определилась."),
       table(["Ветка","Доля топа","Медиана DPS топа"], T.hero.top.map(h=>[esc(h.name) + (h.name===T.hero.my ? ' <span class="tag HIGH">у вас</span>' : ""), pct(h.share,0), num(h.dps)]), {num:[1,2]})) : ""}
     ${box("Отличия от большинства топа", `Сравнение со всеми скачанными логами топа (${T.n}), без отбора по билду. «DPS топа с ним / без» — медианный DPS игроков топа с этим талантом и без него, в скобках — сколько игроков; при малом числе — прочерк. Разница в DPS не доказывает, что дело в таланте.` + (T.has_names ? "" : " Справочник талантов недоступен — вместо названий номера узлов."),
-      table(["Ветка","Талант","Отличие","У вас","У топа","Доля топа","DPS топа: с ним","DPS топа: без"], T.rows.map(x=>[`<span style="font-size:12.5px;color:var(--muted)">${esc(x.branch||"")}</span>`, esc(x.name), esc(TAL_KIND[x.kind]), esc(x.my), esc(x.top), pct(x.share,0), dpsCell(x.dps_with, x.n_with), dpsCell(x.dps_without, x.n_without)]),
+      table(["Ветка","Талант","Отличие","У вас","У топа","Доля топа","DPS топа: с ним","DPS топа: без"], T.rows.map(x=>[`<span style="font-size:13.5px;color:var(--muted)">${esc(x.branch||"")}</span>`, esc(x.name), esc(TAL_KIND[x.kind]), esc(x.my), esc(x.top), pct(x.share,0), dpsCell(x.dps_with, x.n_with), dpsCell(x.dps_without, x.n_without)]),
         {num:[5,6,7], empty:"Билд совпадает с большинством топа.", flag:i=>T.rows[i].kind==="missing"||T.rows[i].kind==="choice"}))}`;
 }
 
@@ -1196,7 +959,7 @@ function renderRaidPeaks(P, el){
       table(["Когда","Урон за 5 с","Доля боя","Механики","Нажатые рейдовые кулдауны"], H.map(h=>[h.time, num(h.damage), pct(h.share,0), esc(h.abilities.join(", ")),
         h.cds.length?esc(h.cds.join(", ")):'<span class="worse">ничего</span>']), {num:[1,2], empty:"Нет данных об уроне.", flag:i=>!H[i].cds.length}))}
     ${(X.roster_cds||[]).length ? box("Рейдовые кулдауны состава", "У кого какой рейдовый кулдаун есть и сколько раз его можно нажать за бой при этой перезарядке. Красным — ни разу не нажат.",
-      table(["Игрок","Кулдаун","Откат","Нажато","Можно за бой","Откуда известно"], X.roster_cds.map(c=>[`${esc(c.player)} <span style="color:var(--muted);font-size:12.5px">${esc(who(c.cls, c.spec))}</span>`,
+      table(["Игрок","Кулдаун","Откат","Нажато","Можно за бой","Откуда известно"], X.roster_cds.map(c=>[`${esc(c.player)} <span style="color:var(--muted);font-size:13.5px">${esc(who(c.cls, c.spec))}</span>`,
         esc(c.name), mmss(c.cd).replace(/,0$/,""), num(c.used), c.max_uses==null?"—":num(c.max_uses), esc(c.source)]), {num:[2,3,4], flag:i=>!X.roster_cds[i].used})) : ""}`;
   raidDamageChart(P);
 }
@@ -1206,7 +969,7 @@ function scopeCell(raid, self, mine){
   const line = (tag, cls, lst) => lst.length ? `<div style="margin:2px 0"><span class="tag ${cls}">${tag}</span> ${esc(lst.join(", "))}</div>` : "";
   if (!raid.length && !self.length) return mine ? '<span class="worse">ничего</span>' : "—";
   return line("на рейд", "k-spell", raid) + line("на себя", "k-trinket", self)
-    + (mine && !raid.length ? '<div class="worse" style="font-size:12.5px">на весь рейд — ничего</div>' : "");
+    + (mine && !raid.length ? '<div class="worse" style="font-size:13.5px">на весь рейд — ничего</div>' : "");
 }
 
 /* План сейвов: на пик — один или два кулдауна; у каждого — откат и когда он снова готов */
@@ -1253,16 +1016,16 @@ function planRows(plan){
   return table(["Нажать в","Пик","Кулдауны и кто"], plan.map(r=>{
     const picks = r.picks || (r.cd ? [{cd:r.cd, player:r.player, like_top:r.like_top}] : []);
     const phc = r.phase && r.phase_time != null && (r.phase > 1 || r.intermission)
-      ? `<div style="font-size:12.5px;color:var(--muted);white-space:nowrap">${esc(r.phase_name||"Фаза "+r.phase)} +${esc(r.phase_time)}</div>`
+      ? `<div style="font-size:13.5px;color:var(--muted);white-space:nowrap">${esc(r.phase_name||"Фаза "+r.phase)} +${esc(r.phase_time)}</div>`
         + (r.intermission ? '<span class="tag MEDIUM">переход</span>' : "") : "";
     return [r.time + phc, esc(r.mechanic) + (r.heavy ? ` <span class="tag LOW">опасный: ${r.need} ${plural(r.need,"сейв","сейва","сейвов")}</span>` : "")
-        + (r.top_n || r.deaths || r.beyond_top ? `<div style="font-size:12.5px;color:var(--muted)">${[r.top_n ? `топ жмёт: ${r.top_n}` : "", r.deaths ? `смертей в этот пик: ${r.deaths}` : "",
+        + (r.top_n || r.deaths || r.beyond_top ? `<div style="font-size:13.5px;color:var(--muted)">${[r.top_n ? `топ жмёт: ${r.top_n}` : "", r.deaths ? `смертей в этот пик: ${r.deaths}` : "",
             r.beyond_top ? "у лучших киллов этого пика нет — бой у них короче; сейвы по тяжести пика" : ""].filter(Boolean).join(", ")}</div>` : ""),
       (picks.length ? picks.map(p=>`<div><b>${esc(p.cd)}</b> — ${esc(p.player)}${p.like_top?' <span class="tag HIGH">как у топа</span>':""}`
-          + (p.cooldown ? `<span style="color:var(--muted);font-size:12.5px"> · откат ${esc(p.cooldown)}, снова готов в ${esc(p.ready)}</span>` : "") + "</div>").join("")
+          + (p.cooldown ? `<span style="color:var(--muted);font-size:13.5px"> · откат ${esc(p.cooldown)}, снова готов в ${esc(p.ready)}</span>` : "") + "</div>").join("")
         : '<span class="worse">нет свободного кулдауна</span>')
-      + (!picks.some(p=>p.like_top) && r.top ? `<div style="font-size:12.5px;color:var(--muted)">у топа здесь: ${esc(r.top)}</div>` : "")
-      + ((r.spare||[]).length ? `<div style="font-size:12.5px;color:var(--muted);margin-top:3px">Запасные, откатаны к этому моменту: ${r.spare.map(x=>`${esc(x.cd)} — ${esc(x.player)}`).join("; ")}</div>` : "")];
+      + (!picks.some(p=>p.like_top) && r.top ? `<div style="font-size:13.5px;color:var(--muted)">у топа здесь: ${esc(r.top)}</div>` : "")
+      + ((r.spare||[]).length ? `<div style="font-size:13.5px;color:var(--muted);margin-top:3px">Запасные, откатаны к этому моменту: ${r.spare.map(x=>`${esc(x.cd)} — ${esc(x.player)}`).join("; ")}</div>` : "")];
   }));
 }
 
@@ -1313,7 +1076,7 @@ function ilvlCell(p){
   if (p.item_level == null) return "—";
   const d = p.ref_item_level != null ? p.item_level - p.ref_item_level : null;
   return `<span class="${d!=null && d <= -5 ? "worse" : ""}">${num(p.item_level,1)}</span>`
-    + (p.ref_item_level != null ? `<div style="font-size:12.5px;color:var(--muted)">топ ${num(p.ref_item_level,1)}</div>` : "");
+    + (p.ref_item_level != null ? `<div style="font-size:13.5px;color:var(--muted)">топ ${num(p.ref_item_level,1)}</div>` : "");
 }
 /* Сейвы на всех боссов (кнопка убрана; открываются только сохранённые в истории разборы) */
 /* Разбор всех боссов: панель переключения (сводка / боссы), «Подробно» — полный разбор с той же панелью,
@@ -1336,7 +1099,7 @@ function allNav(R, curFid, curActor){
   const bossLabel = x => {
     const r = R.everyone ? null : x.rows[0], g = r ? gapOf(r) : null;
     return `${esc(x.boss)}${multiDiff?` <span class="tag none">${esc(x.difficulty==="эпохальный"?"эпох.":x.difficulty==="героический"?"гер.":x.difficulty)}</span>`:""}`
-      + (g != null ? ` <span class="${gapCls(g)}" style="font-size:12.5px">${sgn(g,v=>pct(v,0))}</span>` : "") + (x.kill ? "" : ' <span class="tag MEDIUM">вайп</span>');
+      + (g != null ? ` <span class="${gapCls(g)}" style="font-size:13.5px">${sgn(g,v=>pct(v,0))}</span>` : "") + (x.kill ? "" : ' <span class="tag MEDIUM">вайп</span>');
   };
   let players = "";
   if (R.everyone && curFid != null && curActor != null) {
@@ -1351,8 +1114,7 @@ function bindAllNav(el, R, curFid){
     if (k === "sum") return renderPlayerAll(R);
     const x = allBosses(R).find(x=>String(x.fid)===k);
     if (!x) return;
-    if (R.everyone) return renderPlayerAll(R, x.fid);       // все игроки этого босса
-    openAllDetail(R, x.rows[0]);                             // один игрок — сразу полный разбор
+    renderPlayerAll(R, x.fid);                               // вкладка босса — его игроки, «Подробно» — полный разбор
   });
   const sel = el.querySelector(".allnav [data-navpl]");
   if (sel) sel.onchange = () => { const r = (R.bosses||[]).find(b=>b.fight_id==curFid && String(b.actor)===sel.value); if (r) openAllDetail(R, r); };
@@ -1371,9 +1133,10 @@ function renderPlayerAll(R, bossFid){
     const x = BS.find(x=>x.fid==bossFid) || {rows: []};
     const rows = [...x.rows].sort((a,b)=>(gapOf(a)??0)-(gapOf(b)??0));
     body = box(`${x.boss} — ${x.difficulty}`, `${x.kill?"Килл":"Лучший пулл"}${rows[0]?", "+rows[0].duration:""}. Игроки — от самого большого отставания от топ-1 своего спека.`,
-      table(["Игрок","DPS","Топ-1","Разница","Главное действие",""], rows.map(b=>[
-        `<b>${esc(b.player)}</b><div class="gsub">${esc(who(b.cls, b.spec))}</div>`, num(b.dps), b.ref_dps==null?"—":num(b.ref_dps), gapCell(b), act(b), det(b)]),
-        {num:[1,2,3], cls:"wide"}));
+      table(["Игрок","Бой","DPS","Топ-1","Разница","Главное действие",""], rows.map(b=>[
+        `<b>${esc(b.player)}</b><div class="gsub">${esc(who(b.cls, b.spec))}</div>`, `${b.kill?"килл":"вайп"}, ${esc(b.duration)}`,
+        num(b.dps), b.ref_dps==null?"—":num(b.ref_dps), gapCell(b), act(b), det(b)]),
+        {num:[2,3,4], cls:"wide", empty:"На этом боссе пока никто не разобран."}));
   } else if (R.everyone) {  // сводка: игроки × боссы, в ячейке — разница с топ-1; клик — полный разбор
     const players = [...new Map(B.map(b=>[b.actor, b])).values()].sort((a,b)=>a.player.localeCompare(b.player));
     body = box("Сводка: игроки × боссы", "В ячейке — разница DPS с топ-1 своего спека на этом боссе. Нажмите на ячейку — откроется полный разбор; вкладки боссов — сверху.",
@@ -1383,7 +1146,7 @@ function renderPlayerAll(R, bossFid){
           return r ? `<button class="linkbtn ${gapCls(gapOf(r))}" type="button" data-b="${B.indexOf(r)}" style="font-weight:600">${gapOf(r)==null?"—":sgn(gapOf(r),v=>pct(v,0))}</button>` : '<span class="gsub">—</span>'; })]),
         {num: BS.map((_,i)=>i+1), cls:"wide", empty:"Пока ничего не разобрано."}));
   } else {
-    body = box("Сводка по боссам", "Разница — к DPS топ-1 на этом боссе. Вкладки сверху или «Подробно» — полный разбор: выжимка, бой по шагам, ротация, кулдауны, таланты, экипировка.",
+    body = box("Сводка по боссам", "Разница — к DPS топ-1 на этом боссе. Вкладки сверху или «Подробно» — полный разбор: выжимка, ротация, кулдауны, таланты, экипировка.",
       table(["Босс","Бой","DPS","Топ-1","Разница","Главное действие",""], B.map(b=>[
         `<b>${esc(b.boss)}</b><div class="gsub">${esc(b.difficulty)}</div>`, `${b.kill?"килл":"вайп"}, ${esc(b.duration)}`,
         num(b.dps), b.ref_dps==null?"—":num(b.ref_dps), gapCell(b), act(b), det(b)]),
@@ -1480,7 +1243,7 @@ function renderRaidRot(R){
     </div>
     ${box("Каждый игрок", "Главное действие — первое из трёх в его выжимке. «Подробно» открывает полный разбор игрока: выжимку, графики и все отличия.",
       table(["Игрок","Ур. предметов","Проц.","С учётом экип.","DPS","К топу","К эпох. топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
-        `<b>${esc(p.name)}</b><div style="font-size:12.5px;color:var(--muted)">${esc(who(p.cls, p.spec))}</div>`,
+        `<b>${esc(p.name)}</b><div style="font-size:13.5px;color:var(--muted)">${esc(who(p.cls, p.spec))}</div>`,
         ilvlCell(p), pctChip(p.rank), pctChip(p.ilvl), num(p.dps), `<span class="${p.gap<-0.1?"worse":p.gap>=0?"better":""}">${sgn(p.gap, v=>pct(v))}</span>`,
         p.mythic_gap==null ? "—" : `<span title="Эпохальный топ: ${num(p.mythic_dps)} DPS (медиана по рейтингу)">${sgn(p.mythic_gap, v=>pct(v))}</span>`,
         `<span class="tag ${p.reliability}">${esc(REL_RU[p.reliability]||p.reliability)}</span>`,
@@ -1617,7 +1380,7 @@ function renderRaid(R){
   $("#p-r-pl").innerHTML = box("Все игроки", `Активное время — доля времени, пока игрок жив. Красным — ниже ${pct(th.active,0)}, смерти и урон от выборочных механик от ${ratio(th.select)} среднего.` +
       (canCompare ? " Кнопка «Сравнить с топом» разбирает игрока против топа его спека (размер — в списке «Сравнить с»)." : ""),
     table(["Игрок","Уровень предметов","DPS","HPS","Парс","Активное время","Смерти","Зелья / камни","Прерыв. / диспелы","Выборочные механики", ...(canCompare?[""]:[])],
-      P.map(p=>[`<span style="white-space:nowrap"><i class="role ${p.role}"></i>${esc(p.name)}</span><div style="font-size:12.5px;color:var(--muted);white-space:nowrap">${esc(who(p.cls, p.spec))}</div>`, num(p.ilvl,1), num(p.dps), p.role==="healer"?num(p.hps):"—",
+      P.map(p=>[`<span style="white-space:nowrap"><i class="role ${p.role}"></i>${esc(p.name)}</span><div style="font-size:13.5px;color:var(--muted);white-space:nowrap">${esc(who(p.cls, p.spec))}</div>`, num(p.ilvl,1), num(p.dps), p.role==="healer"?num(p.hps):"—",
         p.parse==null?"—":num(p.parse)+"%",
         `<span class="${p.active!=null&&p.role!=="tank"&&p.active<th.active?"worse":""}">${pct(p.active,0)}</span>`,
         p.deaths?`<span class="worse">${p.deaths} (${mmss(p.first_death)})</span>`:"0",
@@ -1653,7 +1416,7 @@ function renderRaid(R){
   $("#p-r-death").innerHTML = `
     ${box("Смерти и механики на одной оси", "Крестики — смерти, ромб — Жажда крови, точки — моменты урона от самых опасных механик.", '<div class="chart" style="height:320px"><canvas id="cRaidTl"></canvas></div>')}
     ${box("Смерти", "Урон за 5 секунд до смерти и последние действия игрока за 10 секунд.",
-      table(["№","Время","Игрок","Причина","Урон за 5 с","Последние действия",""], R.deaths.map(d=>[d.n, d.time, `${esc(d.player)}<div class="ps" style="font-size:12.5px;color:var(--muted)">${esc(d.role)}, ${esc(who(d.cls, d.spec))}</div>`,
+      table(["№","Время","Игрок","Причина","Урон за 5 с","Последние действия",""], R.deaths.map(d=>[d.n, d.time, `${esc(d.player)}<div class="ps" style="font-size:13.5px;color:var(--muted)">${esc(d.role)}, ${esc(who(d.cls, d.spec))}</div>`,
         esc(d.ability), d.sources.map(x=>`${esc(x.name)}: ${num(x.damage)}`).join("<br>"), esc(d.last_casts.join(" → ")||"—"),
         d.first?'<span class="sev s5">первая смерть</span>':d.wipe_tail?'<span class="sev s1">конец вайпа</span>':""]), {empty:"В этом бою никто не умер."}))}`;
   chart("cRaidTl", {type:"scatter", data:{datasets:lanes.map((l,i)=>({label:l, data:R.timeline.filter(e=>e.lane===l).map(e=>({x:e.t, y:ly[l], e})),

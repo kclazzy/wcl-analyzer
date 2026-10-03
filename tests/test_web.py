@@ -109,8 +109,6 @@ def main():
     assert ra["state"] == "done" and rb["state"] == "done" and rb["result"]["mode"] == "raid"
     ref = ra["result"]["ref"]
     assert ref["cls"] == "Mage" and ref["top_n"] == 10 and ref["collected_at"]
-    bt = ra["result"]["battle"]  # «Бой по шагам» приходит вместе с разбором, без отдельных запросов
-    assert bt and not bt.get("error") and 10 <= len(bt["events"]) <= 20 and bt["movement"]["available"], bt and bt.get("error")
 
     # Браузер забирает Excel, сообщает «забрал» — сервер сразу удаляет результат
     st, data = anna.req("GET", f"/api/report/{job_a}")

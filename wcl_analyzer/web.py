@@ -303,8 +303,6 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
             tops, ref_label = _player_ref(client, me, me.difficulty, p1, lambda m: log("    " + m), {})
             res = _player_result(job, p1, client, me, tops, ref_label, {}, me.difficulty, lambda m: log("    " + m), alt=False)
             res.pop("ref", None)
-            if everyone and isinstance(res.get("battle"), dict):
-                res["battle"].pop("all_events", None)  # десятки разборов — бережём место в браузере
             rows.append({"fight_id": fid, "actor": me.actor_id, "player": me.name, "cls": me.cls, "spec": me.spec,
                          "boss": me.encounter_name, "difficulty": me.difficulty_name, "kill": me.kill,
                          "duration": _fmt_t(me.duration), "dps": round(me.dps), "ref_dps": res["info"].get("ref_dps"),
@@ -416,18 +414,7 @@ def _player_result(job, params, client, me, tops, label, ref_meta, top_diff, log
         result["info"]["ref_stale"] = time.time() - ref_meta["collected_at"] > _max_age_s(params)
     result["params"] = {k: params.get(k) for k in ("url", "fight", "actor", "ref")}
     result["talents"] = r.talents
-    result["battle"] = _battle(r, log)
     return result
-
-
-def _battle(r, log) -> dict | None:
-    """«Бой по шагам» (модуль battle). Ошибка в нём не должна ломать остальной разбор."""
-    try:
-        from .battle import build_battle
-        return build_battle(r)
-    except Exception as e:  # noqa: BLE001
-        log(f"Бой по шагам: не удалось построить ({type(e).__name__}: {e})")
-        return {"error": "Не удалось построить пошаговый разбор этого боя. Остальной разбор — ниже."}
 
 
 def _avoidable_list() -> list[str]:
@@ -549,7 +536,6 @@ def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:
         if "result" in r:
             row["actions"] = r["actions"]
             row["detail"] = to_json(r["result"], job["id"])
-            row["detail"]["battle"] = _battle(r["result"], log)  # «Бой по шагам» и в «Подробно» у каждого игрока
         players.append(row)
     job["result"] = {"mode": "raidrot", "info": I, "brief": R["brief"], "players": players,
                      "skipped": [p.get("name") for p in R["skipped"]], "not_picked": R.get("not_picked", []),

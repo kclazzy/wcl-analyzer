@@ -73,6 +73,12 @@ class PlayerLog:
     gear: list[dict] = field(default_factory=list)  # экипировка: слот, предмет, уровень, зачарование, камни
     icons: dict[int, str] = field(default_factory=dict)  # иконки способностей (masterData)
     trinket_spells: set = field(default_factory=set)     # касты, которые являются применением аксессуара
+    # --- координаты (события с includeResources): ярды, как на карте WCL
+    positions: list[tuple[float, float, float]] = field(default_factory=list)       # игрок: (t, x, y)
+    boss_positions: list[tuple[float, float, float]] = field(default_factory=list)  # босс: (t, x, y)
+    target_seq: list[tuple[float, int]] = field(default_factory=list)               # (t, цель каста)
+    actor_names: dict[int, str] = field(default_factory=dict)                       # id → имя (враги, игроки)
+    map_id: int | None = None
 
     @property
     def difficulty_name(self) -> str:
@@ -127,6 +133,17 @@ def merge_intervals(iv: list[tuple[float, float]]) -> list[tuple[float, float]]:
         else:
             res.append([s, e])
     return [(a, b) for a, b in res]
+
+
+def _xy(ev: dict) -> tuple[float, float] | None:
+    """Координаты из события с ресурсами: в WCL это сотые доли ярда."""
+    x, y = ev.get("x"), ev.get("y")
+    if x is None or y is None:
+        return None
+    try:
+        return float(x) / 100.0, float(y) / 100.0
+    except (TypeError, ValueError):
+        return None
 
 
 def _hp_pct(ev: dict) -> float | None:
@@ -223,6 +240,14 @@ def build_player_log(report: dict, fight: dict, actor: dict, raw: dict,
             if t - st > 6:
                 st = t
             log.casts.append(Cast(t=t, id=ab, start=st, res=_pick_resource(ev), hp=_hp_pct(ev)))
+            tid = int(ev.get("targetID", -1))
+            if tid >= 0 and tid != aid:
+                log.target_seq.append((t, tid))
+        p = _xy(ev)
+        if p:
+            log.positions.append((t, p[0], p[1]))
+            if log.map_id is None and ev.get("mapID"):
+                log.map_id = int(ev["mapID"])
     res_types = [c.res[2] for c in log.casts if c.res]
     if res_types:
         rt = max(set(res_types), key=res_types.count)
@@ -312,7 +337,11 @@ def build_player_log(report: dict, fight: dict, actor: dict, raw: dict,
             continue
         amount = float(ev.get("amount", 0)) + float(ev.get("absorbed", 0) or 0)
         log.dmg_taken.append((rel(ev), int(ev.get("abilityGameID", 0)), amount, _hp_pct(ev)))
+        p = _xy(ev)  # ресурсы урона описывают цель — то есть самого игрока
+        if p:
+            log.positions.append((rel(ev), p[0], p[1]))
     log.dmg_taken.sort()
+    log.positions = sorted(set(log.positions))
 
     log.deaths = sorted(rel(ev) for ev in raw.get("deaths", [])
                         if ev.get("type") == "death" and int(ev.get("targetID", -1)) == aid)
@@ -322,7 +351,12 @@ def build_player_log(report: dict, fight: dict, actor: dict, raw: dict,
         if ev.get("type") != "cast" or (boss_ids and src not in boss_ids):
             continue
         log.boss_casts.append((rel(ev), int(ev.get("abilityGameID", 0))))
+        p = _xy(ev)
+        if p and (not log.boss_ids or src in log.boss_ids):
+            log.boss_positions.append((rel(ev), p[0], p[1]))
     log.boss_casts.sort()
+    log.boss_positions.sort()
+    log.actor_names = {int(a["id"]): a.get("name", "") for a in report["masterData"]["actors"] if "id" in a}
 
     log.dmg_timeline = sorted((rel(ev), float(ev.get("amount", 0)))
                               for ev in raw.get("dmg_done", [])
@@ -436,7 +470,7 @@ def fetch_raw(client, report: dict, fight: dict, actor_id: int,
     raw["dmg_taken"] = client.events(code, fid, s, e, "DamageTaken", target_id=actor_id,
                                      include_resources=True)
     raw["deaths"] = client.events(code, fid, s, e, "Deaths")
-    raw["boss_casts"] = client.events(code, fid, s, e, "Casts", hostility="Enemies")
+    raw["boss_casts"] = client.events(code, fid, s, e, "Casts", hostility="Enemies", include_resources=True)
     # Таланты и экипировка (CombatantInfo): событие бывает не ровно в начале боя — берём весь бой,
     # событий этого типа всего по одному на игрока
     raw["combatant"] = client.events(code, fid, s, e, "CombatantInfo")
@@ -457,7 +491,7 @@ def _fetch_raw_batched(client, report: dict, fight: dict, actor_id: int, with_da
         "resources": {"data_type": "Resources", "target_id": actor_id},
         "dmg_taken": {"data_type": "DamageTaken", "target_id": actor_id, "include_resources": True},
         "deaths": {"data_type": "Deaths"},
-        "boss_casts": {"data_type": "Casts", "hostility": "Enemies"},
+        "boss_casts": {"data_type": "Casts", "hostility": "Enemies", "include_resources": True},
         "combatant": {"data_type": "CombatantInfo"},  # весь бой: событие бывает не ровно в начале
     }
     bosses = boss_actor_ids(report, fight)[:3]

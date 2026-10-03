@@ -5,11 +5,15 @@
 """
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass
 
 DEMO_ENCOUNTER = 9999
 BOSS_ID, SHAMAN_ID, PLAYER_ID, DH_ID, PRIEST_ID = 50, 30, 7, 31, 32
+ADD_ID = 51                                   # адд: появляется на 100-й секунде
+ADD_WINDOW = (100.0, 112.0)
+BOSS_XY = (2140.0, 1830.0)                    # координаты босса на карте, ярды
 MAX_HP = 8_000_000
 
 FB, IL, FL, GS, ORB, IV, BER, POT, AT, IB = 116, 30455, 44614, 199786, 84714, 12472, 26297, 431932, 342245, 45438
@@ -54,6 +58,8 @@ class Policy:
     trk_delay: float = 0.3       # через сколько секунд после Стылой крови жать тринкет
     missing_enchants: tuple = () # слоты без зачарования
     weapon_oil: bool = True      # временное усиление на оружии
+    switch_delay: float = 0.5    # через сколько секунд после появления адда переключиться на него
+    extra_moves: tuple = ()      # лишние перемещения: (начало, длительность, dx, dy)
 
 
 def top_policy(rng: random.Random, dur: float) -> Policy:
@@ -75,6 +81,7 @@ def my_policy(rng: random.Random) -> Policy:
         iv_delays=[0.0, 8.0, 3.5, 0.0], ber_times=[4.0], prepot=False, potion_times=[11.0],
         at_leads=[-3.0, None, 2.5], gs_hold_p=0.45, fof_ignore_p=0.3, move_idle=1.8,
         raid_brand=False, trk_delay=7.0, missing_enchants=(11,), weapon_oil=False,
+        switch_delay=2.6, extra_moves=((118.0, 3.4, 8.0, 5.0), (203.0, 2.6, -7.0, 6.0)),
     )
 
 
@@ -96,13 +103,40 @@ def simulate(policy: Policy, dur: float, ilvl: float, seed: int, name: str,
 
     def boss_cast(t, ab):
         boss_casts.append({"timestamp": ts(t), "type": "cast", "sourceID": BOSS_ID,
-                           "targetID": -1, "abilityGameID": ab, "fight": 1})
+                           "targetID": -1, "abilityGameID": ab, "fight": 1,
+                           "x": int(BOSS_XY[0] * 100), "y": int(BOSS_XY[1] * 100), "mapID": 2290})
 
     for t in crushes:
         boss_cast(t - 2.0, CRUSH)
     for t in waves:
         if t < dur:
             boss_cast(t - 3.0, WAVE)
+
+    # -------------------------------------------------- положение на арене (без случайностей:
+    # последовательность случайных чисел остальной симуляции не меняется)
+    home = (BOSS_XY[0] + 1.5 * math.sin(seed), BOSS_XY[1] - 13.0 + 1.5 * math.cos(seed))
+    moves = []  # (начало, конец, смещение x, смещение y) — уход и возврат
+    for i, w in enumerate(waves):
+        side = 1 if i % 2 == 0 else -1
+        moves.append((w, w + 0.8 + policy.move_idle, side * 12.0, 3.0, w + 14.0))
+    for st_, dur_, dx, dy in policy.extra_moves:
+        moves.append((st_, st_ + dur_, dx, dy, st_ + dur_ + 4.0))
+
+    def pos(tt):
+        x, y = home
+        for a, b, dx, dy, back in moves:
+            if tt < a:
+                continue
+            k = min(1.0, (tt - a) / (b - a))
+            if tt > back:
+                k = max(0.0, 1.0 - (tt - back) / 2.0)
+            x, y = x + dx * k, y + dy * k
+        x += 0.25 * math.sin(tt * 1.7)  # шум координат: стоит на месте, но не идеально
+        return {"x": int(round(x * 100)), "y": int(round(y * 100)), "facing": 0, "mapID": 2290}
+
+    def target_at(tt):
+        a = ADD_WINDOW[0] + policy.switch_delay
+        return ADD_ID if a <= tt <= ADD_WINDOW[1] else BOSS_ID
 
     # -------------------------------------------------- состояние игрока
     t = 0.0
@@ -127,9 +161,9 @@ def simulate(policy: Policy, dur: float, ilvl: float, seed: int, name: str,
     def cast(tt, ab, begin=None):
         if begin is not None:
             casts.append({"timestamp": ts(begin), "type": "begincast", "sourceID": PLAYER_ID,
-                          "targetID": BOSS_ID, "abilityGameID": ab, "fight": 1})
+                          "targetID": target_at(begin), "abilityGameID": ab, "fight": 1})
         casts.append({"timestamp": ts(tt), "type": "cast", "sourceID": PLAYER_ID,
-                      "targetID": BOSS_ID, "abilityGameID": ab, "fight": 1, **res()})
+                      "targetID": target_at(tt), "abilityGameID": ab, "fight": 1, **res(), **pos(tt)})
 
     def buff(tt, typ, ab, src=PLAYER_ID):
         buffs.append({"timestamp": ts(tt), "type": typ, "sourceID": src, "targetID": PLAYER_ID,
@@ -337,7 +371,7 @@ def simulate(policy: Policy, dur: float, ilvl: float, seed: int, name: str,
         cur = max(0.05, cur - amount / MAX_HP)
         taken.append({"timestamp": ts(th), "type": "damage", "sourceID": BOSS_ID, "targetID": PLAYER_ID,
                       "abilityGameID": ab, "amount": int(amount), "absorbed": 0,
-                      "hitPoints": int(cur * MAX_HP), "maxHitPoints": MAX_HP, "fight": 1})
+                      "hitPoints": int(cur * MAX_HP), "maxHitPoints": MAX_HP, "fight": 1, **pos(th)})
 
     # HP игрока на кастах — по последнему входящему удару
     hp_track = [((e["timestamp"] - f0) / 1000, e["hitPoints"]) for e in taken]
@@ -380,6 +414,7 @@ def simulate(policy: Policy, dur: float, ilvl: float, seed: int, name: str,
         "masterData": {
             "actors": [{"id": PLAYER_ID, "name": name, "type": "Mage", "subType": "Mage", "server": "Demo"},
                        {"id": BOSS_ID, "name": "Демо-босс", "type": "NPC", "subType": "Boss"},
+                       {"id": ADD_ID, "name": "Ледяной элементаль", "type": "NPC", "subType": "NPC"},
                        {"id": SHAMAN_ID, "name": "Шаман", "type": "Shaman", "subType": "Shaman"},
                        {"id": DH_ID, "name": "Охотник", "type": "DemonHunter", "subType": "DemonHunter"},
                        {"id": PRIEST_ID, "name": "Жрец", "type": "Priest", "subType": "Priest"}],

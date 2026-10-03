@@ -292,7 +292,18 @@ def _player_result(job, params, client, me, tops, label, ref_meta, top_diff, log
         result["info"]["ref_stale"] = time.time() - ref_meta["collected_at"] > _max_age_s(params)
     result["params"] = {k: params.get(k) for k in ("url", "fight", "actor", "ref")}
     result["talents"] = r.talents
+    result["battle"] = _battle(r, log)
     return result
+
+
+def _battle(r, log) -> dict | None:
+    """«Бой по шагам» (модуль battle). Ошибка в нём не должна ломать остальной разбор."""
+    try:
+        from .battle import build_battle
+        return build_battle(r)
+    except Exception as e:  # noqa: BLE001
+        log(f"Бой по шагам: не удалось построить ({type(e).__name__}: {e})")
+        return {"error": "Не удалось построить пошаговый разбор этого боя. Остальной разбор — ниже."}
 
 
 def _avoidable_list() -> list[str]:

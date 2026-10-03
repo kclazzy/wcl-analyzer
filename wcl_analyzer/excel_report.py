@@ -133,6 +133,7 @@ def write_compare_workbook(r: CompareResult, path: str | Path) -> Path:
     wb.remove(wb.active)
     demo = r.me.report_code.startswith("DEMO")
     _brief_sheet(wb, r, demo)
+    _battle_sheet(wb, r, demo)
     _summary_sheet(wb, r, demo)
     _top5_sheet(wb, r, demo)
     _rotation_sheet(wb, r, demo)
@@ -183,6 +184,36 @@ def _talents_sheet(wb, r: CompareResult, demo: bool) -> None:
     s.table(["Ветка", "Талант", "Отличие", "У вас", "У топа", "Доля топа", "DPS топа: с ним", "DPS топа: без"],
             [[x.get("branch", ""), x["name"], TALENT_KIND[x["kind"]], x["my"], x["top"], x["share"], _v(x["dps_with"], 0),
               _v(x["dps_without"], 0)] for x in T["rows"]], [None, None, None, None, None, F_PCT, F_INT, F_INT])
+
+
+def _battle_sheet(wb, r: CompareResult, demo: bool) -> None:
+    """«Бой по шагам»: ключевые события, главные отличия, движение. Карта — только в приложении."""
+    try:
+        from .battle import build_battle
+        B = build_battle(r)
+    except Exception:  # noqa: BLE001 — лист необязательный
+        return
+    sev = {"high": "сильное", "medium": "заметное"}
+    s = Sheet(wb, "Бой по шагам", demo, {"A": 9, "B": 14, "C": 34, "D": 90, "E": 14})
+    s.title("Бой по шагам", "Ключевые события боя и сравнение с медианой топа. Карта движения и повтор — в приложении.")
+    for line in B["summary"]:
+        s.cell(s.row, 1, "• " + line)
+        s.row += 1
+    s.row += 1
+    s.section("Лента боя")
+    s.table(["Время", "Событие", "Что", "Подробно", "Отличие"],
+            [[_fmt_t(e["t"]), e["type_ru"], e["title"], " | ".join(f"{ln['icon']} {ln['text']}".strip() for ln in e["lines"]),
+              sev.get(e["severity"], "")] for e in B["events"]])
+    s.section("Главные отличия от топа")
+    s.table(["", "Раздел", "Отличие", "Что сделать", "Значение"],
+            [[sev.get(d["level"], ""), d["section"], d["text"], d["do"], d["value"] or d["gain"]] for d in B["differences"]])
+    M = B["movement"]
+    if M.get("available"):
+        s.section("Движение", f"За бой: {M['total']} с (топ {M['top_total']} с). Причина — только подтверждённая данными.")
+        why = {"mechanic": "механика", "target": "к цели", "unknown": "неизвестна"}
+        s.table(["Начало", "Длительность, с", "Причина", "Ярдов", "Топ в этом окне, с"],
+                [[_fmt_t(m["start"]), m["moving"], why[m["reason"]] + (f" «{m['mechanic']}»" if m["mechanic"] else ""),
+                  m["dist"], m["top_window"]] for m in M["moves"]], [None, F_1, None, F_1, F_1])
 
 
 def _gear_sheet(wb, r: CompareResult, demo: bool) -> None:

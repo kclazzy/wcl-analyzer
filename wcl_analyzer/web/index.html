@@ -167,6 +167,55 @@ tr.flag td{background:var(--bad-soft)}
 .tag.k-trinket{background:#EDE4FA;color:#4B2A82}.tag.k-spell{background:var(--soft);color:var(--ink,inherit)}
 .tag.k-potion{background:var(--good-soft);color:#17542B}.tag.k-racial{background:var(--warn-soft);color:#6B4A05}
 .gsub{font-size:12.5px;color:var(--muted)}
+/* ---------- Бой по шагам ---------- */
+.bt-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin-bottom:10px}
+.bt-head h3{margin:0}.bt-head .meta{color:var(--muted);font-size:14px}
+.bt-filters{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px}
+.bt-filters button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 11px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted)}
+.bt-filters button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.bt-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
+.bt-tl{max-height:680px;overflow:auto;padding-right:4px}
+.bt-ph{font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px;padding-top:4px;border-top:1px dashed var(--line)}
+.bt-ph:first-child{border-top:0;margin-top:0}
+.bt-ev{display:grid;grid-template-columns:52px 1fr;gap:4px 10px;padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent}
+.bt-ev:hover{background:var(--soft)}.bt-ev.on{background:var(--you-soft);border-color:var(--you)}
+.bt-ev.now{box-shadow:inset 3px 0 0 var(--you)}
+.bt-t{font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;padding-top:1px}
+.bt-ti{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-weight:600}
+.bt-type{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 7px;border-radius:6px;background:var(--soft);color:var(--muted)}
+.ty-burst,.ty-opener,.ty-cooldown,.ty-potion{background:#EDE4FA;color:#4B2A82}.ty-mechanic,.ty-death{background:var(--bad-soft);color:#7A1F19}
+.ty-defensive{background:var(--top-soft);color:#145C54}.ty-movement{background:#E1ECFA;color:#1D4E89}.ty-switch{background:var(--warn-soft);color:#6B4A05}
+.bt-sev{font-size:11.5px;font-weight:700;border-radius:6px;padding:1px 7px}.bt-sev.high{background:var(--bad);color:#fff}.bt-sev.medium{background:var(--warn-soft);color:#6B4A05}
+.bt-ln{grid-column:2;font-size:13.5px;line-height:1.4}.bt-ln .ic{display:inline-block;width:20px}
+.bt-ln.top{color:var(--top)}.bt-ln.bad{color:var(--bad)}.bt-hidetop .bt-ln.top{display:none}
+.bt-map{position:sticky;top:8px;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel)}
+.bt-map svg{width:100%;height:auto;display:block;touch-action:none}
+.bt-mapbar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:8px;font-size:13px}
+.bt-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.bt-seg button{border:0;background:var(--panel);padding:4px 9px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted)}
+.bt-seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.bt-cap{font-size:13px;color:var(--muted);margin-top:6px;min-height:20px}
+.bt-cap b{color:var(--ink)}
+.bt-play{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px}
+.bt-play input[type=range]{flex:1;min-width:0}
+.bt-play .mini{padding:4px 10px}
+.bt-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted);margin-top:6px}
+.bt-legend i{display:inline-block;width:18px;height:0;border-top:3px solid var(--you);vertical-align:middle;margin-right:5px}
+.bt-legend i.top{border-top:3px dashed var(--top)}
+.bt-bottom{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;margin-top:18px}
+.bt-diff{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--soft);cursor:pointer}
+.bt-diff:last-child{border-bottom:0}.bt-diff .dot{width:10px;height:10px;border-radius:50%;background:var(--warn);align-self:center}
+.bt-diff .dot.high{background:var(--bad)}.bt-diff .v{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bt-diff .do{grid-column:2/4;font-size:13px;color:var(--muted)}
+.bt-sum li{margin-bottom:4px}.bt-gap{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0}
+.bt-gap div{font-size:13px;color:var(--muted)}.bt-gap b{display:block;font-size:20px;color:var(--ink)}
+@media (max-width:900px){
+  .bt-grid,.bt-bottom{grid-template-columns:1fr}
+  .bt-map{order:-1;position:static}
+  .bt-map svg{max-height:50vh}
+  .bt-tl{max-height:none}
+}
+
 .tag{white-space:nowrap}.box td,.box th{overflow-wrap:normal}
 .gear td:first-child{min-width:120px}
 .empty{color:var(--muted);font-style:italic}
@@ -788,6 +837,7 @@ function render(R){
       ${R.talents && (R.talents.summary||[]).length ? `<p class="hint" style="margin:10px 0 0">${R.talents.summary.map(esc).join(". ")}. Подробно — во вкладке «Таланты».</p>` : ""}
       ${B.noise_hidden?`<p class="hint" style="margin:10px 0 0">Скрыто отличий, которые так же часто встречаются у самих игроков топа: ${B.noise_hidden}. Они есть в подробностях.</p>`:""}
     </div>
+    <div id="battle"></div>
     <details class="more" id="more"><summary>Подробности: ротация, кулдауны и бурст, таланты, экипировка</summary>
     <div class="legend"><span class="l-you">Вы</span><span class="l-top">Медиана топа</span><span class="l-bad">Отличие не в вашу пользу</span></div>
     <div class="tabs" role="tablist">${tabs.map(([k,t],i)=>`<button role="tab" aria-selected="${i==0}" aria-controls="p-${k}" id="t-${k}">${t}</button>`).join("")}</div>
@@ -798,6 +848,7 @@ function render(R){
   if (R._back) $("#backRaid").onclick = () => renderRaidRot(R._back);
   el.querySelectorAll(".diffsw button").forEach(b => b.onclick = () => render(b.dataset.sw === "alt" ? pair.alt : pair.main));
   showProgress(R);
+  renderBattle(R.battle, $("#battle"), I);
   el.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
     el.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
     el.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "p-"+b.id.slice(2)));
@@ -849,6 +900,196 @@ function render(R){
 
 
   el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+}
+
+
+/* ================= Бой по шагам (модуль battle) =================
+   Время → ключевое событие → действие игрока → карта → сравнение с топом. */
+const BT_FILTERS = [["mechanics","Механики"],["movement","Движение"],["burst","Бурст"],["cooldowns","Кулдауны"],
+  ["defensives","Защита"],["switch","Смена цели"],["errors","Ошибки"],["top","Сравнение с топом"]];
+const BT_REASON = {mechanic:"механика", target:"к цели", unknown:"причина неизвестна"};
+const SEV_RU = {high:"сильное отличие", medium:"заметное"};
+const btTitle = e => { const t = (e.title||"").startsWith(e.type_ru) ? e.title.slice(e.type_ru.length).trim() : (e.title||""); return t; };
+function btT(t){ if (t==null) return "—"; t=Math.max(0,t); const m=Math.floor(t/60), s=Math.floor(t-m*60); return m+":"+(s<10?"0":"")+s; }
+
+function renderBattle(B, el, I){
+  if (!el) return;
+  if (!B) { el.innerHTML = ""; return; }   // разборы старых версий — без этого блока
+  if (B.error) { el.innerHTML = box("Бой по шагам", "", `<p class="empty">${esc(B.error)}</p>`); return; }
+  const M = B.movement || {}, has = !!M.available;
+  const st = {sel:null, mode:"both", heat:false, all:false, f:new Set(BT_FILTERS.map(x=>x[0])), t:null, playing:false, speed:1, raf:0};
+  el.innerHTML = `<div class="box bt">
+    <div class="bt-head"><h3>Бой по шагам</h3><span class="meta">${esc(B.boss)} · ${esc(who(I.cls, I.spec))} · ${btT(B.duration)} · ${B.kill?"килл":"вайп"}
+      · сравнение: медиана ${esc(B.ref_label)} (${B.ref_n})</span>
+      ${B.reliability?`<span class="rel ${B.reliability}" title="${esc((B.reliability_reasons||[]).join("\n"))}">Надёжность: ${esc(REL_RU[B.reliability]||B.reliability)}</span>`:""}</div>
+    ${(B.reliability_reasons||[]).length && B.reliability!=="HIGH" ? `<p class="hint" style="margin:0 0 6px">${B.reliability_reasons.map(esc).join(" · ")}</p>`:""}
+    <div class="bt-filters" role="group" aria-label="Что показывать">${BT_FILTERS.map(([k,t])=>`<button type="button" data-f="${k}" aria-pressed="true">${t}</button>`).join("")}</div>
+    <div class="bt-grid">
+      <div><div class="bt-tl" id="btTl"></div>
+        <button type="button" class="mini" id="btAll" style="margin-top:8px">Показать все события (${(B.all_events||[]).length})</button></div>
+      <div class="bt-map">
+        ${has ? `<div class="bt-mapbar"><span class="bt-seg" role="group" aria-label="Чья траектория">
+            <button type="button" data-m="me" aria-pressed="false">Мой бой</button><button type="button" data-m="top" aria-pressed="false">Топ</button>
+            <button type="button" data-m="both" aria-pressed="true">Вместе</button></span>
+          <label class="chk"><input type="checkbox" id="btHeat"> Тепловая карта</label></div>
+          <svg id="btSvg" role="img" aria-label="Карта движения относительно босса"></svg>
+          <div class="bt-legend"><span><i></i>вы</span><span><i class="top"></i>топ: ${M.top_log ? (I.demo ? esc(M.top_log.name) : `<a href="${esc(M.top_log.url)}" target="_blank" rel="noopener">${esc(M.top_log.name)}</a>`) : "лог"} — движение ближе всех к медиане</span><span>● босс в центре, кольца — 10 ярдов</span></div>
+          <div class="bt-cap" id="btCap"></div>
+          <div class="bt-play"><button type="button" class="mini" id="btPlay">▶ Повтор</button>
+            <select id="btSpeed" aria-label="Скорость">${[0.5,1,2,4].map(v=>`<option value="${v}" ${v==1?"selected":""}>${String(v).replace(".",",")}×</option>`).join("")}</select>
+            <input type="range" id="btScrub" min="0" max="${B.duration}" step="0.5" value="0" aria-label="Момент боя"><span id="btNow" style="font-variant-numeric:tabular-nums">0:00</span></div>
+          <div class="bt-cap" style="margin-top:8px">Движение за бой: <b>${num(M.total,1)} с</b>${M.top_total!=null?` · топ <b>${num(M.top_total,1)} с</b> · ${sgn(M.diff,v=>num(v,1)+" с")}`:""}
+            · значимых перемещений: <b>${(M.moves||[]).length}</b></div>`
+        : `<p class="empty">В этом логе нет координат игрока — карту движения построить нельзя. Остальная лента — по событиям боя.</p>`}
+      </div>
+    </div>
+    <div class="bt-bottom">
+      <div><h4 style="margin:0 0 4px">Главные отличия от топа</h4><div id="btDiff"></div></div>
+      <div><h4 style="margin:0 0 4px">Коротко</h4>
+        ${B.dps && B.dps.top ? `<div class="bt-gap"><div>Ваш DPS<b>${num(B.dps.my)}</b></div><div>Медиана топа<b>${num(B.dps.top)}</b></div>
+          <div>Разрыв<b class="${B.dps.gap<0?"worse":"better"}">${sgn(B.dps.gap,v=>pct(v))}</b></div></div>
+          ${(B.dps.contributors||[]).length?`<p class="hint" style="margin:0 0 6px">Возможные факторы: ${B.dps.contributors.map(esc).join(", ")}</p>`:""}` : ""}
+        <ul class="bt-sum">${(B.summary||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+        <button type="button" class="mini" id="btMore">Подробный анализ ↓</button></div>
+    </div></div>`;
+
+  const tl = $("#btTl");
+  const evs = () => st.all ? (B.all_events||[]) : (B.events||[]);
+  const visible = e => e.type==="end" || e.type==="phase" || e.filters.some(f=>st.f.has(f))
+    || (st.f.has("errors") && (e.severity==="high"||e.severity==="medium"));
+  function drawList(){
+    const list = evs().filter(visible);
+    let ph = null, html = "";
+    for (const e of list){
+      if (e.phase!=null && e.phase!==ph && (B.phases||[]).length>1){
+        ph = e.phase; const i = B.phases.findIndex(p=>p.id===ph), a = B.phases[i], b = B.phases[i+1];
+        html += `<div class="bt-ph">Фаза ${ph} · ${btT(a?a.t:0)}–${btT(b?b.t:B.duration)}</div>`;
+      }
+      const k = evs().indexOf(e);
+      html += `<div class="bt-ev ${st.sel===k?"on":""}" data-k="${k}" tabindex="0" role="button">
+        <div class="bt-t">${btT(e.t)}</div>
+        <div class="bt-ti"><span class="bt-type ty-${e.type}">${esc(e.type_ru)}</span>${esc(btTitle(e))}
+          ${SEV_RU[e.severity]?`<span class="bt-sev ${e.severity}">${SEV_RU[e.severity]}</span>`:""}</div>
+        ${e.lines.map(l=>`<div class="bt-ln ${l.kind||""}"><span class="ic">${esc(l.icon)}</span>${esc(l.text)}</div>`).join("")}</div>`;
+    }
+    tl.innerHTML = html || '<p class="empty">Под выбранные фильтры событий нет.</p>';
+    tl.classList.toggle("bt-hidetop", !st.f.has("top"));
+    tl.querySelectorAll(".bt-ev").forEach(d => { const go = () => select(+d.dataset.k); d.onclick = go;
+      d.onkeydown = ev => { if (ev.key==="Enter"||ev.key===" ") { ev.preventDefault(); go(); } }; });
+  }
+  function select(k){
+    st.sel = (st.sel===k) ? null : k; stop();
+    tl.querySelectorAll(".bt-ev").forEach(d => d.classList.toggle("on", +d.dataset.k===st.sel));
+    const e = st.sel==null ? null : evs()[st.sel];
+    if (e) { st.t = e.t; const sc=$("#btScrub"); if (sc) { sc.value = e.t; $("#btNow").textContent = btT(e.t); } }
+    drawMap();
+    if (e && matchMedia("(max-width:900px)").matches && $("#btSvg")) $(".bt-map").scrollIntoView({block:"nearest", behavior:"smooth"});
+  }
+
+  // ---------- карта
+  const R = Math.max(20, ...[...(M.path||[]), ...(M.top_path||[])].map(p=>Math.max(Math.abs(p[1]),Math.abs(p[2]))*1.12+3));
+  const sx = x => x, sy = y => -y;   // y вверх
+  // участок траектории [a, b] с точками на краях (интерполяция): между редкими точками линия не пропадает
+  const slice = (path, a, b) => { if (!path.length || b < path[0][0]) return [];
+    const inner = path.filter(p => p[0] > a && p[0] < b);
+    return [at(path, a), ...inner, at(path, b)]; };
+  function at(path, t){ if (!path.length) return null; if (t<=path[0][0]) return path[0];
+    for (let i=1;i<path.length;i++) if (path[i][0]>=t){ const a=path[i-1], b=path[i], k=(t-a[0])/Math.max(1e-6,b[0]-a[0]); return [t, a[1]+(b[1]-a[1])*k, a[2]+(b[2]-a[2])*k]; }
+    return path[path.length-1]; }
+  const line = (pts, cls) => pts.length>1 ? `<polyline points="${pts.map(p=>sx(p[1]).toFixed(2)+","+sy(p[2]).toFixed(2)).join(" ")}" class="${cls}"/>` : "";
+  function heat(){
+    const P = M.path||[], cell = Math.max(2, R/14), acc = {}; let mx = 0;
+    for (let i=0;i<P.length-1;i++){ const w = Math.min(10, P[i+1][0]-P[i][0]); const kx=Math.floor(P[i][1]/cell), ky=Math.floor(P[i][2]/cell);
+      const key=kx+","+ky; acc[key]=(acc[key]||0)+w; mx=Math.max(mx,acc[key]); }
+    return Object.entries(acc).map(([k,v])=>{ const [kx,ky]=k.split(",").map(Number);
+      return `<rect x="${(kx*cell).toFixed(2)}" y="${(-(ky+1)*cell).toFixed(2)}" width="${cell}" height="${cell}" fill="#E39B2F" opacity="${(0.12+0.7*v/mx).toFixed(2)}"/>`; }).join("");
+  }
+  function drawMap(){
+    const svg = $("#btSvg"); if (!svg) return;
+    const e = st.sel==null ? null : evs()[st.sel];
+    const showMe = st.mode!=="top", showTop = st.mode!=="me";
+    const rings = [10,20,30,40,50,60].filter(r=>r<R);
+    let body = rings.map(r=>`<circle r="${r}" class="ring"/><text x="${r*0.71+0.6}" y="${-r*0.71-0.6}" class="rl">${r}</text>`).join("");
+    if (st.heat) body += heat();
+    const P = M.path||[], TP = M.top_path||[];
+    let a = 0, b = B.duration, cap = "";
+    if (e && e.window) { [a,b] = e.window; }
+    if (st.t!=null && st.playing) { a = Math.max(0, st.t-8); b = st.t; }
+    if (!e && !st.playing) {
+      // общий вид: вся траектория бледно, значимые движения — пронумерованы
+      if (showMe) body += line(P, "full");
+      const labels = [];
+      if (showMe) (M.moves||[]).forEach(m=>{ const s = slice(P, m.start, m.end); if (s.length>1){ body += line(s, "me");
+        const q = s[s.length-1]; let lx = sx(q[1])+R/40, ly = sy(q[2])-R/40;
+        while (labels.some(([x,y])=>Math.hypot(x-lx,y-ly) < R/14)) ly -= R/14;   // номера в одной точке — столбиком
+        labels.push([lx,ly]);
+        body += `<circle cx="${sx(q[1])}" cy="${sy(q[2])}" r="${R/55}" class="end"/><text x="${lx}" y="${ly}" class="num">${m.i+1}</text>`; }});
+      if (showTop && !showMe) body += line(TP, "topfull");
+      cap = `Вся траектория боя. Выберите событие в ленте — карта покажет этот момент. Или нажмите «▶ Повтор».`;
+    } else {
+      if (showMe) body += line(P, "full");
+      const sm = slice(P, a, b), stp = slice(TP, a, b);
+      if (showTop && stp.length>1) { body += line(stp, "top"); const q = stp[stp.length-1]; body += `<circle cx="${sx(q[1])}" cy="${sy(q[2])}" r="${R/60}" class="tend"/>`; }
+      if (showMe && sm.length>1) { body += line(sm, "me"); const s0 = sm[0], q = sm[sm.length-1];
+        body += `<circle cx="${sx(s0[1])}" cy="${sy(s0[2])}" r="${R/60}" class="start"/><circle cx="${sx(q[1])}" cy="${sy(q[2])}" r="${R/55}" class="end"/>`; }
+      const now = st.playing ? st.t : b;
+      const pm = showMe ? at(P, now) : null, pt = showTop ? at(TP, now) : null;
+      if (pt) body += `<circle cx="${sx(pt[1])}" cy="${sy(pt[2])}" r="${R/38}" class="tdot"/>`;
+      if (pm) body += `<circle cx="${sx(pm[1])}" cy="${sy(pm[2])}" r="${R/34}" class="mdot"/>`;
+      if (e) {
+        const mv = e.movement!=null ? (M.moves||[])[e.movement] : null;
+        cap = `<b>${btT(e.t)} — ${esc(e.type_ru)} ${esc(btTitle(e))}</b>`;
+        if (mv) cap += ` · вы двигались ${num(mv.moving,1)} с (${num(mv.dist,0)} ярд.), ${BT_REASON[mv.reason]}${mv.mechanic?" «"+esc(mv.mechanic)+"»":""}`
+          + (mv.top_window!=null ? ` · топ: ${num(mv.top_window,1)} с` : "");
+        else { let len = 0; for (let i=1;i<sm.length;i++) len += Math.hypot(sm[i][1]-sm[i-1][1], sm[i][2]-sm[i-1][2]);
+          cap += len < 2 ? " · вы стояли на месте" : ` · вы прошли ${num(len,0)} ярд.`; }
+      } else cap = `Повтор: ${btT(st.t)}`;
+    }
+    body += `<circle r="${R/30}" class="boss"/><text y="${-R/30-1}" class="bl">Босс</text>`;
+    svg.setAttribute("viewBox", `${-R} ${-R} ${2*R} ${2*R}`);
+    svg.innerHTML = `<style>
+      .ring{fill:none;stroke:#D5DBE4;stroke-width:${R/250}} .rl{font-size:${R/22}px;fill:#9AA3B5}
+      .full{fill:none;stroke:#E39B2F;stroke-opacity:.18;stroke-width:${R/160}} .topfull{fill:none;stroke:#1F8A7E;stroke-opacity:.35;stroke-width:${R/160};stroke-dasharray:${R/60} ${R/80}}
+      .me{fill:none;stroke:#E39B2F;stroke-width:${R/80};stroke-linecap:round;stroke-linejoin:round}
+      .top{fill:none;stroke:#1F8A7E;stroke-width:${R/110};stroke-dasharray:${R/45} ${R/70};stroke-linecap:round}
+      .start{fill:#fff;stroke:#E39B2F;stroke-width:${R/150}} .end{fill:#E39B2F} .tend{fill:#1F8A7E}
+      .mdot{fill:#E39B2F;stroke:#fff;stroke-width:${R/200}} .tdot{fill:#1F8A7E;stroke:#fff;stroke-width:${R/200};opacity:.85}
+      .boss{fill:#C9423A} .bl{font-size:${R/18}px;fill:#C9423A;text-anchor:middle;font-weight:700}
+      .num{font-size:${R/16}px;fill:#16213A;font-weight:700}</style>${body}`;
+    $("#btCap").innerHTML = cap;
+  }
+
+  // ---------- повтор
+  function frame(prev){ return now => { if (!st.playing) return; const dt = prev ? (now-prev)/1000 : 0;
+      st.t = Math.min(B.duration, (st.t||0) + dt*st.speed*4);  // 1× = 4 секунды боя в секунду: 5-минутный бой — за минуту с небольшим
+      $("#btScrub").value = st.t; $("#btNow").textContent = btT(st.t); markNow(); drawMap();
+      if (st.t >= B.duration) { stop(); return; } st.raf = requestAnimationFrame(frame(now)); }; }
+  function markNow(){ let k = -1; evs().forEach((e,i)=>{ if (e.t <= (st.t||0)) k = i; });
+    tl.querySelectorAll(".bt-ev").forEach(d => d.classList.toggle("now", +d.dataset.k===k)); }
+  function stop(){ st.playing = false; cancelAnimationFrame(st.raf); const b = $("#btPlay"); if (b) b.textContent = "▶ Повтор"; }
+  if (has){
+    $("#btPlay").onclick = () => { if (st.playing) { stop(); return; }
+      if (st.sel!=null) { st.sel = null; tl.querySelectorAll(".bt-ev").forEach(d=>d.classList.remove("on")); }
+      if ((st.t||0) >= B.duration) st.t = 0; st.playing = true; $("#btPlay").textContent = "❚❚ Пауза"; st.raf = requestAnimationFrame(frame(0)); };
+    $("#btSpeed").onchange = ev => st.speed = +ev.target.value;
+    $("#btScrub").oninput = ev => { st.t = +ev.target.value; $("#btNow").textContent = btT(st.t); const was = st.playing; st.playing = true; markNow(); drawMap(); st.playing = was; };
+    el.querySelectorAll("[data-m]").forEach(b => b.onclick = () => { st.mode = b.dataset.m;
+      el.querySelectorAll("[data-m]").forEach(x=>x.setAttribute("aria-pressed", x===b)); drawMap(); });
+    $("#btHeat").onchange = ev => { st.heat = ev.target.checked; drawMap(); };
+  }
+  el.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { const k = b.dataset.f;
+    st.f.has(k) ? st.f.delete(k) : st.f.add(k); b.setAttribute("aria-pressed", st.f.has(k)); drawList(); });
+  $("#btAll").onclick = () => { st.all = !st.all; st.sel = null;
+    $("#btAll").textContent = st.all ? `Только ключевые (${(B.events||[]).length})` : `Показать все события (${(B.all_events||[]).length})`; drawList(); drawMap(); };
+  $("#btMore").onclick = () => { const m = $("#more"); if (m) { m.open = true; m.scrollIntoView({behavior:"smooth"}); } };
+  $("#btDiff").innerHTML = (B.differences||[]).length ? B.differences.map((d,i)=>`<div class="bt-diff" data-i="${i}" title="Показать в ленте только это">
+      <span class="dot ${d.level}"></span><span>${esc(d.section)}: ${esc(d.text)}</span><span class="v">${esc(d.value||d.gain||"")}</span>
+      ${d.do?`<span class="do">${esc(d.do)}</span>`:""}</div>`).join("") : '<p class="empty">Существенных отличий от топа не найдено.</p>';
+  $("#btDiff").querySelectorAll(".bt-diff").forEach(d => d.onclick = () => {
+    const f = B.differences[+d.dataset.i].filter; st.f = new Set([f, "top"]);
+    el.querySelectorAll("[data-f]").forEach(b=>b.setAttribute("aria-pressed", st.f.has(b.dataset.f))); drawList();
+    tl.scrollIntoView({behavior:"smooth", block:"nearest"}); });
+  drawList(); drawMap();
 }
 
 const KIND_CLS = {"Тринкет":"k-trinket","Зелье":"k-potion","Расовая":"k-racial"};

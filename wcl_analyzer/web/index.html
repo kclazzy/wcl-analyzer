@@ -820,6 +820,7 @@ function render(R){
       </div>
       <div class="side">
         <span class="rel ${R.reliability.overall}">Надёжность сравнения: ${REL_RU[R.reliability.overall]||R.reliability.overall}</span>
+        ${R.battle && !R.battle.error ? '<button type="button" class="btn" id="toBattle" style="background:#fff;color:var(--ink)">Бой по шагам ↓</button>' : ""}
         <a class="btn you" href="${R.excel}" download>Скачать Excel</a>
         <a href="${esc(I.url)}" target="_blank" rel="noopener" style="color:#B8C2D9;font-size:14px">Открыть лог на WCL</a>
       </div>
@@ -849,6 +850,7 @@ function render(R){
   el.querySelectorAll(".diffsw button").forEach(b => b.onclick = () => render(b.dataset.sw === "alt" ? pair.alt : pair.main));
   showProgress(R);
   renderBattle(R.battle, $("#battle"), I);
+  if ($("#toBattle")) $("#toBattle").onclick = () => $("#battle").scrollIntoView({behavior:"smooth"});
   el.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
     el.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
     el.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "p-"+b.id.slice(2)));

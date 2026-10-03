@@ -149,6 +149,8 @@ def _run_job(job: dict, params: dict, creds) -> None:
             _run_raid_rotation(job, params, creds, log)
         elif mode == "saves":
             _run_saves(job, params, creds, log)
+        elif mode == "allbosses":
+            _run_player_all(job, params, creds, log)
         elif mode == "refresh":
             _run_refresh(job, params, creds, log)
         else:
@@ -205,8 +207,6 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
     """Разбор игрока: эталон — топ той же сложности, что и ваш бой; если бой не эпохальный —
     дополнительно эпохальный топ (переключатель в шапке результата)."""
     from .collect import collect_reference, load_my_log
-    if str(params.get("fight")) == "all" and not params.get("demo"):
-        return _run_player_all(job, params, creds, log)
 
     client = None
     ref_meta: dict = {}
@@ -250,9 +250,10 @@ ALL_BOSSES_POINTS = 25.0   # оценка очков WCL на одного бо�
 
 
 def _run_player_all(job: dict, params: dict, creds, log) -> None:
-    """Разбор игрока на всех боссах отчёта. Эталон — топ-1 (ради экономии запросов), без эпохального
-    второго эталона. Если часового лимита WCL не хватает — разбор останавливается, а оставшиеся боссы
-    возвращаются списком «pending»: браузер покажет кнопку «Продолжить» (уже скачанное берётся из кэша)."""
+    """Разбор на всех боссах отчёта: выбранный игрок или все DPS (actor="all"). Эталон — топ-1 (ради
+    экономии запросов), без эпохального второго эталона. Если часового лимита WCL не хватает — разбор
+    останавливается, а оставшиеся пары «босс — игрок» возвращаются списком «pending»: браузер покажет
+    кнопку «Продолжить» (уже скачанное берётся из кэша и лимит не тратит)."""
     from .api import WCLError
     from .collect import load_my_log
     from .config import DIFFICULTY_NAMES
@@ -263,68 +264,85 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
     client.max_wait_s = 0  # не ждём сброса лимита — останавливаемся и предлагаем продолжить
     code, _, _ = parse_report_url(params["url"])
     report = client.report(code)
-    actor = int(params["actor"]) if params.get("actor") not in (None, "") else None
-    only = {int(x) for x in params.get("fights") or []}
-    fights = _boss_fights(report)
-    if only:
-        fights = [f for f in fights if int(f["id"]) in only]
+    everyone = str(params.get("actor")) == "all"
+    fights = {int(f["id"]): f for f in _boss_fights(report)}
     if not fights:
         raise LookupError("В отчёте нет боёв с боссами")
+    if params.get("units"):  # «Продолжить»: только оставшиеся пары
+        units = [(int(fid), int(aid) if aid not in (None, "") else None) for fid, aid in params["units"]
+                 if int(fid) in fights]
+    elif everyone:
+        units = [(fid, aid) for fid in fights for aid in _dps_ids(client, code, fid)]
+    else:
+        aid = int(params["actor"]) if params.get("actor") not in (None, "") else None
+        units = [(fid, aid) for fid in fights]
     p1 = {**params, "ref": "top1", "mythic": False}
-    log(f"Боссов: {len(fights)}. Эталон — топ-1 на каждом (экономия запросов WCL).")
-    bosses, skipped, pending = [], [], []
-    per_boss: list[float] = []
-    for i, f in enumerate(fights):
+    log(f"Боссов: {len(fights)}{f', разборов «босс — игрок»: {len(units)}' if everyone else ''}. "
+        "Эталон — топ-1 на каждом (экономия запросов WCL).")
+    rows, skipped, pending = [], [], []
+    per_unit: list[float] = []
+    for i, (fid, aid) in enumerate(units):
+        f = fights[fid]
         label = f"{f.get('name')} ({DIFFICULTY_NAMES.get(int(f.get('difficulty') or 0), '')})"
         left = client.points_left() if hasattr(client, "points_left") else None
-        need = (sum(per_boss) / len(per_boss)) if per_boss else ALL_BOSSES_POINTS
+        need = (sum(per_unit) / len(per_unit)) if per_unit else ALL_BOSSES_POINTS
         if left is not None and left < need * 1.2:
-            pending = fights[i:]
-            log(f"Лимита WCL не хватит на следующих боссов: осталось {left:.0f} очков, на босса уходит ≈ {need:.0f}.")
+            pending = units[i:]
+            log(f"Лимита WCL не хватит на следующий разбор: осталось {left:.0f} очков, на один уходит ≈ {need:.0f}.")
             break
-        log(f"[{i + 1}/{len(fights)}] {label}…")
+        log(f"[{i + 1}/{len(units)}] {label}{f', игрок #{aid}' if everyone else ''}…")
         try:
-            me = load_my_log(client, params["url"], int(f["id"]), actor_id=actor)
+            me = load_my_log(client, params["url"], fid, actor_id=aid)
             tops, ref_label = _player_ref(client, me, me.difficulty, p1, lambda m: log("    " + m), {})
             res = _player_result(job, p1, client, me, tops, ref_label, {}, me.difficulty, lambda m: log("    " + m), alt=False)
             res.pop("ref", None)
-            bosses.append({"fight_id": int(f["id"]), "boss": me.encounter_name, "difficulty": me.difficulty_name,
-                           "kill": me.kill, "duration": _fmt_t(me.duration), "dps": round(me.dps),
-                           "ref_dps": res["info"].get("ref_dps"), "ref_label": ref_label,
-                           "actions": (res.get("brief") or {}).get("actions", [])[:3], "detail": res})
+            if everyone and isinstance(res.get("battle"), dict):
+                res["battle"].pop("all_events", None)  # десятки разборов — бережём место в браузере
+            rows.append({"fight_id": fid, "actor": me.actor_id, "player": me.name, "cls": me.cls, "spec": me.spec,
+                         "boss": me.encounter_name, "difficulty": me.difficulty_name, "kill": me.kill,
+                         "duration": _fmt_t(me.duration), "dps": round(me.dps), "ref_dps": res["info"].get("ref_dps"),
+                         "ref_label": ref_label, "actions": (res.get("brief") or {}).get("actions", [])[:3], "detail": res})
         except WCLError as e:
             if "лимит" in str(e).lower():
-                pending = fights[i:]
+                pending = units[i:]
                 log(f"    Закончился часовой лимит WCL — остановился на «{f.get('name')}».")
                 break
             skipped.append({"boss": label, "reason": str(e)})
             log(f"    пропущен: {e}")
-        except Exception as e:  # noqa: BLE001 — один босс не должен ронять остальные
+        except Exception as e:  # noqa: BLE001 — один разбор не должен ронять остальные
             skipped.append({"boss": label, "reason": str(e)})
             log(f"    пропущен: {e}")
         after = client.points_left() if hasattr(client, "points_left") else None
         if left is not None and after is not None and left - after > 0:
-            per_boss.append(left - after)
-        job["progress"] = max(job["progress"], min(0.95, (i + 1) / len(fights)))
+            per_unit.append(left - after)
+        job["progress"] = max(job["progress"], min(0.95, (i + 1) / len(units)))
     reset_in = None
     if pending:
         try:
             reset_in = float(client.rate_limit().get("pointsResetIn") or 0)
         except Exception:  # noqa: BLE001
             pass
-    first = next((b["detail"]["info"] for b in bosses), {})
-    R = {"mode": "playerall",
-         "info": {"name": first.get("name", ""), "cls": first.get("cls", ""), "spec": first.get("spec", ""),
+    first = next((r["detail"]["info"] for r in rows), {})
+    R = {"mode": "playerall", "everyone": everyone,
+         "info": {"name": "Все игроки" if everyone else first.get("name", ""),
+                  "cls": "" if everyone else first.get("cls", ""), "spec": "" if everyone else first.get("spec", ""),
                   "title": report.get("title", ""), "code": code, "url": f"https://www.warcraftlogs.com/reports/{code}",
                   "demo": False},
-         "bosses": bosses, "skipped": skipped,
-         "pending": [{"fight_id": int(f["id"]), "boss": f.get("name", ""),
-                      "difficulty": DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), "")} for f in pending],
+         "bosses": rows, "skipped": skipped,
+         "pending": [{"fight_id": fid, "actor": aid, "boss": fights[fid].get("name", ""),
+                      "difficulty": DIFFICULTY_NAMES.get(int(fights[fid].get("difficulty") or 0), "")} for fid, aid in pending],
          "reset_in": reset_in, "params": {"url": params["url"], "actor": params.get("actor")}}
     _excel_bytes(job, f"Все_боссы_{R['info']['name'] or code}", write_player_all_workbook,
                  {**R, "prev": params.get("prev") or []})
     job["result"] = {**R, "excel": f"/api/report/{job['id']}"}
-    log("Готово." if not pending else f"Готово частично: осталось боссов — {len(pending)}. Нажмите «Продолжить», когда лимит восстановится.")
+    log("Готово." if not pending else f"Готово частично: осталось разборов — {len(pending)}. "
+        "Нажмите «Продолжить», когда лимит восстановится.")
+
+
+def _dps_ids(client, code: str, fid: int) -> list[int]:
+    """DPS-игроки боя (танки и лекари — не по рейтингу урона, их сравнение с топом по DPS не имеет смысла)."""
+    det = client.player_details(code, fid) or {}
+    return [int(p["id"]) for p in det.get("dps") or [] if "id" in p]
 
 
 def _boss_fights(report: dict) -> list[dict]:
@@ -855,9 +873,9 @@ class Handler(BaseHTTPRequestHandler):
                 cl.max_wait_s = 0  # поиск боя не ждёт сброса лимита: сразу объясняем, что случилось
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
             if path == "/api/analyze":
-                params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "fights", "prev",
+                params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "units", "prev",
                                                    "refresh", "max_age_days", "pick", "mythic")}
-                if params["mode"] not in (None, "raid", "raidrot", "saves"):
+                if params["mode"] not in (None, "raid", "raidrot", "saves", "allbosses"):
                     params["mode"] = None
                 return self._json({"job": start_job(creds, params)})
             if path == "/api/refs/refresh":

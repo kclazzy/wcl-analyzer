@@ -256,19 +256,26 @@ def test_player_all_bosses():
         return cache["r"]
     web._player_ref = ref_any_boss
     job = {"id": "t" * 32, "progress": 0.0}
-    params = {"url": "https://www.warcraftlogs.com/reports/MYREPORT0001", "fight": "all", "actor": "7"}
-    web._run_player(job, params, None, lambda *_: None)
+    params = {"url": "https://www.warcraftlogs.com/reports/MYREPORT0001", "mode": "allbosses", "actor": "7"}
+    web._run_player_all(job, params, None, lambda *_: None)
     R = job["result"]
     assert R["mode"] == "playerall" and len(R["bosses"]) == 1 and R["bosses"][0]["detail"]["info"]["ref_n"] == 1, R["bosses"]
-    assert [p["fight_id"] for p in R["pending"]] == [2, 3] and R["reset_in"] == 1500, R["pending"]
+    assert [(p["fight_id"], p["actor"]) for p in R["pending"]] == [(2, 7), (3, 7)] and R["reset_in"] == 1500, R["pending"]
     assert job["xlsx"][:2] == b"PK"
     # «Продолжить»: только оставшиеся боссы, краткие строки уже разобранных — для общего Excel
     client.points_left = lambda: 1000
     job2 = {"id": "u" * 32, "progress": 0.0}
     prev = [{k: R["bosses"][0][k] for k in ("boss", "difficulty", "kill", "dps", "ref_dps", "actions")}]
-    web._run_player(job2, {**params, "fights": [2, 3], "prev": prev}, None, lambda *_: None)
+    web._run_player_all(job2, {**params, "units": [[p["fight_id"], p["actor"]] for p in R["pending"]], "prev": prev},
+                        None, lambda *_: None)
     R2 = job2["result"]
     assert [b["fight_id"] for b in R2["bosses"]] == [2, 3] and not R2["pending"], (R2["bosses"], R2["pending"])
+    # «Все игроки»: DPS каждого боя на каждом боссе
+    job3 = {"id": "v" * 32, "progress": 0.0}
+    web._run_player_all(job3, {**params, "actor": "all"}, None, lambda *_: None)
+    R3 = job3["result"]
+    assert R3["everyone"] and len(R3["bosses"]) == 3 and {b["player"] for b in R3["bosses"]} == {"Me"}, R3["bosses"]
+    assert "all_events" not in R3["bosses"][0]["detail"]["battle"]
     web._player_ref = orig_ref
     print("OK игрок на всех боссах: топ-1, остановка по лимиту WCL и продолжение с оставшихся")
 

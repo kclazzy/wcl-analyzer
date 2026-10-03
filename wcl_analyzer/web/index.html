@@ -167,6 +167,8 @@ tr.flag td{background:var(--bad-soft)}
 .tag.k-trinket{background:#EDE4FA;color:#4B2A82}.tag.k-spell{background:var(--soft);color:var(--ink,inherit)}
 .tag.k-potion{background:var(--good-soft);color:#17542B}.tag.k-racial{background:var(--warn-soft);color:#6B4A05}
 .gsub{font-size:12.5px;color:var(--muted)}
+.mini.mrtbtn{background:var(--good);border-color:var(--good);color:#fff;font-weight:700;font-size:15.5px;padding:10px 20px;border-radius:var(--r-sm)}
+.mini.mrtbtn:hover{background:#277A42;border-color:#277A42}
 /* ---------- Бой по шагам ---------- */
 .bt-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin-bottom:10px}
 .bt-head h3{margin:0}.bt-head .meta{color:var(--muted);font-size:14px}
@@ -1202,7 +1204,7 @@ function mrtBlock(plan, title){
   const note = mrtNote(plan, title);
   if (!note) return "";
   return `<div class="mrt" style="margin-top:12px">
-    <button type="button" class="mini" data-mrt>Скопировать для MRT</button>
+    <button type="button" class="mini mrtbtn" data-mrt>Скопировать для MRT</button>
     <span class="hint" style="margin-left:8px">В игре: /mrt → Заметки → вставить (Ctrl+V) → Отправить. Время — от пулла, а со 2-й фазы — от начала фазы (p2, p3…). Номера фаз сверьте с вашим босс-модом.</span>
     <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:13.5px">Текст заметки</summary>
       <textarea readonly rows="${Math.min(14, note.split("\n").length + 1)}" style="width:100%;margin-top:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;box-sizing:border-box">${esc(note)}</textarea></details></div>`;

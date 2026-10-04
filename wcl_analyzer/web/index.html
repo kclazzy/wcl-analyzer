@@ -426,17 +426,20 @@ dialog label.check input{width:auto;margin:0}
     <div class="refs-head">
       <div>
         <h2 id="saveTitle">Куда сохранять файлы</h2>
-        <p class="sub" id="saveHint">Excel и копии данных сохраняются в выбранную папку. Если папка не выбрана — как обычно, в «Загрузки».</p>
+        <p class="sub" id="saveHint">Сюда сохраняются файлы, которые вы скачиваете кнопками: Excel разборов и «Мои данные → Сохранить в файл». Если папка не выбрана — в «Загрузки».</p>
       </div>
     </div>
     <div class="refs-opts" style="border-top:0;margin-top:0;padding-top:0;align-items:center">
-      <span>Сейчас: <b id="saveNow">«Загрузки» (по умолчанию)</b></span>
+      <span style="overflow-wrap:anywhere">Сейчас: <b id="saveNow">«Загрузки» (по умолчанию)</b></span>
       <button class="btn alt" id="savePick" type="button">Выбрать папку…</button>
+      <button class="mini" id="saveOpen" type="button" hidden>Открыть папку</button>
       <label id="saveTextWrap" hidden style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span id="saveTextLabel">Папка</span>
-        <input id="saveText" type="text" style="min-width:260px;border:1px solid var(--line);border-radius:6px;padding:6px 8px" placeholder="C:\Users\Имя\Documents\WCL">
+        <input id="saveText" type="text" style="min-width:min(420px,100%);border:1px solid var(--line);border-radius:6px;padding:6px 8px" placeholder="C:\Users\Имя\Documents\WCL">
         <button class="btn alt" id="saveTextOk" type="button">Сохранить</button></label>
       <button class="mini" id="saveReset" type="button">Сбросить</button>
     </div>
+    <p class="hint" id="cacheInfo" hidden style="margin:12px 0 0;overflow-wrap:anywhere">Скачанные с Warcraft Logs логи сюда не сохраняются: программа держит их в своей базе-кэше, чтобы повторный разбор не тратил лимит запросов. Это не файлы для чтения, а один файл базы:
+      <b id="cachePath"></b> <button class="mini" id="cacheOpen" type="button">Открыть папку кэша</button></p>
   </section>
 
   <section class="refs" id="mydata" aria-labelledby="dataTitle">
@@ -1902,22 +1905,39 @@ async function kv(mode, fn){
     tx.oncomplete = () => resolve(req && req.result); tx.onerror = () => reject(tx.error); });
   } catch(e){ return undefined; }
 }
-const canPickDir = () => typeof window.showDirectoryPicker === "function" && STATUS.app !== "android";
-const textSaveMode = () => STATUS.app === "android" ? "android" : (!canPickDir() && STATUS.local && !STATUS.public ? "path" : null);
+/* Программа на этом компьютере (STATUS.downloads): папку выбирает системное окно через программу, путь — полностью,
+   файл пишет программа; по умолчанию — «Загрузки» полным путём. Браузер сам полный путь не сообщает (только имя папки). */
+const DESK = () => !!STATUS.downloads;
+const canPickDir = () => typeof window.showDirectoryPicker === "function" && STATUS.app !== "android" && !DESK();
+const textSaveMode = () => STATUS.app === "android" ? "android" : (DESK() || (!canPickDir() && STATUS.local && !STATUS.public) ? "path" : null);
+const ANDROID_DL = "/storage/emulated/0/Download/";
 async function renderSaveDir(){
   const handle = canPickDir() ? await kv("readonly", st => st.get("saveDir")) : null;
   const P = prefs(), mode = textSaveMode();
-  $("#savePick").hidden = !canPickDir();
+  $("#savePick").hidden = !(canPickDir() || DESK());
+  $("#saveOpen").hidden = !DESK();
+  $("#cacheInfo").hidden = !STATUS.cache; $("#cachePath").textContent = STATUS.cache || "";
   $("#saveTextWrap").hidden = !mode;
   if (mode === "android") { $("#saveTextLabel").textContent = "Папка в «Загрузках»"; $("#saveText").placeholder = "WCL Analyzer"; $("#saveText").value = P.save_sub || ""; }
-  if (mode === "path") { $("#saveTextLabel").textContent = "Путь к папке"; $("#saveText").value = P.save_path || ""; }
-  $("#saveNow").textContent = handle ? `папка «${handle.name}»`
-    : mode === "android" ? `Загрузки/${P.save_sub || "WCL Analyzer"}`
-    : mode === "path" && P.save_path ? P.save_path : "«Загрузки» (по умолчанию)";
+  if (mode === "path") { $("#saveTextLabel").textContent = "Путь к папке (полностью)"; $("#saveText").value = P.save_path || STATUS.downloads || ""; }
+  $("#saveNow").textContent = handle ? `папка «${handle.name}» (полный путь браузер не сообщает)`
+    : mode === "android" ? ANDROID_DL + (P.save_sub || "WCL Analyzer")
+    : mode === "path" && P.save_path ? P.save_path
+    : mode === "path" && STATUS.downloads ? STATUS.downloads + " — «Загрузки» (по умолчанию)" : "«Загрузки» (по умолчанию)";
   if (!canPickDir() && !mode) $("#saveHint").textContent = "Этот браузер не умеет выбирать папку — файлы сохраняются в его папку загрузок (её можно поменять в настройках браузера).";
   $("#saveReset").hidden = !(handle || P.save_sub || P.save_path);
 }
 $("#savePick").onclick = async () => {
+  if (DESK()) {  // системное окно выбора папки на этом компьютере — путь приходит полностью
+    try {
+      const r = await api("/api/pickdir", {dir: prefs().save_path || STATUS.downloads || ""});
+      if (r.error) { showErr(`Окно выбора папки не открылось (${r.error}) — впишите путь в поле.`); $("#saveText").focus(); return; }
+      if (!r.dir) return;  // отмена
+      store.set("wclPrefs", {...prefs(), save_path: r.dir});
+      showOk(`Файлы будут сохраняться в папку: ${r.dir}`); renderSaveDir();
+    } catch(e){ showErr("Не удалось выбрать папку: " + e.message); }
+    return;
+  }
   try {
     const h = await window.showDirectoryPicker({id: "wcl-save", mode: "readwrite"});
     await kv("readwrite", st => st.put(h, "saveDir"));
@@ -1927,12 +1947,14 @@ $("#savePick").onclick = async () => {
 $("#saveTextOk").onclick = () => {
   const v = $("#saveText").value.trim();
   store.set("wclPrefs", {...prefs(), ...(textSaveMode() === "android" ? {save_sub: v.replace(/[\\:*?"<>|]+/g, "_")} : {save_path: v})});
-  showOk(v ? "Папка сохранена." : "Папка сброшена — файлы пойдут в «Загрузки»."); renderSaveDir();
+  showOk(v ? `Папка сохранена: ${v}` : "Папка сброшена — файлы пойдут в «Загрузки»."); renderSaveDir();
 };
+$("#cacheOpen").onclick = () => api("/api/opendir", {cache: true}).catch(e => showErr(e.message));
+$("#saveOpen").onclick = () => api("/api/opendir", {dir: prefs().save_path || STATUS.downloads || ""}).catch(e => showErr(e.message));
 $("#saveReset").onclick = async () => {
   await kv("readwrite", st => st.delete("saveDir"));
   const P = {...prefs()}; delete P.save_sub; delete P.save_path; store.set("wclPrefs", P);
-  showOk("Файлы снова сохраняются в «Загрузки»."); renderSaveDir();
+  showOk("Файлы снова сохраняются в «Загрузки»" + (STATUS.downloads ? `: ${STATUS.downloads}` : "") + "."); renderSaveDir();
 };
 async function saveToDir(handle, blob, name){
   let perm = await handle.queryPermission({mode: "readwrite"});
@@ -1950,11 +1972,11 @@ async function saveBlob(blob, name){
     }
   }
   const mode = textSaveMode(), P = prefs();
-  if (mode === "android" || (mode === "path" && P.save_path)) {
+  if (mode === "android" || (mode === "path" && (P.save_path || STATUS.downloads))) {
     try {
       const data = await blobToB64(blob);
       const r = await api("/api/save", {name, data, mime: blob.type || "application/octet-stream",
-                                        dir: mode === "android" ? (P.save_sub || "") : P.save_path});
+                                        dir: mode === "android" ? (P.save_sub || "") : (P.save_path || STATUS.downloads)});
       showOk(`Файл сохранён: ${r.saved}`); window.scrollTo({top:0, behavior:"smooth"});
     } catch(e){ showErr("Не удалось сохранить файл: " + e.message); }
     return;

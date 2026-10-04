@@ -109,3 +109,64 @@ def android_open_url(url: str) -> None:
     intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     activity.startActivity(intent)
+
+
+def downloads_dir() -> Path:
+    """Папка «Загрузки» пользователя полным путём (Windows — настоящая, даже если её перенесли на другой диск)."""
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class GUID(ctypes.Structure):
+                _fields_ = [("a", wintypes.DWORD), ("b", wintypes.WORD), ("c", wintypes.WORD), ("d", ctypes.c_ubyte * 8)]
+            # FOLDERID_Downloads {374DE290-123F-4565-9164-39C4925E467B}
+            fid = GUID(0x374DE290, 0x123F, 0x4565, (ctypes.c_ubyte * 8)(0x91, 0x64, 0x39, 0xC4, 0x92, 0x5E, 0x46, 0x7B))
+            p = ctypes.c_wchar_p()
+            if ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(fid), 0, None, ctypes.byref(p)) == 0:
+                out = Path(p.value)
+                ctypes.windll.ole32.CoTaskMemFree(p)
+                return out
+        except Exception:  # noqa: BLE001 — запасной путь ниже
+            pass
+    return Path.home() / "Downloads"
+
+
+def pick_folder(start: str = "") -> str | None:
+    """Системное окно выбора папки на этом компьютере → полный путь; отмена — None.
+    Windows — окно проводника (PowerShell), macOS — Finder, Linux — zenity/kdialog. Нет такого окна — OSError."""
+    import shutil
+    import subprocess
+    if os.name == "nt":
+        ps = ("[Console]::OutputEncoding=[Text.Encoding]::UTF8;Add-Type -AssemblyName System.Windows.Forms;"
+              "$d=New-Object System.Windows.Forms.FolderBrowserDialog;$d.Description='WCL Analyzer: куда сохранять файлы';"
+              "$d.ShowNewFolderButton=$true;$d.SelectedPath=$env:WCL_START;"
+              "$f=New-Object System.Windows.Forms.Form -Property @{TopMost=$true};"
+              "if($d.ShowDialog($f) -eq 'OK'){$d.SelectedPath}")
+        cmd = ["powershell", "-NoProfile", "-STA", "-Command", ps]
+    elif sys.platform == "darwin":
+        cmd = ["osascript", "-e", 'POSIX path of (choose folder with prompt "WCL Analyzer: куда сохранять файлы")']
+    elif shutil.which("zenity"):
+        cmd = ["zenity", "--file-selection", "--directory", "--title=WCL Analyzer: куда сохранять файлы"]
+    elif shutil.which("kdialog"):
+        cmd = ["kdialog", "--getexistingdirectory", start or str(Path.home())]
+    else:
+        raise OSError("на этом компьютере нет окна выбора папки — впишите путь вручную")
+    env = {**os.environ, "WCL_START": start or ""}
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    r = subprocess.run(cmd, capture_output=True, timeout=600, env=env, creationflags=flags)
+    out = r.stdout.decode("utf-8", "replace").strip()
+    return out or None
+
+
+def open_folder(path: str) -> None:
+    """Открыть папку в проводнике / Finder."""
+    import subprocess
+    p = Path(path)
+    p.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        os.startfile(str(p))  # noqa: S606
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(p)])
+    else:
+        subprocess.Popen(["xdg-open", str(p)])

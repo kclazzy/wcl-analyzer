@@ -278,6 +278,17 @@ def test_plan_own_timings():
     print("OK план с топом: таймеры MRT — по вашему бою, пики «по топу» в заметку не входят")
 
 
+def test_save_dir_full_path():
+    """«Куда сохранять файлы» на компьютере: «Загрузки» — полным путём, выбранная папка — полным путём."""
+    from pathlib import Path
+    from wcl_analyzer import platform_support as ps
+    d = ps.downloads_dir()
+    assert isinstance(d, Path) and d.is_absolute() and d.name == "Downloads", d
+    html = (Path(__file__).resolve().parents[1] / "wcl_analyzer" / "web" / "index.html").read_text(encoding="utf-8")
+    assert "/api/pickdir" in html and "STATUS.downloads" in html and "Путь к папке (полностью)" in html
+    print("OK папка сохранения: полный путь («Загрузки» по умолчанию, выбор — системным окном)")
+
+
 def test_roster_plan():
     """План по составу: экспорт WoWUtils Group Export (или список «Имя Класс Спек») + минуты боя → киллы топа
     ближе всего по длительности, план сейвов и одна заметка MRT; кулдауны-таланты — если их жмёт топ."""
@@ -730,6 +741,7 @@ if __name__ == "__main__":
     test_plan_longer_phase()
     test_plan_own_timings()
     test_roster_plan()
+    test_save_dir_full_path()
     test_plan_healer_cds()
     test_saves_all_bosses()
     test_gear_and_trinkets()

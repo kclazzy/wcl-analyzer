@@ -456,6 +456,11 @@ def _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titl
         raise LookupError("Ни один бой не удалось разобрать: " + "; ".join(dict.fromkeys(errors.values())))
 
 
+def _cache_file() -> Path:
+    from .config import cache_path
+    return Path(cache_path()).resolve()
+
+
 def _new_wb():
     from openpyxl import Workbook
     wb = Workbook()
@@ -1291,9 +1296,14 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:  # noqa: BLE001
                 self._json({"available": False, "error": _friendly(e)})
         elif path == "/api/status":
-            from .platform_support import app_mode
+            from .platform_support import app_mode, downloads_dir
+            desk = app_mode() in ("exe", "python") and not SERVER["public"] and self._is_local()
             self._json({"has_key": bool(self._creds() or env_key()), "server_key": bool(env_key()),
-                        "public": SERVER["public"], "local": self._is_local(), "app": app_mode()})
+                        "public": SERVER["public"], "local": self._is_local(), "app": app_mode(),
+                        # программа на этом компьютере: полный путь «Загрузок» — папка по умолчанию
+                        "downloads": str(downloads_dir()) if desk else None,
+                        # где лежат скачанные с WCL данные (кэш) — полным путём
+                        "cache": str(_cache_file()) if desk else None})
         elif path == "/api/phone":
             # Только локальная программа и только на самом компьютере: адрес для телефона в Wi-Fi сети
             if SERVER["public"] or not self._is_local():
@@ -1360,6 +1370,16 @@ class Handler(BaseHTTPRequestHandler):
                     if job and job["state"] != "running":
                         JOBS.pop(job["id"], None)
                 return self._json({"ok": True})
+            if path in ("/api/pickdir", "/api/opendir") and app_mode_is_desktop() and not SERVER["public"] and self._is_local():
+                # Окно выбора папки и «Открыть папку» — на этом же компьютере; путь — полностью
+                from .platform_support import downloads_dir, open_folder, pick_folder
+                if path == "/api/opendir":
+                    open_folder(str(_cache_file().parent) if body.get("cache") else (str(body.get("dir") or "") or str(downloads_dir())))
+                    return self._json({"ok": True})
+                try:
+                    return self._json({"dir": pick_folder(str(body.get("dir") or ""))})
+                except Exception as e:  # noqa: BLE001 — нет окна выбора: путь впишут вручную
+                    return self._json({"dir": None, "error": str(e)})
             if path == "/api/save" and app_mode_is_desktop() and not SERVER["public"] and self._is_local():
                 # Программа на этом же компьютере: файл пишется в папку, выбранную в «Куда сохранять файлы»
                 import base64

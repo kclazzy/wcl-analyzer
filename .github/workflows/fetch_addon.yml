@@ -1,0 +1,30 @@
+name: fetch-addon
+on:
+  push:
+    branches: [debug/addon]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: download
+        run: |
+          mkdir -p addon && cd addon
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
+          curl -sSL -A "$UA" -o files.html "https://www.curseforge.com/wow/addons/wowutilsgroupexport/files" || true
+          grep -o 'files/[0-9]\{7\}' files.html | sort -u > file_ids.txt || true
+          curl -sSL -A "$UA" -o a.zip "https://mediafilez.forgecdn.net/files/8640/546/WowUtilsGroupExport-1.0.1.zip" || true
+          file a.zip > info.txt
+          for id in $(sed 's#files/##' file_ids.txt | sort -r | head -3); do
+            curl -sSL -A "$UA" -o "f_$id.zip" "https://www.curseforge.com/api/v1/mods/0/files/$id/download" || true
+            file "f_$id.zip" >> info.txt
+          done
+          for z in *.zip; do unzip -o -q "$z" -d "x_${z%.zip}" || true; done
+          find . -name '*.zip' -delete; rm -f files.html
+          ls -R >> info.txt
+      - name: commit
+        run: |
+          git config user.name bot; git config user.email bot@users.noreply.github.com
+          git add addon && git commit -m "addon dump" && git push

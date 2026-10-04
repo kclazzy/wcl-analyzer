@@ -209,6 +209,12 @@ def test_plan_healer_cds():
     assert one[0] == "Сейвы: Демо" and any("{spell:200183}" in l for l in one) and any("{spell:64843}" in l for l in one), one
     heads = [l.split(" - ")[0] for l in one[1:]]
     assert len(heads) == len(set(heads)), one     # сейв и кулдаун лекаря на один пик в одно время — одной строкой
+    # пик в самом начале 2-й фазы: нажатие лекаря за секунду до смены фазы — в той же строке, что и сейв (p2)
+    X2 = {"roster_cds": roster, "spikes": [{"t": 111, "peak_t": 112, "ability": "Волна", "ability_id": 5, "k": 1,
+                                            "damage": 300, "phase": 2}]}
+    ph = [{"n": 1, "t": 0, "name": "Фаза 1"}, {"n": 2, "t": 111, "name": "Фаза 2"}]
+    one2 = mrt_note(make_plan(X2, {}, [], {}, ph), "Б").split("\n")
+    assert len(one2) == 2 and one2[1].startswith("{time:0:00,p2}") and "{spell:200183}" in one2[1], one2
     print("OK план: кулдауны лекарей — отдельным проходом, в общей заметке MRT вместе с сейвами")
 
 
@@ -270,6 +276,53 @@ def test_plan_own_timings():
     note = mrt_note(V["plan"], "Б")
     assert "{spell:8}" not in note and "М8" not in note and "{spell:5}" in note, note
     print("OK план с топом: таймеры MRT — по вашему бою, пики «по топу» в заметку не входят")
+
+
+def test_roster_plan():
+    """План по составу: экспорт WoWUtils Group Export (или список «Имя Класс Спек») + минуты боя → киллы топа
+    ближе всего по длительности, план сейвов и одна заметка MRT; кулдауны-таланты — если их жмёт топ."""
+    import io
+    import json
+    from openpyxl import load_workbook
+    from wcl_analyzer import web
+    from wcl_analyzer.raid_demo import ENCOUNTER, FakeRaidClient
+    from wcl_analyzer.roster_plan import parse_roster, roster_cooldowns
+    ex = {"version": "1.0", "metadata": {"exportedFrom": "Гильдия"}, "members": [
+        {"displayName": n, "mainRole": r, "characters": [{"name": n, "realm": "X", "playerClass": c, "playerSpec": sp, "order": "a0"}]}
+        for n, r, c, sp in (("Элария", "healer", "Priest", "Holy"), ("Таргун", "healer", "Shaman", "Restoration"),
+                            ("Вейла", "healer", "Druid", "Restoration"), ("Торвин", "tank", "Warrior", "Protection"),
+                            ("Морг", "melee", "Death Knight", "Unholy"), ("Хант", "ranged", "Hunter", "Beast Mastery"))]}
+    pl, meta = parse_roster(json.dumps(ex, ensure_ascii=False))
+    assert meta == {"source": "wowutils", "guild": "Гильдия"} and len(pl) == 6
+    assert pl[4] == {"name": "Морг", "cls": "DeathKnight", "spec": "Unholy", "role": "DPS"} and pl[0]["role"] == "Лекарь"
+    pl2, _ = parse_roster("Элария Priest Holy\nМорг Рыцарь смерти Unholy\nмусор")
+    assert [p["cls"] for p in pl2] == ["Priest", "DeathKnight"]
+    # таланты: Апофеоз — только если его жмут лучшие гильдии
+    assert "Апофеоз" not in {c["name"] for c in roster_cooldowns(pl2, 300)}
+    assert "Апофеоз" in {c["name"] for c in roster_cooldowns(pl2, 300, {200183: 2}, 3)}
+    try:
+        parse_roster("{не json")
+        raise AssertionError("ожидалась ошибка")
+    except LookupError as e:
+        assert "целиком" in str(e)
+
+    orig = web.CLIENT_FACTORY
+    web.CLIENT_FACTORY = lambda creds: FakeRaidClient()
+    try:
+        job = {"id": "rp1", "log": [], "progress": 0.0, "state": "running"}
+        web._run_roster_plan(job, {"mode": "rosterplan", "encounter": str(ENCOUNTER), "difficulty": "5", "minutes": "5,2",
+                                   "roster": json.dumps(ex, ensure_ascii=False)}, None, job["log"].append)
+    finally:
+        web.CLIENT_FACTORY = orig
+    R = job["result"]
+    assert R["mode"] == "rosterplan" and R["info"]["target"] == "5:12" and R["info"]["base"]["duration"] == "5:10", R["info"]
+    assert R["plan"] and R["mrt"].startswith("Сейвы: ") and "{spell:" in R["mrt"]
+    used = {p["player"] for r in R["plan"] for p in r["picks"] + r["heal_picks"]}
+    assert used <= {p["name"] for p in pl}, used          # в плане — только игроки из состава
+    assert "Сейвы" in R["mrt"] and len(R["kills"]) == 3
+    names = load_workbook(io.BytesIO(job["xlsx"])).sheetnames
+    assert names == ["План по составу"], names
+    print("OK план по составу: экспорт WoWUtils + минуты → киллы топа по длительности, план и заметка MRT")
 
 
 def test_fight_mode():
@@ -676,6 +729,7 @@ if __name__ == "__main__":
     test_top_progress()
     test_plan_longer_phase()
     test_plan_own_timings()
+    test_roster_plan()
     test_plan_healer_cds()
     test_saves_all_bosses()
     test_gear_and_trinkets()

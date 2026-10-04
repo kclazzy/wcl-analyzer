@@ -157,6 +157,8 @@ def _run_job(job: dict, params: dict, creds) -> None:
             _run_player_all(job, params, creds, log)
         elif mode == "refresh":
             _run_refresh(job, params, creds, log)
+        elif mode == "rosterplan":
+            _run_roster_plan(job, params, creds, log)
         else:
             _run_player(job, params, creds, log)
         job["progress"], job["state"] = 1.0, "done"
@@ -734,6 +736,25 @@ def _run_saves(job: dict, params: dict, creds, log) -> None:
                        progress=lambda x: job.__setitem__("progress", max(job["progress"], min(0.97, x))))
     _excel_bytes(job, f"Сейвы_{R['info']['zone'] or R['info']['code']}", write_saves_workbook, R)
     job["result"] = {**R, "excel": f"/api/report/{job['id']}", "source_url": url}
+    log("Готово.")
+
+
+def _run_roster_plan(job: dict, params: dict, creds, log) -> None:
+    """План сейвов по составу из игры (WoWUtils Group Export) и длительности боя — по лучшим киллам топа."""
+    from .excel_raid import write_roster_plan_workbook
+    from .roster_plan import run_roster_plan
+    roster = str(params.get("roster") or "")[:200_000]
+    try:
+        minutes = max(1.0, min(20.0, float(str(params.get("minutes") or "5").replace(",", "."))))
+    except ValueError:
+        raise LookupError("Длительность боя — число минут, например 5 или 6,5") from None
+    if params.get("encounter") in (None, "", "all"):
+        raise LookupError("Выберите босса — план составляется на одного босса")
+    client = _client(creds, job, log, wait=bool(params.get("wait")))
+    R = run_roster_plan(client, int(params["encounter"]), int(params.get("difficulty") or 5), minutes, roster, log=log,
+                        progress=lambda x: job.__setitem__("progress", max(job["progress"], min(0.97, x))))
+    _excel_bytes(job, f"План_по_составу_{R['info']['boss']}", write_roster_plan_workbook, R)
+    job["result"] = {**R, "excel": f"/api/report/{job['id']}"}
     log("Готово.")
 
 
@@ -1324,9 +1345,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "units", "prev", "wait",
-                                                   "zone", "encounter", "difficulty",
+                                                   "zone", "encounter", "difficulty", "roster", "minutes",
                                                    "refresh", "max_age_days", "pick", "mythic")}
-                if params["mode"] not in (None, "fight", "progress", "raid", "raidrot", "saves", "allbosses"):
+                if params["mode"] not in (None, "fight", "progress", "raid", "raidrot", "saves", "allbosses", "rosterplan"):
                     params["mode"] = None
                 return self._json({"job": start_job(creds, params)})
             if path == "/api/refs/refresh":

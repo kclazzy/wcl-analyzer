@@ -430,11 +430,12 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
         row["heal_picks"] = [{"cd": cds[k]["name"], "player": cds[k]["player"], "cooldown": _fmt_t(cds[k]["cd"]),
                               "ready": _fmt_t(at + cds[k]["cd"]), "at": _fmt_t(at), "t": at, "id": cds[k]["id"],
                               "cls": cds[k].get("cls") or game_data.class_of(cds[k]["id"])} for k, at in heal]
-        if heal:  # своё время — первое нажатие лекаря, со 2-й фазы — от начала фазы
-            th = heal[0][1]
-            nh = ph_n(th)
-            ph_info = next((p for p in phases if p["n"] == nh), None)
-            sh = ph_info["t"] if ph_info else None
+        if heal:  # своё время — первое нажатие лекаря; фаза — та же, что у пика (как у сейвов на этот пик),
+            th = heal[0][1]  # иначе нажатие за секунду до смены фазы ушло бы в другую строку заметки
+            nh, sh = (n, start) if start is not None else (ph_n(th), None)
+            if sh is None:
+                ph_info = next((p for p in phases if p["n"] == nh), None)
+                sh = ph_info["t"] if ph_info else None
             row["heal_time"] = _fmt_t(th)
             row["mrt_heal"] = mrt_line(th, ev["mechanic"], row["heal_picks"], nh if (nh or 0) > 1 else None,
                                        max(0.0, th - sh) if sh is not None else None, mech_id=(ev.get("key") or (None,))[0])

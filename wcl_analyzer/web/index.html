@@ -343,6 +343,21 @@ dialog label.check input{width:auto;margin:0}
       </div>
       <p class="hint" id="tpInfo" style="margin:10px 0 0">Бой гильдии, которая первой в мире убила босса на этой сложности: урон, сейвы и кто какие кулдауны жал, смерти, состав, заметка MRT. Без сравнения и без вашего лога; нужен только ключ Warcraft Logs. «Все боссы» — вкладка на каждого босса. На героической и обычной сложности рейтинга прогресса нет — берётся самый ранний по дате килл среди 300 лучших в рейтинге WCL. Не все эпохальные логи открыты: если лог гильдии закрыт, программа возьмёт следующее место (до 6-го) и напишет, чьи логи недоступны.</p>
     </details>
+    <details class="tpbox" id="rpBox">
+      <summary>План сейвов по составу — состав из игры и длительность боя</summary>
+      <div class="tpgrid">
+        <div><label for="rpZone">Рейд</label><select id="rpZone"><option value="">Загружаю список…</option></select></div>
+        <div><label for="rpDiff">Сложность</label><select id="rpDiff"></select></div>
+        <div><label for="rpBoss">Босс</label><select id="rpBoss"></select></div>
+        <div><label for="rpMin">Бой, минут</label><input id="rpMin" type="text" inputmode="decimal" value="5" style="width:100%" aria-describedby="rpInfo"></div>
+      </div>
+      <label for="rpRoster" style="display:block;margin-top:10px">Состав — экспорт аддона WoWUtils Group Export</label>
+      <textarea id="rpRoster" rows="5" spellcheck="false" placeholder='В игре: /wugx → Ctrl+C → вставить сюда. Можно и списком: «Имя Класс Спек» на строку, например «Элария Priest Holy»'
+        style="width:100%;box-sizing:border-box;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px"></textarea>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px">
+        <button class="btn" id="rpRun" type="button">Расписать сейвы</button><span class="hint" id="rpCount"></span></div>
+      <p class="hint" id="rpInfo" style="margin:10px 0 0">Бой берётся у лучших гильдий: из рейтинга Warcraft Logs — киллы этого босса с длительностью ближе всего к указанным минутам. Их пики урона и самые тяжёлые моменты — то, на что нужны сейвы; что жмут лучшие гильдии — подсказка, какие кулдауны ставить. Кулдауны — из вашего состава: основные по классу и спеку, а таланты (Апофеоз, Перерождение, Древо Жизни…) — если их жмут лучшие гильдии: в экспорте талантов нет. Аддон: <a href="https://www.curseforge.com/wow/addons/wowutilsgroupexport" target="_blank" rel="noopener">WoWUtils Group Export</a>. Состав запоминается на этом устройстве.</p>
+    </details>
 
     <div class="picks" id="picks" hidden>
       <div><label for="fight">Бой</label><select id="fight"></select></div>
@@ -706,7 +721,7 @@ function updatePickInfo(){
 $("#pickBy").addEventListener("change", updatePickInfo);
 $("#ref").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
-const RUN_BTNS = ["#runBtn", "#progBtn", "#tpRun"];
+const RUN_BTNS = ["#runBtn", "#progBtn", "#tpRun", "#rpRun"];
 
 /* ---------- «Топ прогресса» без лога: рейд, сложность, босс из Warcraft Logs ---------- */
 const TP_DIFF = {5: "Эпохальный", 4: "Героический", 3: "Обычный"};
@@ -721,18 +736,41 @@ async function loadZones(){
     try { localStorage.setItem("wclZones", JSON.stringify({at: Date.now(), zones: TP_ZONES})); } catch(e){}
   }
   if (!TP_ZONES.length) { $("#tpZone").innerHTML = '<option value="">Рейды не найдены</option>'; return; }
-  $("#tpZone").innerHTML = TP_ZONES.map(z => `<option value="${z.id}">${esc(z.name)}${z.frozen ? " (прошлый сезон)" : ""}</option>`).join("");
-  tpZoneChanged();
+  ["tp", "rp"].forEach(k => {
+    $(`#${k}Zone`).innerHTML = TP_ZONES.map(z => `<option value="${z.id}">${esc(z.name)}${z.frozen ? " (прошлый сезон)" : ""}</option>`).join("");
+    zoneChanged(k);
+  });
 }
-function tpZoneChanged(){
-  const z = (TP_ZONES || []).find(z => String(z.id) === $("#tpZone").value); if (!z) return;
-  const prev = $("#tpDiff").value || "5";
+/* k: tp — «Топ прогресса» (есть «Все боссы»), rp — план по составу (один босс) */
+function zoneChanged(k){
+  const z = (TP_ZONES || []).find(z => String(z.id) === $(`#${k}Zone`).value); if (!z) return;
+  const prev = $(`#${k}Diff`).value || "5";
   const ds = z.difficulties.map(d => d.id).sort((a, b) => b - a);
-  $("#tpDiff").innerHTML = ds.map(d => `<option value="${d}" ${String(d) === prev ? "selected" : ""}>${TP_DIFF[d] || d}</option>`).join("");
-  $("#tpBoss").innerHTML = '<option value="all">Все боссы</option>' + z.encounters.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join("");
+  $(`#${k}Diff`).innerHTML = ds.map(d => `<option value="${d}" ${String(d) === prev ? "selected" : ""}>${TP_DIFF[d] || d}</option>`).join("");
+  $(`#${k}Boss`).innerHTML = (k === "tp" ? '<option value="all">Все боссы</option>' : "") + z.encounters.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join("");
 }
+const tpZoneChanged = () => zoneChanged("tp");
 $("#tpBox").addEventListener("toggle", () => { if ($("#tpBox").open) loadZones(); });
+$("#rpBox").addEventListener("toggle", () => { if ($("#rpBox").open) loadZones(); });
 $("#tpZone").onchange = tpZoneChanged;
+$("#rpZone").onchange = () => zoneChanged("rp");
+/* Состав: запоминаем на устройстве; счётчик игроков — сразу при вставке */
+try { $("#rpRoster").value = localStorage.getItem("wclRoster") || ""; $("#rpMin").value = localStorage.getItem("wclRosterMin") || "5"; } catch(e){}
+function rosterCount(){
+  const t = $("#rpRoster").value.trim(); let n = 0, h = 0;
+  if (t.startsWith("{")) { try { const m = JSON.parse(t).members || []; n = m.length; h = m.filter(x => x.mainRole === "healer").length; } catch(e){ $("#rpCount").textContent = "экспорт скопирован не целиком"; return; } }
+  else n = t.split("\n").filter(l => l.trim().split(/\s+/).length >= 2).length;
+  $("#rpCount").textContent = n ? `игроков: ${n}${h ? `, лекарей: ${h}` : ""}` : "";
+}
+$("#rpRoster").addEventListener("input", () => { rosterCount(); try { localStorage.setItem("wclRoster", $("#rpRoster").value); } catch(e){} });
+rosterCount();
+$("#rpRun").onclick = () => {
+  if (!$("#rpBoss").value) return showErr("Сначала выберите рейд и босса.");
+  if (!$("#rpRoster").value.trim()) return showErr("Вставьте состав: в игре /wugx (аддон WoWUtils Group Export) → Ctrl+C → сюда.");
+  try { localStorage.setItem("wclRosterMin", $("#rpMin").value); } catch(e){}
+  run({mode: "rosterplan", encounter: $("#rpBoss").value, difficulty: $("#rpDiff").value, minutes: $("#rpMin").value,
+       roster: $("#rpRoster").value, wait: $("#waitLimit").checked});
+};
 $("#tpRun").onclick = () => {
   if (!$("#tpZone").value) return showErr("Сначала выберите рейд.");
   run({mode: "progress", zone: $("#tpZone").value, difficulty: $("#tpDiff").value, encounter: $("#tpBoss").value, wait: $("#waitLimit").checked});
@@ -846,6 +884,7 @@ function histTitle(R){
     return R.all_bosses ? `Все боссы: ${I.boss || I.title || I.zone}${rot}` : `Бой: ${I.boss}, ${I.difficulty}, пулл ${(P.raid && P.raid.summary || {}).pull_n || "?"} (${I.kill?"килл":"вайп"})${rot}`;
   }
   if (R.mode === "raidcd") return `Полученный урон и сейвы: ${I.boss}, ${I.difficulty}`;
+  if (R.mode === "rosterplan") return `План по составу: ${I.boss}, ${I.difficulty}, бой ~${I.target} (${I.players} игроков)`;
   if (R.mode === "raidrot") return `Разбор ротации рейда: ${I.boss}, ${I.difficulty} (${R.players.length} DPS)`;
   if (R.mode === "playerall") return `${R.everyone ? "Все игроки" : (I.name || "Игрок")} — все боссы (${R.bosses.length}${(R.pending||[]).length?`, ещё ${R.pending.length} ждут лимита`:""})`;
   if (R.mode === "saves") return `Сейвы на всех боссов: ${I.boss || I.title} (${R.bosses.length} ${plural(R.bosses.length,"босс","босса","боссов")})`;
@@ -859,7 +898,7 @@ function openResult(item){
   const R = {...item.result, excel: "#excel-" + item.id, _hid: item.id, _created: item.created};
   if (R.alt && R.mode !== "raidcd") R.alt = {...R.alt, excel: "#excelalt-" + item.id};
   (R.mode === "raid" ? renderRaid : R.mode === "raidrot" ? renderRaidRot : R.mode === "raidcd" ? renderRaidCd
-    : R.mode === "saves" ? renderSaves : R.mode === "playerall" ? renderPlayerAll : render)(R);
+    : R.mode === "saves" ? renderSaves : R.mode === "rosterplan" ? renderRosterPlan : R.mode === "playerall" ? renderPlayerAll : render)(R);
 }
 /* ---------- «Разобрать бой»: результат вкладками ----------
    Каждая вкладка — прежний разбор (рейд, ротация рейда, игрок, сейвы по боссам, ротация по боссам) целиком,
@@ -1198,12 +1237,17 @@ function renderRaidPeaks(P, el){
   if (!P) { el.innerHTML = box("Рейдовые кулдауны в пики урона", "", '<p class="empty">Нет данных: урон по рейду для этого боя не загрузился. </p>'); return; }
   const X = P.extras || {}, V = X.vs_top, H = [...(X.heaviest || [])].sort((a, b) => a.t - b.t), TP = (P.info || {}).top_progress;  // по ходу боя
   const HT = (TP ? TP.guild + " — " : "") + ((P.info||{}).boss || "");
+  /* Заметка MRT — одна, там, где она подробнее: в плане сейвов или в самых тяжёлых моментах */
+  const PL = X.plan || (V && V.plan) || [], HM = (X.heaviest_mrt || []).map(x => ({mrt: x.mrt, t: x.t}));
+  const nPlan = mrtCount(mrtNote(PL, (P.info||{}).boss)), nHeavy = mrtCount(mrtNote(HM, HT));
+  const heavyWins = nHeavy > nPlan;
+  const where = (w, n) => `<p class="hint" style="margin-top:12px">Заметка MRT — под таблицей «${w}»: там она подробнее (${n} ${plural(n,"нажатие","нажатия","нажатий")}).</p>`;
   el.innerHTML = `
     ${(P.brief||[]).length ? `<div class="box brief"><ul class="lines">${P.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
     ${box("Урон по рейду и рейдовые кулдауны", "Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники — рейдовые кулдауны вашего рейда (красная обводка — нажат вне пиков)" + (V ? ", полые бирюзовые — что жмут лучшие киллы." : "."),
       '<div class="chart" style="height:300px"><canvas id="cRaidDmg"></canvas></div>')}
     ${(R => R.length ? box("План сейвов на следующий пулл", "Кулдауны всего состава — классы и спеки, взятые таланты — расставлены на пики с учётом перезарядки: нажать за 1–5 с до пика. Сколько сейвов на пик — по тому, сколько жмут лучшие гильдии, и по тяжести пика (до трёх, разных игроков). «Запасные» — что ещё откатано к этому моменту и не сломает остальной план. «Как у топа» — тот же кулдаун на этот пик жмут лучшие гильдии.",
-      planTable(R, (P.info||{}).boss, (P.info||{}).phases)) : "")(X.plan || (V && V.plan) || [])}
+      planTable(R, (P.info||{}).boss, (P.info||{}).phases, heavyWins ? where(TP ? `Самые тяжёлые моменты боя ${TP.guild}` : "Самые тяжёлые моменты вашего боя", nHeavy) : null)) : "")(PL)}
     ${V ? `<div class="box"><h3>Пики урона: что нажал ваш рейд и что жмёт топ</h3>
       <p class="sub">Пики сопоставлены по механике и её номеру. Лучшие киллы${V.difficulty?` той же сложности (${esc(V.difficulty)})`:""}: ${V.kills.map(k=>`<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> (${esc(k.duration)})`).join(", ")}.
       Кулдауном закрыто: у топа ${pct(V.top_cover,0)}, у вашего рейда ${pct(V.my_cover,0)}.</p>` +
@@ -1215,10 +1259,11 @@ function renderRaidPeaks(P, el){
         r.top_raid!==undefined ? scopeCell(r.top_raid, r.top_self||[], false) : esc((r.top_cds||[]).join(", ")||"—")]),
         {num:[3], cls:"wide", flag:i=>{const r=V.rows[i]; return r.my!=null && !r.my.length && (r.top_share||0)>=0.5;}}) + "</div>" : ""}
     ${box(TP ? `Самые тяжёлые моменты боя ${TP.guild}` : "Самые тяжёлые моменты вашего боя", "5 секунд с наибольшим уроном по рейду, по ходу боя. Кулдаун засчитан, если нажат за 8 с до момента или во время него."
-        + ((X.heaviest_mrt||[]).length ? " Под таблицей — заметка MRT с этими нажатиями: сейвы рейда и кулдауны лекарей, у каждой строки — время первого нажатия." : ""),
+        + ((X.heaviest_mrt||[]).length ? " Заметка MRT с этими нажатиями (сейвы рейда и кулдауны лекарей, у каждой строки — время первого нажатия) — здесь, если она подробнее плана сейвов." : ""),
       table(["Когда","Урон за 5 с","Доля боя","Механики","Нажатые рейдовые кулдауны"], H.map(h=>[h.time, num(h.damage), pct(h.share,0), esc(h.abilities.join(", ")),
         h.cds.length?esc([...new Set(h.cds)].join(", ")):'<span class="worse">ничего</span>']), {num:[1,2], empty:"Нет данных об уроне.", flag:i=>!H[i].cds.length})
-      + mrtBlock((X.heaviest_mrt || []).map(x => ({mrt: x.mrt, t: x.t})), HT, {label: "Скопировать для MRT", hint: "Одна заметка: сейвы рейда и кулдауны лекарей по времени."}))}
+      + (heavyWins || !PL.length ? mrtBlock(HM, HT, {label: "Скопировать для MRT", hint: "Одна заметка: сейвы рейда и кулдауны лекарей по времени."})
+         : nHeavy ? where("План сейвов на следующий пулл", nPlan) : ""))}
     ${(X.roster_cds||[]).length ? box("Рейдовые кулдауны состава", "У кого какой рейдовый кулдаун есть и сколько раз его можно нажать за бой при этой перезарядке. Красным — ни разу не нажат.",
       table(["Игрок","Кулдаун","Откат","Нажато","Можно за бой","Откуда известно"], X.roster_cds.map(c=>[`${esc(c.player)} <span style="color:var(--muted);font-size:13.5px">${esc(who(c.cls, c.spec))}</span>`,
         esc(c.name), mmss(c.cd).replace(/,0$/,""), num(c.used), c.max_uses==null?"—":num(c.max_uses), esc(c.source)]), {num:[2,3,4], flag:i=>!X.roster_cds[i].used})) : ""}`;
@@ -1291,11 +1336,16 @@ document.addEventListener("click", async ev => {
   setTimeout(() => b.textContent = old, 2500);
 });
 
-function planTable(plan, title, phases){
+/* Сколько нажатий в заметке MRT: иконки кулдаунов после « - » в каждой строке */
+function mrtCount(note){
+  return (note || "").split("\n").reduce((n, l) => { const w = l.split(" - ")[1] || "";
+    return n + ((w.match(/\{spell:/g) || []).length || w.split("  ").filter(Boolean).length); }, 0);
+}
+function planTable(plan, title, phases, mrtElsewhere){
   const ph = (phases||[]).length > 1 ? `<p class="hint" style="margin:0 0 8px">Фазы этого боя: ${phases.map(p=>`<b>${esc(p.name)}</b>${p.intermission?' <span class="tag MEDIUM">переход</span>':""} с ${btT(p.t)}`).join(" · ")}.
     Время от начала фазы показано под «Нажать в» — по нему и ставятся таймеры MRT: если фаза придёт раньше или позже, сейвы сдвинутся вместе с ней.
     Кулдаун, который жмётся в разных фазах, планируется с запасом 10 с на смещение фазы.</p>` : "";
-  return ph + planRows(plan) + mrtBlock(plan, title, {label: "Скопировать для MRT", hint: "Одна заметка: сейвы рейда и кулдауны лекарей по времени."});
+  return ph + planRows(plan) + (mrtElsewhere || mrtBlock(plan, title, {label: "Скопировать для MRT", hint: "Одна заметка: сейвы рейда и кулдауны лекарей по времени."}));
 }
 function planRows(plan){
   return table(["Нажать в","Пик","Кулдауны и кто"], plan.map(r=>{
@@ -1494,6 +1544,33 @@ function renderPlayerAll(R, bossFid, noScroll){
     run({mode: "allbosses", url: R.params.url, actor: R.params.actor, units: P.map(p=>[p.fight_id, p.actor]), prev, wait: $("#waitLimit") && $("#waitLimit").checked});
   };
   if (!noScroll) el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+}
+
+function renderRosterPlan(R){
+  charts.splice(0).forEach(c => c.destroy());
+  const I = R.info, el = resEl(), C = R.roster_cds || [];
+  const byPlayer = {};
+  C.forEach(c => (byPlayer[c.player] = byPlayer[c.player] || []).push(c));
+  el.innerHTML = `
+    <div class="hero"><div>
+        <div class="who"><strong>План сейвов по составу</strong>${esc(I.boss)} — ${esc(I.difficulty)}${I.guild ? " · " + esc(I.guild) : ""}.
+          Бой около ${esc(I.target)}; образец по времени — килл <a href="${esc(I.base.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(I.base.guild)}</a> (${esc(I.base.duration)}).</div>
+        <div class="dps">${(R.plan||[]).length} <small>${plural((R.plan||[]).length,"пик","пика","пиков")} · ${I.players} ${plural(I.players,"игрок","игрока","игроков")}, лекарей: ${I.healers}</small></div>
+      </div>
+      <div class="side"><a class="btn you" href="${R.excel}" download>Скачать Excel</a></div>
+    </div>
+    ${box("План сейвов", "Пики урона и самые тяжёлые моменты киллов топа длительностью ближе всего к вашим минутам. Кулдауны вашего состава расставлены с учётом перезарядки: нажать за 1–5 с до пика. Со 2-й фазы время — от начала фазы, поэтому заметка подстроится, если фаза придёт раньше или позже.",
+      (R.plan||[]).length ? planTable(R.plan, I.boss, I.phases) : '<p class="empty">У киллов топа не нашлось пиков урона, на которые нужны сейвы.</p>')}
+    ${(R.heaviest||[]).length ? box(`Самые тяжёлые моменты образца (${esc(I.base.guild)})`, "5 секунд с наибольшим уроном по рейду у образца — и что на них нажала эта гильдия.",
+      table(["Когда","Урон за 5 с","Механики","Что нажали"], R.heaviest.map(h => [h.time, num(h.damage), esc((h.abilities||[]).join(", ")),
+        h.cds.length ? esc([...new Set(h.cds)].join(", ")) : '<span class="worse">ничего</span>']), {num:[1]})) : ""}
+    ${box("Рейдовые кулдауны состава", "Талантов в экспорте нет: основные кулдауны — по классу и спеку, кулдауны-таланты — если их жмут лучшие гильдии на этом боссе. Если у игрока другой талант — поменяйте строку в заметке.",
+      table(["Игрок","Кулдауны"], Object.entries(byPlayer).map(([p, cs]) => [`${esc(p)} <span style="color:var(--muted);font-size:13.5px">${esc(who(cs[0].cls, cs[0].spec))}</span>`,
+        cs.map(c => `${esc(c.name)} <span style="color:var(--muted);font-size:13.5px">· откат ${mmss(c.cd).replace(/,0$/,"")} · ${esc(c.source)}</span>`).join("<br>")]))
+      + ((R.players||[]).filter(p => !byPlayer[p.name]).length ? `<p class="hint">Без рейдовых кулдаунов: ${R.players.filter(p => !byPlayer[p.name]).map(p => esc(p.name)).join(", ")}.</p>` : ""))}
+    ${box("Киллы топа, на которые опирается план", "", `<ul class="lines">${(R.kills||[]).map(k => `<li><a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.guild)}</a> — ${esc(k.duration)}</li>`).join("")}</ul>`)}`;
+  el.hidden = false;
+  el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
 }
 
 function renderSaves(R){

@@ -551,3 +551,38 @@ def write_saves_workbook(R: dict, path: str | Path, wb=None) -> Path:
     path = Path(path)
     wb.save(path)
     return path
+
+
+# ============================================================ план по составу (без лога)
+def write_roster_plan_workbook(R: dict, path: str | Path, wb=None) -> Path:
+    """План сейвов по составу из игры: план, заметка MRT, состав с кулдаунами, киллы топа-образцы."""
+    from .compare import _fmt_t
+    own = wb is None
+    if own:
+        wb = Workbook()
+        wb.remove(wb.active)
+    I = R["info"]
+    s = Sheet(wb, "План по составу", False, {"A": 26, "B": 30, "C": 80, "D": 30})
+    s.title(f"План сейвов по составу: {I['boss']} — {I['difficulty']}, бой около {I['target']}",
+            f"Образец по времени — килл {I['base']['guild']} ({I['base']['duration']}). Состав: {I['players']} игроков, "
+            f"лекарей: {I['healers']}." + (" Фазы: " + " · ".join(f"{p['name']} с {_fmt_t(p['t'])}" for p in I["phases"])
+                                         if len(I.get("phases") or []) > 1 else ""))
+    s.table(["Нажать в", "Пик", "Кулдауны и кто", "У топа здесь"],
+            [[r["time"] + (f" ({r['phase_name']} +{r['phase_time']})" if (r.get("phase") or 0) > 1 and r.get("phase_time") else ""),
+              r["mechanic"], _plan_text(r), r.get("top") or "—"] for r in R["plan"]])
+    if R.get("mrt"):
+        s.section("Заметка для MRT — сейвы рейда и кулдауны лекарей", "В игре: /mrt → Заметки → вставить → Отправить.")
+        for line in R["mrt"].split("\n"):
+            s.cell(s.row, 1, line)
+            s.row += 1
+    s.section("Рейдовые кулдауны состава", "По классу и спеку; таланты в экспорте не видны: основные кулдауны спека, а таланты — если их жмут лучшие гильдии (колонка «Почему»).")
+    s.table(["Игрок", "Кулдаун", "Роль", "Откат, с", "Почему"],
+            [[c["player"], c["name"], c["role"], _v(c["cd"], 0), c["source"]] for c in R["roster_cds"]])
+    s.section("Киллы топа, на которые опирается план")
+    s.table(["Время боя", "Гильдия", "Ссылка"], [[k["duration"], k["guild"], k["url"]] for k in R["kills"]],
+            links={2: lambda i: R["kills"][i]["url"]})
+    if not own:
+        return wb
+    path = Path(path)
+    wb.save(path)
+    return path

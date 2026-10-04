@@ -303,6 +303,23 @@ def test_top_progress():
     R = job["result"]
     assert cl.metric == "progress", cl.metric
     assert R["info"]["top_progress"]["guild"] == "Echo" and R["info"]["top_progress"]["rank"] == 2, R["info"]["top_progress"]
+    assert R["info"]["top_progress"]["skipped"] == [{"rank": 1, "guild": "Закрытые", "reason": "лог закрыт или удалён"}], \
+        R["info"]["top_progress"]["skipped"]
+    # закрыты все — понятная ошибка: какие места и почему, совет про эпохальную гонку
+    class Closed(C):
+        def fight_rankings(self, enc, diff, metric="speed", **k):
+            return [{"report": {"code": f"PRIVATE0000{i}", "fightID": 1}, "guild": {"name": f"Г{i}"}} for i in range(1, 9)]
+    clc = Closed()
+    web.CLIENT_FACTORY = lambda creds: clc
+    try:
+        jobc = {"id": "tpc", "log": [], "progress": 0.0, "state": "running"}
+        web._run_top_progress(jobc, {"mode": "progress", "url": DEMO_URL}, None, jobc["log"].append)
+        raise AssertionError("ожидалась ошибка")
+    except LookupError as e:
+        msg = str(e)
+    finally:
+        web.CLIENT_FACTORY = orig
+    assert "проверено мест: 6" in msg and "1-е место — Г1: лог закрыт или удалён" in msg, msg
     assert R["extras"].get("vs_top") is None and job.get("xlsx")       # без сравнения, Excel есть
     # такты канала — одно нажатие; второе нажатие через полторы минуты — отдельное
     from wcl_analyzer.raid import heaviest_mrt, merge_cd_ticks

@@ -657,7 +657,7 @@ def _progress_cands(client, enc: int, diff: int) -> list[dict]:
     """Первые киллы босса в мире (рейтинг WCL по прогрессу): до 5 мест с открытым логом."""
     from .config import SITE_URL
     cands = []
-    for i, rk in enumerate(client.fight_rankings(enc, diff, "progress")[:5]):
+    for i, rk in enumerate(client.fight_rankings(enc, diff, "progress")[:10]):
         rep = rk.get("report") or {}
         if rep.get("code"):
             g, srv = rk.get("guild") or {}, rk.get("server") or {}
@@ -667,31 +667,42 @@ def _progress_cands(client, enc: int, diff: int) -> list[dict]:
     return cands
 
 
-def _progress_one(job, client, cands: list[dict], params: dict, log, lo: float, hi: float) -> dict:
-    """Разбор боя лучшей гильдии из cands: закрытый или битый лог — следующая (до 3-го места). Без сравнения."""
+CLOSED_HINTS = ("закрыт", "не найден", "permission", "private", "not found", "does not exist", "403", "unauthorized",
+                "нет доступа")
+PROGRESS_TRIES = 6   # сколько первых мест пробуем, если логи закрыты
+
+
+def _progress_one(job, client, cands: list[dict], params: dict, log, lo: float, hi: float,
+                  difficulty: int | None = None) -> dict:
+    """Разбор боя лучшей гильдии из cands без сравнения. Закрытый, удалённый или битый лог — следующее место
+    (до PROGRESS_TRIES). Какие места пропущены и почему — в info.top_progress.skipped, а если не открылся
+    ни один — понятная ошибка со списком мест и причин."""
     from .api import WCLError
     from .raid import run_raid
-    last = None
-    for c in cands[:3]:
+    tried = []
+    for c in cands[:PROGRESS_TRIES]:
         log(f"Место {c['rank']}: {c['guild']} — разбираю их бой…")
         try:
             R = run_raid(client, c["url"], c["fight"], log=lambda m: log("    " + m), compare_top=False, mythic=False,
                          talent_data=[] if params.get("demo") else None, save_talents=not SERVER["public"],
                          avoidable=set(_avoidable_list()),
                          progress=lambda x: job.__setitem__("progress", max(job["progress"], min(hi, lo + (hi - lo) * x))))
-        except WCLError as e:
-            if "лимит" in str(e).lower():
-                raise
-            last = e
-            log(f"    не получилось: {_friendly(e)}")
-            continue
         except Exception as e:  # noqa: BLE001
-            last = e
-            log(f"    не получилось: {_friendly(e)}")
+            if isinstance(e, WCLError) and "лимит" in str(e).lower():
+                raise
+            msg = str(e)
+            reason = "лог закрыт или удалён" if any(h in msg.lower() for h in CLOSED_HINTS) else _friendly(e)
+            tried.append({"rank": c["rank"], "guild": c["guild"], "reason": reason})
+            log(f"    недоступен: {reason}")
             continue
-        R["info"]["top_progress"] = {k: c.get(k) for k in ("rank", "guild", "server", "region", "start")}
+        R["info"]["top_progress"] = {**{k: c.get(k) for k in ("rank", "guild", "server", "region", "start")},
+                                     "skipped": tried}
         return {**R, "source_url": c["url"]}
-    raise LookupError(f"Не удалось открыть бои лучших гильдий: {_friendly(last) if last else 'нет данных'}")
+    places = "; ".join(f"{t['rank']}-е место — {t['guild']}: {t['reason']}" for t in tried)
+    hint = (" На эпохальной сложности гильдии во время гонки за первый килл часто прячут логи — попробуйте "
+            "героическую сложность или зайдите позже, когда логи откроют.") if int(difficulty or 0) == 5 else \
+        " Попробуйте позже — гильдии иногда открывают логи не сразу."
+    raise LookupError(f"Логи первых гильдий недоступны — проверено мест: {len(tried)}. {places}.{hint}")
 
 
 def _run_top_progress(job: dict, params: dict, creds, log) -> None:
@@ -730,7 +741,7 @@ def _run_top_progress(job: dict, params: dict, creds, log) -> None:
         if not cands:
             raise LookupError(f"{name}: на этой сложности пока нет киллов в рейтинге прогресса Warcraft Logs")
         job["progress"] = 0.1
-        R = _progress_one(job, client, cands, params, log, 0.1, 0.95)
+        R = _progress_one(job, client, cands, params, log, 0.1, 0.95, difficulty=diff)
         _excel_bytes(job, f"Топ_прогресса_{R['info']['boss']}_{R['info']['top_progress']['guild']}", write_raid_workbook, R)
         job["result"] = {**R, "excel": f"/api/report/{job['id']}"}
         log("Готово.")
@@ -757,7 +768,7 @@ def _run_top_progress(job: dict, params: dict, creds, log) -> None:
     if not cands:
         raise LookupError("У этого босса на этой сложности пока нет рейтинга прогресса в Warcraft Logs")
     job["progress"] = 0.1
-    R = _progress_one(job, client, cands, params, log, 0.1, 0.95)
+    R = _progress_one(job, client, cands, params, log, 0.1, 0.95, difficulty=diff)
     _excel_bytes(job, f"Топ_прогресса_{R['info']['boss']}_{R['info']['top_progress']['guild']}", write_raid_workbook, R)
     job["result"] = {**R, "excel": f"/api/report/{job['id']}"}
     log("Готово.")
@@ -791,7 +802,7 @@ def _run_top_progress_all(job: dict, params: dict, client, bosses: list[tuple], 
             cands = _progress_cands(client, enc, diff)
             if not cands:
                 raise LookupError("пока нет рейтинга прогресса в Warcraft Logs")
-            R = _progress_one(job, client, cands, params, lambda m: log("  " + m), lo, lo + 1 / len(bosses))
+            R = _progress_one(job, client, cands, params, lambda m: log("  " + m), lo, lo + 1 / len(bosses), difficulty=diff)
         except Exception as e:  # noqa: BLE001
             msg = _friendly(e)
             if "лимит" in msg.lower():

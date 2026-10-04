@@ -216,6 +216,69 @@ def test_plan_longer_phase():
     print("OK план сейвов: фаза длиннее, чем у топа — сопоставление по фазе и образцу способности")
 
 
+def test_fight_mode():
+    """«Разобрать бой» — одна кнопка: рейд, затем ротация; первая часть доступна до конца разбора,
+    нехватка лимита на ротации не теряет готовый рейд; Excel один на всё. Все боссы — сейвы + ротация по боссам."""
+    import io
+    from openpyxl import load_workbook
+    from wcl_analyzer import web
+    job = {"id": "fight1", "log": [], "progress": 0.0, "state": "running"}
+    seen = {}
+    orig_rot = web._run_raid_rotation
+
+    def rot_spy(sj, params, creds, log):
+        seen["partial"] = job.get("partial")      # во время ротации рейд уже отдан браузеру
+        return orig_rot(sj, params, creds, log)
+    web._run_raid_rotation = rot_spy
+    try:
+        web._run_fight(job, {"mode": "fight", "demo": True, "ref": "top10"}, None, job["log"].append)
+    finally:
+        web._run_raid_rotation = orig_rot
+    R = job["result"]
+    assert R["order"] == ["raid", "rot"] and set(R["parts"]) == {"raid", "rot"} and not R["errors"], R["order"]
+    assert seen["partial"]["parts"].keys() == {"raid"} and seen["partial"]["pending"] == "rot"
+    assert "partial" not in job and R["parts"]["rot"]["excel"] == R["excel"] == "/api/report/fight1"
+    names = load_workbook(io.BytesIO(job["xlsx"])).sheetnames
+    assert "Выжимка" in names and "Ротация рейда" in names, names   # один файл: листы рейда и ротации
+
+    # кончился лимит на ротации — рейд остаётся, у ротации понятная причина
+    def no_limit(sj, params, creds, log):
+        from wcl_analyzer.api import WCLError
+        raise WCLError("Закончился часовой лимит запросов Warcraft Logs для вашего ключа — разбор остановлен.")
+    web._run_raid_rotation = no_limit
+    try:
+        job2 = {"id": "fight2", "log": [], "progress": 0.0, "state": "running"}
+        web._run_fight(job2, {"mode": "fight", "demo": True, "ref": "top1"}, None, job2["log"].append)
+    finally:
+        web._run_raid_rotation = orig_rot
+    assert set(job2["result"]["parts"]) == {"raid"} and "лимит" in job2["result"]["errors"]["rot"]
+    assert job2.get("xlsx")
+    # без ротации — только рейд
+    job3 = {"id": "fight3", "log": [], "progress": 0.0, "state": "running"}
+    web._run_fight(job3, {"mode": "fight", "demo": True, "ref": "none"}, None, job3["log"].append)
+    assert job3["result"]["order"] == ["raid"] and "partial_v" not in job3
+
+    # все боссы: сейвы на каждого босса, затем ротация по боссам (против топ-1)
+    calls = []
+    o_saves, o_all = web._run_saves, web._run_player_all
+
+    def fake_saves(sj, params, creds, log):
+        calls.append(("saves", params.get("mode")))
+        sj["result"] = {"mode": "saves", "info": {"boss": "Рейд", "title": "Рейд"}, "bosses": [], "excel": "x"}
+
+    def fake_all(sj, params, creds, log):
+        calls.append(("pall", params.get("actor")))
+        sj["result"] = {"mode": "playerall", "info": {}, "bosses": [], "pending": [], "excel": "x"}
+    web._run_saves, web._run_player_all = fake_saves, fake_all
+    try:
+        job4 = {"id": "fight4", "log": [], "progress": 0.0, "state": "running"}
+        web._run_fight(job4, {"mode": "fight", "fight": "all", "url": "u", "actor": "all", "ref": "top1"}, None, job4["log"].append)
+    finally:
+        web._run_saves, web._run_player_all = o_saves, o_all
+    assert calls == [("saves", "saves"), ("pall", "all")] and job4["result"]["order"] == ["saves", "pall"], calls
+    print("OK «Разобрать бой»: рейд сразу, ротация следом, лимит не теряет готовое, один Excel, все боссы")
+
+
 def test_player_all_bosses():
     """Игрок на всех боссах: эталон топ-1; не хватило лимита — оставшиеся боссы в «pending», потом «Продолжить»."""
     import copy
@@ -396,6 +459,7 @@ if __name__ == "__main__":
     test_cache_reuse_between_modes()
     test_player_all_bosses()
     test_plan_long_fight()
+    test_fight_mode()
     test_plan_longer_phase()
     test_saves_all_bosses()
     test_gear_and_trinkets()

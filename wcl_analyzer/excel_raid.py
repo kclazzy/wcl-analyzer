@@ -23,9 +23,11 @@ F_RATIO = '0.0"×"'
 ROLE_COLOR = {"Танк": "4F7CC0", "Лекарь": "2F8F4E", "DPS": "E39B2F"}
 
 
-def write_raid_workbook(R: dict, path: str | Path) -> Path:
-    wb = Workbook()
-    wb.remove(wb.active)
+def write_raid_workbook(R: dict, path: str | Path, wb=None) -> Path:
+    own = wb is None   # wb передан — листы дописываются в общую книгу (разбор боя целиком)
+    if own:
+        wb = Workbook()
+        wb.remove(wb.active)
     demo = R["info"]["demo"]
     _brief(wb, R, demo)
     _damage(wb, R, demo)
@@ -36,6 +38,8 @@ def write_raid_workbook(R: dict, path: str | Path) -> Path:
     _deaths(wb, R, demo)
     _pulls(wb, R, demo)
     _timeline(wb, R, demo)
+    if not own:
+        return wb
     path = Path(path)
     wb.save(path)
     return path
@@ -493,11 +497,13 @@ def _vs_top(wb, R, demo):
 
 
 # ============================================================ сейвы на всех боссов
-def write_saves_workbook(R: dict, path: str | Path) -> Path:
+def write_saves_workbook(R: dict, path: str | Path, wb=None) -> Path:
     """План сейвов на каждого босса: лист на босса (план + заметка MRT) и общий лист с заметками."""
     from .compare import _fmt_t
-    wb = Workbook()
-    wb.remove(wb.active)
+    own = wb is None   # wb передан — листы дописываются в общую книгу (разбор боя целиком)
+    if own:
+        wb = Workbook()
+        wb.remove(wb.active)
     demo = R["info"]["demo"]
     s = Sheet(wb, "Все боссы", demo, {"A": 34, "B": 14, "C": 16, "D": 12, "E": 60})
     s.title(f"Рейдовые сейвы: {R['info']['title'] or R['info']['zone']}",
@@ -535,6 +541,8 @@ def write_saves_workbook(R: dict, path: str | Path) -> Path:
             for line in b["mrt"].split("\n"):
                 t.cell(t.row, 1, line)
                 t.row += 1
+    if not own:
+        return wb
     path = Path(path)
     wb.save(path)
     return path

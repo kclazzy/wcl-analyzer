@@ -128,9 +128,11 @@ def _v(x, nd=None):
 
 
 # ============================================================ COMPARE
-def write_compare_workbook(r: CompareResult, path: str | Path) -> Path:
-    wb = Workbook()
-    wb.remove(wb.active)
+def write_compare_workbook(r: CompareResult, path: str | Path, wb=None) -> Path:
+    own = wb is None   # wb передан — листы дописываются в общую книгу (разбор боя целиком)
+    if own:
+        wb = Workbook()
+        wb.remove(wb.active)
     demo = r.me.report_code.startswith("DEMO")
     _brief_sheet(wb, r, demo)
     _summary_sheet(wb, r, demo)
@@ -150,6 +152,8 @@ def write_compare_workbook(r: CompareResult, path: str | Path) -> Path:
     _reference_sheet(wb, r.ref, demo)
     _players_sheet(wb, r.ref, demo)
     _raw_sheet(wb, r, demo)
+    if not own:
+        return wb
     path = Path(path)
     wb.save(path)
     return path
@@ -861,11 +865,13 @@ def _raw_sheet(wb, r: CompareResult, demo):
 
 
 # ===================================================== РОТАЦИЯ ВСЕГО РЕЙДА
-def write_raid_rotation_workbook(R: dict, path: str | Path) -> Path:
+def write_raid_rotation_workbook(R: dict, path: str | Path, wb=None) -> Path:
     """Сводка по всем DPS рейда + лист «Что исправить» + выжимка на каждого игрока."""
     import re as _re
-    wb = Workbook()
-    wb.remove(wb.active)
+    own = wb is None   # wb передан — листы дописываются в общую книгу (разбор боя целиком)
+    if own:
+        wb = Workbook()
+        wb.remove(wb.active)
     demo = R["info"]["demo"]
     I = R["info"]
     s = Sheet(wb, "Ротация рейда", demo, {"A": 18, "B": 28, "C": 12, "D": 14, "E": 12, "F": 13, "G": 60, "H": 18,
@@ -923,16 +929,20 @@ def write_raid_rotation_workbook(R: dict, path: str | Path) -> Path:
             name, k = f"{base[:26]} {k}", k + 1
         used.add(name)
         _brief_sheet(wb, r["result"], demo, title=name)
+    if not own:
+        return wb
     path = Path(path)
     wb.save(path)
     return path
 
 
-def write_player_all_workbook(R: dict, path: str | Path) -> Path:
+def write_player_all_workbook(R: dict, path: str | Path, wb=None) -> Path:
     """Игрок на всех боссах: строка на босса — DPS против топ-1 и три главных действия.
     prev — боссы, разобранные до «Продолжить» (их краткие строки присылает браузер)."""
-    wb = Workbook()
-    wb.remove(wb.active)
+    own = wb is None   # wb передан — листы дописываются в общую книгу (разбор боя целиком)
+    if own:
+        wb = Workbook()
+        wb.remove(wb.active)
     s = Sheet(wb, "Все боссы", False, {"A": 30, "B": 14, "C": 12, "D": 12, "E": 12, "F": 10, "G": 70, "H": 22, "I": 14})
     I = R["info"]
     s.title(f"{I.get('name') or 'Игрок'} — все боссы отчёта",
@@ -961,6 +971,8 @@ def write_player_all_workbook(R: dict, path: str | Path) -> Path:
         for p in R["pending"]:
             s.cell(s.row, 1, f"{p['boss']} ({p['difficulty']})")
             s.row += 1
+    if not own:
+        return wb
     path = Path(path)
     wb.save(path)
     return path

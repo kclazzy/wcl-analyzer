@@ -143,7 +143,9 @@ def _run_job(job: dict, params: dict, creds) -> None:
         JOB_SLOTS.acquire()
     try:
         mode = params.get("mode")
-        if mode == "raid":
+        if mode == "fight":
+            _run_fight(job, params, creds, log)
+        elif mode == "raid":
             _run_raid(job, params, creds, log)
         elif mode == "raidrot":
             _run_raid_rotation(job, params, creds, log)
@@ -193,7 +195,11 @@ def _client(creds, job: dict, log, wait: bool = False):
 
 
 def _excel_bytes(job: dict, name: str, writer, data, key: str = "xlsx") -> None:
-    """Excel собирается во временной папке и сразу удаляется; файл живёт только в памяти задачи."""
+    """Excel собирается во временной папке и сразу удаляется; файл живёт только в памяти задачи.
+    Внутри «Разобрать бой» (_SubJob) листы запоминаются, а файл собирается один на весь разбор."""
+    if isinstance(job, _SubJob):
+        job.writers.append((key, name, writer, data))
+        return
     fname = re.sub(r"[^\w\-]+", "_", f"{name}_{time.strftime('%Y%m%d_%H%M%S')}") + ".xlsx"
     with tempfile.TemporaryDirectory() as tmp:
         path = writer(data, Path(tmp) / fname)
@@ -255,6 +261,118 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
             log(f"Эпохальный эталон не собран: {e}")
     job["result"] = main
     log("Готово.")
+
+
+class _SubJob(dict):
+    """Часть разбора «Разобрать бой» (рейд, ротация, игрок…): своя шкала прогресса внутри общей.
+    Пишет лог и ожидание лимита в общую задачу; Excel не собирает — только запоминает листы."""
+
+    def __init__(self, parent: dict, lo: float, hi: float):
+        super().__init__(id=parent["id"], progress=0.0, log=parent["log"], state="running")
+        self.parent, self.lo, self.hi, self.writers = parent, lo, hi, []
+
+    def __setitem__(self, k, v):
+        super().__setitem__(k, v)
+        if k == "progress":
+            self.parent["progress"] = max(self.parent["progress"], self.lo + (self.hi - self.lo) * min(1.0, float(v)))
+        elif k == "wait_until":
+            self.parent[k] = v
+
+
+FIGHT_PARTS = {"raid": "Урон, сейвы, смерти", "rot": "Ротация рейда", "player": "Игрок",
+               "saves": "Сейвы по боссам", "pall": "Ротация по боссам"}
+
+
+def _run_fight(job: dict, params: dict, creds, log) -> None:
+    """«Разобрать бой» — одна кнопка вместо трёх. Один бой: разбор рейда (урон, сейвы, смерти, механики),
+    затем ротация — всех DPS (Игрок = «Все игроки») или одного игрока. Все боссы отчёта (fight="all"):
+    план сейвов на каждого босса + ротация по боссам против топ-1. Сначала считается дешёвая часть —
+    браузер показывает её сразу (job["partial"]), ротация досчитывается следом. Кончился лимит WCL на
+    ротации — готовые вкладки остаются, во вкладке ротации — причина и «Продолжить». Excel — один на всё."""
+    allb = params.get("fight") == "all"
+    ref = params.get("ref") or "top10"
+    actor = params.get("actor")
+    demo = bool(params.get("demo"))
+    parts: dict = {}
+    errors: dict = {}
+    writers: list = []
+    first = ("saves" if allb else "raid")
+    second = None if ref == "none" else ("pall" if allb else ("rot" if actor in (None, "", "all") or demo else "player"))
+    order = [first] + ([second] if second else [])
+
+    def combined(pending=None) -> dict:
+        base = parts.get(first) or {}
+        return {"mode": "fight", "all_bosses": allb, "info": base.get("info") or {}, "parts": dict(parts),
+                "order": order, "errors": dict(errors), "pending": pending, "titles": FIGHT_PARTS,
+                "focus": actor, "ref": ref, "excel": f"/api/report/{job['id']}", "source_url": params.get("url"),
+                "params": {k: params.get(k) for k in ("url", "fight", "actor", "ref", "pick", "mythic", "demo")}}
+
+    def run_part(key, fn, sub_params, lo, hi) -> None:
+        sj = _SubJob(job, lo, hi)
+        log(f"— {FIGHT_PARTS[key]} —")
+        try:
+            fn(sj, sub_params, creds, log)
+        except SystemExit:
+            raise
+        except Exception as e:  # noqa: BLE001 — одна часть не должна ронять уже готовые
+            if key == first:
+                raise
+            errors[key] = _friendly(e)
+            log(f"{FIGHT_PARTS[key]}: не досчитано — {errors[key]}")
+            return
+        res = sj.get("result") or {}
+        res["excel"] = f"/api/report/{job['id']}"
+        if (res.get("alt") or {}).get("excel"):
+            res["alt"]["excel"] = f"/api/report/{job['id']}/alt"
+        for pl in res.get("players") or []:  # подробности игрока внутри ротации — тот же общий Excel
+            if isinstance(pl.get("detail"), dict):
+                pl["detail"]["excel"] = res["excel"]
+        for k, name, writer, data in sj.writers:
+            if k == "xlsx":
+                writers.append((name, writer, data, key))
+            else:  # второй (эпохальный) эталон игрока — отдельный файл, как и раньше
+                _excel_bytes(job, name, writer, data, key=k)
+        parts[key] = res
+
+    if allb:
+        run_part("saves", _run_saves, {**params, "mode": "saves"}, 0.0, 0.45 if second else 0.95)
+    else:
+        run_part("raid", _run_raid, {**params, "mode": "raid"}, 0.0, 0.3 if second else 0.95)
+    if second:
+        job["partial"] = combined(pending=second)
+        job["partial_v"] = job.get("partial_v", 0) + 1
+        if second == "pall":
+            run_part("pall", _run_player_all, {**params, "mode": "allbosses", "actor": actor or "all"}, 0.45, 0.95)
+        elif second == "rot":
+            run_part("rot", _run_raid_rotation, {**params, "mode": "raidrot", "ref": ref}, 0.3, 0.95)
+        else:
+            run_part("player", _run_player, {**params, "ref": ref}, 0.3, 0.95)
+    if writers:  # один Excel на весь разбор: листы рейда, затем ротации
+        short = {"raid": "Рейд", "rot": "Ротация", "player": "Игрок", "saves": "Сейвы", "pall": "Ротация"}
+
+        def write_all(_data, path):
+            wb = _new_wb()
+            for _name, writer, data, key in writers:
+                before = set(wb.sheetnames)
+                writer(data, None, wb=wb)
+                for ws in wb.worksheets:  # одноимённый лист второй части: «Выжимка1» → «Игрок — Выжимка»
+                    m = re.match(r"(.+?)(\d+)$", ws.title)
+                    if ws.title not in before and m and m.group(1) in before:
+                        ws.title = f"{short.get(key, key)} — {m.group(1)}"[:31]
+            wb.save(path)
+            return path
+        name = writers[0][0] + ("_и_ротация" if len(writers) > 1 else "")
+        _excel_bytes(job, name, write_all, None)
+    job.pop("partial", None)
+    job["result"] = combined()
+    log("Готово.")
+
+
+def _new_wb():
+    from openpyxl import Workbook
+    wb = Workbook()
+    wb.remove(wb.active)
+    return wb
 
 
 ALL_BOSSES_POINTS = 25.0   # оценка очков WCL на одного босса до первого замера (свой лог + лог топ-1)
@@ -859,7 +977,10 @@ class Handler(BaseHTTPRequestHandler):
             if not job:
                 return self._json({"error": "Разбор не найден: результаты хранятся на сервере не дольше часа"}, 404)
             since = int(self.headers.get("X-Log-Since") or 0)
+            pv = int(self.headers.get("X-Partial-V") or 0)  # готовая часть «Разобрать бой» — один раз на версию
             self._json({"state": job["state"], "progress": job["progress"], "log": job["log"][since:],
+                        "partial": job.get("partial") if job.get("partial_v", 0) > pv else None,
+                        "partial_v": job.get("partial_v", 0),
                         "wait_left": max(0.0, job.get("wait_until", 0) - time.time()),
                         "log_total": len(job["log"]), "error": job.get("error"), "need_key": job.get("need_key", False),
                         "result": job.get("result") if job["state"] == "done" else None})
@@ -892,7 +1013,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "units", "prev", "wait",
                                                    "refresh", "max_age_days", "pick", "mythic")}
-                if params["mode"] not in (None, "raid", "raidrot", "saves", "allbosses"):
+                if params["mode"] not in (None, "fight", "raid", "raidrot", "saves", "allbosses"):
                     params["mode"] = None
                 return self._json({"job": start_job(creds, params)})
             if path == "/api/refs/refresh":

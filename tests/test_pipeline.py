@@ -333,8 +333,9 @@ def test_top_progress():
           {"t": 30, "abilities": ["Удар"], "ability_id": 6, "cd_list": [
               {"cd": "Тотем", "player": "А", "id": 108280, "t": 28, "cls": "Shaman", "kind": "raid"}]}]
     note = [x["mrt"] for x in heaviest_mrt(hv, [])]
-    assert len(note) == 2 and note[0].startswith("{time:0:28}") and note[1].startswith("{time:1:28}"), note
-    assert note[1].index("{spell:108280}") < note[1].index("{spell:200183}"), note
+    # один список по времени; у кулдауна лекаря своё время (1:28), у рейдового — своё (1:29)
+    assert len(note) == 3 and note[0].startswith("{time:0:28}") and note[1].startswith("{time:1:28}"), note
+    assert "{spell:200183}" in note[1] and note[2].startswith("{time:1:29}") and "{spell:108280}" in note[2], note
     # окна соседних моментов перекрываются — одно нажатие только в одной строке, у ближайшего момента
     press = {"cd": "Гимн", "player": "Б", "id": 64843, "t": 100, "cls": "Priest", "kind": "raid"}
     note = [x["mrt"] for x in heaviest_mrt([

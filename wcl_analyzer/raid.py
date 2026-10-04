@@ -222,8 +222,9 @@ def _cd_kind(c: dict) -> str:
 
 
 def heaviest_mrt(heaviest: list[dict], phases: list[dict]) -> list[dict]:
-    """Заметка MRT по самым тяжёлым моментам: строка на момент, по времени первого нажатия (со 2-й фазы —
-    от начала фазы); в строке сначала рейдовые кулдауны, затем кулдауны лекарей.
+    """Заметка MRT по самым тяжёлым моментам: один список по времени (со 2-й фазы — от начала фазы).
+    На момент — строка рейдовых кулдаунов (время их первого нажатия) и отдельная строка кулдаунов лекарей
+    со своим временем.
     Для разбора топа — готовая расстановка лучших гильдий."""
     from .raid_top import mrt_line
     # Окна соседних моментов перекрываются (8 с до момента + 5 + 3 после): одно нажатие — только в одну
@@ -238,17 +239,18 @@ def heaviest_mrt(heaviest: list[dict], phases: list[dict]) -> list[dict]:
     out = []
     for hi_, h in enumerate(heaviest or []):
         mine = [p for p in h.get("cd_list") or [] if owner[(p["player"], p.get("id") or p["cd"], p["t"])][1] == hi_]
-        picks = sorted(mine, key=lambda p: (p.get("kind", "raid") != "raid", p["t"]))
-        if not picks:
-            continue
-        t0 = min(p["t"] for p in picks)
-        ph = phase_at(phases, t0)
-        n = ph["n"] if ph and (ph.get("n") or 0) > 1 else None
-        line = mrt_line(t0, "«" + (h["abilities"][0] if h.get("abilities") else "Пик") + "»", picks, n,
-                        round(t0 - ph["t"], 1) if n else None, mech_id=h.get("ability_id"))
-        if line:
-            out.append({"t": t0, "time": _fmt_t(t0), "mrt": line})
-    return sorted(out, key=lambda x: x["t"])
+        for kind in ("raid", "heal"):  # у рейдовых и у лекарей — своё время: первое нажатие своей группы
+            picks = sorted([p for p in mine if p.get("kind", "raid") == kind], key=lambda p: p["t"])
+            if not picks:
+                continue
+            t0 = min(p["t"] for p in picks)
+            ph = phase_at(phases, t0)
+            n = ph["n"] if ph and (ph.get("n") or 0) > 1 else None
+            line = mrt_line(t0, "«" + (h["abilities"][0] if h.get("abilities") else "Пик") + "»", picks, n,
+                            round(t0 - ph["t"], 1) if n else None, mech_id=h.get("ability_id"))
+            if line:
+                out.append({"t": t0, "time": _fmt_t(t0), "mrt": line, "kind": kind})
+    return sorted(out, key=lambda x: (x["t"], x["kind"] != "raid"))
 
 
 def phase_at(phases: list[dict], t: float) -> dict | None:

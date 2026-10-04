@@ -524,7 +524,7 @@ def _run_saves(job: dict, params: dict, creds, log) -> None:
         log("Демо-рейд: один босс — на настоящем отчёте план будет на каждого босса вечера.")
         client, url = FakeRaidClient(), DEMO_URL
     else:
-        client, url = _client(creds, job, log), params["url"]
+        client, url = _client(creds, job, log, wait=bool(params.get("wait"))), params["url"]
     R = run_raid_saves(client, url, log=log, talent_data=[] if params.get("demo") else None,
                        save_talents=not SERVER["public"], avoidable=set(_avoidable_list()),
                        progress=lambda x: job.__setitem__("progress", max(job["progress"], min(0.97, x))))

@@ -59,6 +59,14 @@ def run_raid_saves(client, url: str, log=print, progress=lambda x: None, talent_
                          talent_data=talent_data, save_talents=save_talents, mythic=False,
                          progress=lambda x, b=base: progress(b + x / len(chosen)))
         except Exception as e:  # noqa: BLE001 — один босс не должен ронять остальные
+            if "лимит" in str(e).lower():  # кончился часовой лимит WCL — дальше не идём, уже скачанное в кэше
+                log("    Закончился часовой лимит WCL — остальные боссы после сброса: запустите снова, "
+                    "уже разобранное повторно лимит не тратит.")
+                skipped += [{"boss": c2["fight"].get("name", ""), "difficulty": DIFFICULTY_NAMES.get(int(c2["fight"].get("difficulty") or 0), ""),
+                             "reason": "не хватило лимита WCL — запустите снова после сброса"} for c2 in chosen[i:]]
+                if not bosses:
+                    raise
+                break
             log(f"    пропущен: {e}")
             skipped.append({"boss": f.get("name", ""), "difficulty": diff, "reason": str(e)})
             continue

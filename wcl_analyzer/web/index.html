@@ -341,6 +341,7 @@ dialog label.check input{width:auto;margin:0}
             <input id="pickMax" type="number" min="1" max="99" step="1" value="50" list="pickPresets" disabled></label>
           <datalist id="pickPresets"><option value="25"><option value="50"><option value="75"><option value="90"></datalist>
         </div></div>
+      <p class="hint" id="allHint" hidden style="grid-column:1/-1;margin:0;font-size:14px">Выбраны <b>все боссы отчёта</b> — по одному бою на босса (последний килл, без киллов — лучший пулл). «Разобрать игрока» и «Разбор ротации рейда» сравнивают с топ-1, чтобы хватило лимита WCL; «Разбор рейда» составит план сейвов на каждого босса (героик и эпохальный).</p>
       <div class="runrow">
         <button class="btn you" id="runBtn" type="button">Разобрать игрока</button>
         <button class="btn" id="raidBtn" type="button" title="Весь бой целиком: полученный урон и план сейвов, смерти, механики, игроки (расходники, прерывания, диспелы), пуллы">Разбор рейда: урон, сейвы, смерти</button>
@@ -621,7 +622,9 @@ async function inspect(fight){
   try {
     inspected = await api("/api/inspect", {url, fight});
     const fs = $("#fight");
-    fs.innerHTML = inspected.fights.map(f => `<option value="${f.id}" ${f.id==inspected.fight?"selected":""}>${esc(f.name)}, ${esc(f.difficulty)} — ${f.kill?"килл":"вайп"}, ${mmss(f.duration)}</option>`).join("");
+    fs.innerHTML = inspected.fights.map(f => `<option value="${f.id}" ${f.id==inspected.fight?"selected":""}>${esc(f.name)}, ${esc(f.difficulty)} — ${f.kill?"килл":"вайп"}, ${mmss(f.duration)}</option>`).join("")
+      + `<option value="all">Все боссы отчёта (${new Set(inspected.fights.map(f => f.name + "|" + f.difficulty)).size})</option>`;
+    syncAllMode();
     const ps = $("#player");
     const dps = inspected.players;
     ps.innerHTML = dps.map(p => `<option value="${p.id}" ${p.id==inspected.source?"selected":""}>${esc(p.name)} — ${esc(who(p.cls, p.spec))}, ${esc(p.role)}${p.rank!=null?` · проц. ${Math.floor(p.rank)}%`:""}${p.ilvl!=null?` · с учётом экип. ${Math.floor(p.ilvl)}%`:""}</option>`).join("") + '<option value="all">Все игроки (DPS)</option>';
@@ -633,13 +636,27 @@ async function inspect(fight){
 $("#findForm").onsubmit = ev => { ev.preventDefault(); inspect(); };
 /* Вставили ссылку — сразу ищем бой, без нажатия кнопки */
 $("#url").addEventListener("paste", () => setTimeout(() => inspect(), 50));
-$("#fight").onchange = () => { if ($("#fight").value !== "all") inspect($("#fight").value); };
+$("#fight").onchange = () => { syncAllMode(); if ($("#fight").value !== "all") inspect($("#fight").value); };
+/* «Все боссы» в рамке «Бой»: каждая кнопка разбирает весь отчёт — по одному бою на босса
+   (последний килл, без киллов — лучший пулл). Игрок и ротация — против топ-1 ради экономии лимита WCL,
+   «Разбор рейда» — план сейвов на каждого босса (героик и эпохальный). */
+const allFights = () => $("#fight").value === "all";
+function syncAllMode(){
+  const all = allFights();
+  $("#allHint").hidden = !all;
+  $("#ref").disabled = all;
+  $("#ref").title = all ? "На всех боссах сравнение идёт с топ-1 — так хватает лимита WCL" : "";
+  $("#pickBy").disabled = all; $("#pickMax").disabled = all || !$("#pickBy").value;
+  $("#raidBtn").title = all ? "На каждого босса отчёта (героик и эпохальный): план сейвов на следующий пулл, заметка MRT, сравнение с лучшими киллами"
+                            : "Весь бой целиком: полученный урон и план сейвов, смерти, механики, игроки (расходники, прерывания, диспелы), пуллы";
+}
 try { if (localStorage.getItem("wclMythicToo") === "0") $("#mythicToo").checked = false; } catch(e){}
 $("#mythicToo").addEventListener("change", () => { try { localStorage.setItem("wclMythicToo", $("#mythicToo").checked ? "1" : "0"); } catch(e){} });
 /* «Все игроки» в одном бою — это разбор ротации рейда */
-$("#runBtn").onclick = () => $("#player").value === "all" ? $("#raidRotBtn").click() : run({url:$("#url").value.trim(), fight:$("#fight").value, actor:$("#player").value, ref:$("#ref").value, mythic: $("#mythicToo").checked});
+$("#runBtn").onclick = () => allFights() ? $("#allBtn").click() : $("#player").value === "all" ? $("#raidRotBtn").click() : run({url:$("#url").value.trim(), fight:$("#fight").value, actor:$("#player").value, ref:$("#ref").value, mythic: $("#mythicToo").checked});
 $("#demoBtn").onclick = () => run({demo:true});
-$("#raidBtn").onclick = () => run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value, mythic: $("#mythicToo").checked});
+$("#raidBtn").onclick = () => allFights() ? run({mode:"saves", url:$("#url").value.trim(), wait: $("#waitLimit").checked})
+  : run({mode:"raid", url:$("#url").value.trim(), fight:$("#fight").value, mythic: $("#mythicToo").checked});
 $("#demoRaidBtn").onclick = () => run({mode:"raid", demo:true});
 /* Отбор игроков по рейтингу с учётом экипировки (WCL bracketPercent): место среди игроков спека с тем же уровнем предметов */
 function pickValue(){
@@ -661,7 +678,7 @@ function updatePickInfo(){
 }
 $("#pickBy").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
-$("#raidRotBtn").onclick = () => run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: $("#ref").value, pick: pickValue() || null, mythic: $("#mythicToo").checked});
+$("#raidRotBtn").onclick = () => allFights() ? run({mode:"allbosses", url:$("#url").value.trim(), actor:"all", wait: $("#waitLimit").checked}) : run({mode:"raidrot", url:$("#url").value.trim(), fight:$("#fight").value, ref: $("#ref").value, pick: pickValue() || null, mythic: $("#mythicToo").checked});
 $("#demoRaidRotBtn").onclick = () => run({mode:"raidrot", demo:true});
 $("#allBtn").onclick = () => run({mode:"allbosses", url:$("#url").value.trim(), actor:$("#player").value, wait: $("#waitLimit").checked});
 const RUN_BTNS = ["#runBtn", "#raidBtn", "#raidRotBtn", "#allBtn"];

@@ -114,6 +114,7 @@ PANEL = re.compile(r"""class=["']SpellPanel_panel__""")
 SHARE = re.compile(r"""value=["'](https?://(?:www\.)?mythictrap\.com/[^"'?]+\?ability=[^"'&]+)["']""")
 TITLE = re.compile(r"""class=["']SpellPanel_headerTitle__[^"']*["'][^>]*>(.*?)</div>""", re.S)
 SPELL_ID = re.compile(r"wowhead\.com/(?:[a-z]{2}/)?spell=(\d+)")
+VIDEO = re.compile(r"""<source[^>]*src=["'](https?://[^"']+\.(?:mp4|webm))["']""", re.I)
 
 
 def parse_abilities(page: str) -> list[dict]:
@@ -139,6 +140,11 @@ def parse_abilities(page: str) -> list[dict]:
         a = {"name": name, "id": sid}
         if sh:
             a["share"] = html.unescape(sh.group(1))
+        # ролик механики стоит прямо перед карточкой (VideoAbilityPanel: видео, затем карточка)
+        gap = page[starts[i - 1] if i else max(0, st - 20000):st]
+        vids = VIDEO.findall(gap)
+        if vids and "VideoAbilityPanel" in gap[gap.rfind(vids[-1]):]:
+            a["video"] = html.unescape(vids[-1])
         out.append(a)
     return out or parse_abilities_plain(page)
 
@@ -272,6 +278,38 @@ def summary(new: list[dict], old: dict) -> list[str]:
     return lines
 
 
+def video_sizes(raids: list[dict]) -> None:
+    """Сколько роликов и сколько они весят (запрос HEAD, сами видео не скачиваются)."""
+    lines = []
+    total_n, total_b = 0, 0
+    for r in raids:
+        urls = {}
+        for b in r["bosses"]:
+            for v in b["abilities"].values():
+                for x in v:
+                    if x.get("video"):
+                        urls.setdefault(x["video"], b["name"])
+        rb = 0
+        for u in urls:
+            try:
+                req = urllib.request.Request(u, method="HEAD", headers={"User-Agent": UA})
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    rb += int(resp.headers.get("Content-Length") or 0)
+            except Exception as e:  # noqa: BLE001
+                lines.append(f"  ! {u}: {e}")
+            time.sleep(0.3)
+        per_boss = {}
+        for u, bn in urls.items():
+            per_boss[bn] = per_boss.get(bn, 0) + 1
+        lines.append(f"{r['name']}: роликов {len(urls)}, {rb / 1e6:.1f} МБ — " + ", ".join(f"{k} {v}" for k, v in per_boss.items()))
+        total_n += len(urls)
+        total_b += rb
+    lines.insert(0, f"Всего роликов {total_n}, {total_b / 1e6:.1f} МБ")
+    print("\n".join(lines))
+    if os.environ.get("GITHUB_ACTIONS"):
+        print("::notice title=videos::" + "\n".join(lines).replace("%", "%25").replace("\n", "%0A"))
+
+
 def _counts(raids: list[dict]) -> list[str]:
     return [f"{r['name']} / {b['name']}: " + ", ".join(
         f"{d} {len(v)} (share {sum(1 for x in v if x.get('share'))})" for d, v in b["abilities"].items())
@@ -284,6 +322,7 @@ def main(argv=None) -> int:
     ap.add_argument("--raid", action="append", help="только этот рейд (slug), можно несколько")
     ap.add_argument("--dump", metavar="URL", help="показать разметку вокруг первой ссылки на Wowhead и выйти")
     ap.add_argument("--find", metavar="TEXT", help="с --dump: показать разметку вокруг этого текста")
+    ap.add_argument("--video-sizes", action="store_true", help="посчитать, сколько весят все ролики")
     a = ap.parse_args(argv)
 
     if a.dump:
@@ -305,6 +344,8 @@ def main(argv=None) -> int:
     old = load_old()
     try:
         raids, notes = collect(old, set(a.raid) if a.raid else None)
+        if a.video_sizes:
+            video_sizes(raids)
     except SystemExit as e:
         print(e)
         _step_summary(["### Ссылки на гайды: файл не обновлён", f"- {e}"])

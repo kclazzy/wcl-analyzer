@@ -13,6 +13,10 @@ on:
         description: "Только проверить, ничего не сохранять"
         type: boolean
         default: false
+      video_sizes:
+        description: "Посчитать, сколько весят ролики"
+        type: boolean
+        default: false
       debug_url:
         description: "Отладка: показать разметку страницы (адрес)"
         type: string
@@ -42,7 +46,7 @@ jobs:
         run: python tools/update_guides.py --dump "${{ inputs.debug_url }}" --find "${{ inputs.debug_find }}"
       - name: Собрать ссылки с Mythic Trap
         if: ${{ !inputs.debug_url }}
-        run: python tools/update_guides.py ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: python tools/update_guides.py ${{ inputs.dry_run && '--dry-run' || '' }} ${{ inputs.video_sizes && '--video-sizes' || '' }}
       - name: Проверить программу с новыми ссылками
         if: ${{ !inputs.dry_run && !inputs.debug_url }}
         run: |

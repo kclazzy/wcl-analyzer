@@ -225,10 +225,13 @@ def test_player_all_bosses():
     R2 = job2["result"]
     assert [b["fight_id"] for b in R2["bosses"]] == [2, 3] and not R2["pending"], (R2["bosses"], R2["pending"])
     # «Все игроки»: DPS каждого боя на каждом боссе
+    client.report_rankings = lambda code, fid: {"data": [{"roles": {"dps": {"characters": [
+        {"name": "Me", "rankPercent": 40 + fid, "bracketPercent": 50 + fid}]}}}]}
     job3 = {"id": "v" * 32, "progress": 0.0}
     web._run_player_all(job3, {**params, "actor": "all"}, None, lambda *_: None)
     R3 = job3["result"]
     assert R3["everyone"] and len(R3["bosses"]) == 3 and {b["player"] for b in R3["bosses"]} == {"Me"}, R3["bosses"]
+    assert sorted(b["ilvl_pct"] for b in R3["bosses"]) == [51, 52, 53], [b.get("ilvl_pct") for b in R3["bosses"]]
     web._player_ref = orig_ref
     print("OK игрок на всех боссах: топ-1, остановка по лимиту WCL и продолжение с оставшихся")
 

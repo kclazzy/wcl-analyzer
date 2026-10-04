@@ -266,6 +266,18 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
     if not wait:
         client.max_wait_s = 0  # не ждём сброса лимита — останавливаемся и предлагаем продолжить
     shared = shared_cache(client)  # общие данные боя — один раз на всех игроков этого боя
+    ranks_cache: dict = {}
+
+    def ranks_of(fid: int) -> dict:
+        """Рейтинги WCL игроков боя (процентиль и с учётом экипировки) — один запрос на бой, только киллы."""
+        if fid not in ranks_cache:
+            from .collect import player_percentiles
+            try:
+                ranks_cache[fid] = player_percentiles(client.report_rankings(code, fid)) \
+                    if fights[fid].get("kill") and hasattr(client, "report_rankings") else {}
+            except Exception:  # noqa: BLE001 — рейтинги необязательны
+                ranks_cache[fid] = {}
+        return ranks_cache[fid]
     code, _, _ = parse_report_url(params["url"])
     report = client.report(code)
     everyone = str(params.get("actor")) == "all"
@@ -303,7 +315,9 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
             tops, ref_label = _player_ref(client, me, me.difficulty, p1, lambda m: log("    " + m), {})
             res = _player_result(job, p1, client, me, tops, ref_label, {}, me.difficulty, lambda m: log("    " + m), alt=False)
             res.pop("ref", None)
+            rk = ranks_of(fid).get(me.name) or ranks_of(fid).get(me.actor_id) or {}
             rows.append({"fight_id": fid, "actor": me.actor_id, "player": me.name, "cls": me.cls, "spec": me.spec,
+                         "rank": rk.get("rank"), "ilvl_pct": rk.get("ilvl"),
                          "boss": me.encounter_name, "difficulty": me.difficulty_name, "kill": me.kill,
                          "duration": _fmt_t(me.duration), "dps": round(me.dps), "ref_dps": res["info"].get("ref_dps"),
                          "ref_label": ref_label, "actions": (res.get("brief") or {}).get("actions", [])[:3], "detail": res})

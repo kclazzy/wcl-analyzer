@@ -326,17 +326,17 @@ def test_top_progress():
     ticks = [{"t": 43.0 + i, "name": "Tranquility", "pid": 7, "id": 740} for i in range(8)] + \
             [{"t": 140.0, "name": "Tranquility", "pid": 7, "id": 740}, {"t": 44.0, "name": "Divine Hymn", "pid": 8, "id": 64843}]
     assert [(c["name"], c["t"]) for c in merge_cd_ticks(ticks)] == [("Tranquility", 43.0), ("Divine Hymn", 44.0), ("Tranquility", 140.0)]
-    # заметка: сверху рейдовые, ниже кулдауны лекарей, в каждом блоке по времени
+    # заметка: одна, строки по времени; в строке сначала рейдовые кулдауны, затем лекарей
     hv = [{"t": 90, "abilities": ["Волна"], "ability_id": 5, "cd_list": [
               {"cd": "Апофеоз", "player": "Б", "id": 200183, "t": 88, "cls": "Priest", "kind": "heal"},
-              {"cd": "Гимн", "player": "Б", "id": 64843, "t": 89, "cls": "Priest", "kind": "raid"}]},
+              {"cd": "Тотем", "player": "В", "id": 108280, "t": 89, "cls": "Shaman", "kind": "raid"}]},
           {"t": 30, "abilities": ["Удар"], "ability_id": 6, "cd_list": [
               {"cd": "Тотем", "player": "А", "id": 108280, "t": 28, "cls": "Shaman", "kind": "raid"}]}]
     note = [x["mrt"] for x in heaviest_mrt(hv, [])]
-    assert note[0].startswith("--- Рейдовые") and note[1].startswith("{time:0:28}") and note[2].startswith("{time:1:29}"), note
-    assert note[3].startswith("--- Кулдауны лекарей") and note[4].startswith("{time:1:28}") and len(note) == 5, note
+    assert len(note) == 2 and note[0].startswith("{time:0:28}") and note[1].startswith("{time:1:28}"), note
+    assert note[1].index("{spell:108280}") < note[1].index("{spell:200183}"), note
     # заметка MRT по самым тяжёлым моментам: их нажатия, без повторов способности в строке
-    assert R["extras"]["heaviest_mrt"] and all(x["mrt"].startswith("{time:") or x.get("header") for x in R["extras"]["heaviest_mrt"])
+    assert R["extras"]["heaviest_mrt"] and all(x["mrt"].startswith("{time:") for x in R["extras"]["heaviest_mrt"])
     for h in R["extras"]["heaviest"]:
         assert len(h["cds"]) == len(set(h["cds"])), h["cds"]
 

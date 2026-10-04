@@ -222,29 +222,23 @@ def _cd_kind(c: dict) -> str:
 
 
 def heaviest_mrt(heaviest: list[dict], phases: list[dict]) -> list[dict]:
-    """Заметка MRT по самым тяжёлым моментам: какие кулдауны нажал этот рейд — сверху рейдовые, ниже
-    кулдауны лекарей, в каждом блоке по времени первого нажатия (со 2-й фазы — от начала фазы).
+    """Заметка MRT по самым тяжёлым моментам: строка на момент, по времени первого нажатия (со 2-й фазы —
+    от начала фазы); в строке сначала рейдовые кулдауны, затем кулдауны лекарей.
     Для разбора топа — готовая расстановка лучших гильдий."""
     from .raid_top import mrt_line
-    blocks = {"raid": [], "heal": []}
-    for h in heaviest or []:
-        for kind in blocks:
-            picks = [p for p in h.get("cd_list") or [] if p.get("kind", "raid") == kind]
-            if not picks:
-                continue
-            t0 = min(p["t"] for p in picks)
-            ph = phase_at(phases, t0)
-            n = ph["n"] if ph and (ph.get("n") or 0) > 1 else None
-            line = mrt_line(t0, "«" + (h["abilities"][0] if h.get("abilities") else "Пик") + "»", picks, n,
-                            round(t0 - ph["t"], 1) if n else None, mech_id=h.get("ability_id"))
-            if line:
-                blocks[kind].append({"t": t0, "time": _fmt_t(t0), "mrt": line, "kind": kind})
     out = []
-    for kind, title in (("raid", "--- Рейдовые кулдауны ---"), ("heal", "--- Кулдауны лекарей ---")):
-        if blocks[kind]:
-            out.append({"t": -1, "time": "", "mrt": title, "kind": kind, "header": True})
-            out += sorted(blocks[kind], key=lambda x: x["t"])
-    return out
+    for h in heaviest or []:
+        picks = sorted(h.get("cd_list") or [], key=lambda p: (p.get("kind", "raid") != "raid", p["t"]))
+        if not picks:
+            continue
+        t0 = min(p["t"] for p in picks)
+        ph = phase_at(phases, t0)
+        n = ph["n"] if ph and (ph.get("n") or 0) > 1 else None
+        line = mrt_line(t0, "«" + (h["abilities"][0] if h.get("abilities") else "Пик") + "»", picks, n,
+                        round(t0 - ph["t"], 1) if n else None, mech_id=h.get("ability_id"))
+        if line:
+            out.append({"t": t0, "time": _fmt_t(t0), "mrt": line})
+    return sorted(out, key=lambda x: x["t"])
 
 
 def phase_at(phases: list[dict], t: float) -> dict | None:

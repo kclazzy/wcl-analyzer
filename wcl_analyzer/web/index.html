@@ -1214,7 +1214,7 @@ function renderRaidPeaks(P, el){
         r.top_raid!==undefined ? scopeCell(r.top_raid, r.top_self||[], false) : esc((r.top_cds||[]).join(", ")||"—")]),
         {num:[3], cls:"wide", flag:i=>{const r=V.rows[i]; return r.my!=null && !r.my.length && (r.top_share||0)>=0.5;}}) + "</div>" : ""}
     ${box(TP ? `Самые тяжёлые моменты боя ${TP.guild}` : "Самые тяжёлые моменты вашего боя", "5 секунд с наибольшим уроном по рейду. Кулдаун засчитан, если нажат за 8 с до момента или во время него."
-        + ((X.heaviest_mrt||[]).length ? " «Скопировать для MRT» — заметка с этими нажатиями: сверху рейдовые кулдауны, ниже кулдауны лекарей, в каждом блоке по времени первого нажатия." : ""),
+        + ((X.heaviest_mrt||[]).length ? " «Скопировать для MRT» — заметка с этими нажатиями: строка на момент, по времени первого нажатия; в строке сначала рейдовые кулдауны, затем кулдауны лекарей." : ""),
       table(["Когда","Урон за 5 с","Доля боя","Механики","Нажатые рейдовые кулдауны"], H.map(h=>[h.time, num(h.damage), pct(h.share,0), esc(h.abilities.join(", ")),
         h.cds.length?esc([...new Set(h.cds)].join(", ")):'<span class="worse">ничего</span>']), {num:[1,2], empty:"Нет данных об уроне.", flag:i=>!H[i].cds.length})
       + mrtBlock(X.heaviest_mrt || [], (TP ? TP.guild + " — " : "") + ((P.info||{}).boss || "")))}

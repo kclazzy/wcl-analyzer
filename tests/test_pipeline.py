@@ -279,6 +279,34 @@ def test_fight_mode():
     print("OK «Разобрать бой»: рейд сразу, ротация следом, лимит не теряет готовое, один Excel, все боссы")
 
 
+def test_top_progress():
+    """«Топ прогресса»: первый килл в мире по рейтингу прогресса WCL, разбор без сравнения;
+    закрытый лог первой гильдии — берётся следующая."""
+    from wcl_analyzer import web
+    from wcl_analyzer.raid_demo import CODE, DEMO_URL, FakeRaidClient
+
+    class C(FakeRaidClient):
+        def fight_rankings(self, enc, diff, metric="speed", **k):
+            self.metric = metric
+            fid = int([f for f in self.report(CODE)["fights"] if f.get("encounterID")][-1]["id"])
+            return [{"report": {"code": "PRIVATE00001", "fightID": 1}, "guild": {"name": "Закрытые"}},
+                    {"report": {"code": CODE, "fightID": fid}, "guild": {"name": "Echo"},
+                     "server": {"name": "Tarren Mill", "region": "EU"}}]
+    cl = C()
+    orig = web.CLIENT_FACTORY
+    web.CLIENT_FACTORY = lambda creds: cl
+    try:
+        job = {"id": "tp", "log": [], "progress": 0.0, "state": "running"}
+        web._run_top_progress(job, {"mode": "progress", "url": DEMO_URL}, None, job["log"].append)
+    finally:
+        web.CLIENT_FACTORY = orig
+    R = job["result"]
+    assert cl.metric == "progress", cl.metric
+    assert R["info"]["top_progress"]["guild"] == "Echo" and R["info"]["top_progress"]["rank"] == 2, R["info"]["top_progress"]
+    assert R["extras"].get("vs_top") is None and job.get("xlsx")       # без сравнения, Excel есть
+    print("OK топ прогресса: первый килл по рейтингу прогресса, закрытый лог — следующая гильдия, без сравнения")
+
+
 def test_player_all_bosses():
     """Игрок на всех боссах: эталон топ-1; не хватило лимита — оставшиеся боссы в «pending», потом «Продолжить»."""
     import copy
@@ -460,6 +488,7 @@ if __name__ == "__main__":
     test_player_all_bosses()
     test_plan_long_fight()
     test_fight_mode()
+    test_top_progress()
     test_plan_longer_phase()
     test_saves_all_bosses()
     test_gear_and_trinkets()

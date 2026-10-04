@@ -169,6 +169,7 @@ tr.flag td{background:var(--bad-soft)}
 .gsub{font-size:13.5px;color:var(--muted)}
 td .tag{font-size:13px}
 td .imp{font-size:13.5px}
+.tp-flag{display:inline-block;margin:0 0 10px;padding:4px 12px;border-radius:99px;background:var(--top);color:#fff;font-weight:600;font-size:14px}
 .ftabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
 .ftabs button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:10px 18px;font-weight:600;font-size:15px;color:var(--muted);cursor:pointer}
 .ftabs button:hover{color:var(--ink);border-color:var(--ink)}
@@ -321,7 +322,7 @@ dialog label.check input{width:auto;margin:0}
 
   <section class="start" aria-labelledby="startTitle">
     <h2 id="startTitle">Чем ваш бой отличается от лучших игроков вашего спека</h2>
-    <p class="lead">Вставьте ссылку на свой отчёт. Программа найдёт бой, соберёт топ-10 того же спека на том же боссе и покажет, что тренировать в первую очередь.</p>
+    <p class="lead">Вставьте ссылку на свой отчёт. Программа найдёт бой, сравнит его с лучшими игроками того же спека на том же боссе и покажет, что тренировать в первую очередь.</p>
     <form class="urlrow" id="findForm">
       <input id="url" type="text" inputmode="url" placeholder="https://www.warcraftlogs.com/reports/…" aria-label="Ссылка на отчёт Warcraft Logs" autocomplete="off">
       <button class="btn" id="findBtn" type="submit">Найти бой</button>
@@ -333,8 +334,7 @@ dialog label.check input{width:auto;margin:0}
       <div><label for="player" title="«Все игроки» — ротация всех DPS рейда; один игрок — подробный разбор только его">Ротация: игрок</label><select id="player"></select></div>
       <div><label for="ref">Ротацию сравнить с</label>
         <select id="ref" title="С кем сравнивать ротацию игроков. Топ-1 почти не тратит лимит WCL; «Без ротации» — только урон, сейвы и смерти">
-          <option value="top10" selected>Топ-10 (рекомендуется)</option>
-          <option value="top3">Топ-3</option>
+          <option value="top3" selected>Топ-3 (рекомендуется)</option>
           <option value="top1">Топ-1 (экономит лимит)</option>
           <option value="none">Без ротации — только рейд</option>
         </select></div>
@@ -351,6 +351,7 @@ dialog label.check input{width:auto;margin:0}
       <p class="hint" id="allHint" hidden style="grid-column:1/-1;margin:0;font-size:14px">Выбраны <b>все боссы отчёта</b> — по одному бою на босса (последний килл, без киллов — лучший пулл): план сейвов на каждого босса (героик и эпохальный) и ротация по боссам против топ-1, чтобы хватило лимита WCL.</p>
       <div class="runrow">
         <button class="btn you" id="runBtn" type="button" title="Одна кнопка — весь разбор: сначала урон, сейвы и смерти (готово через несколько секунд), затем ротация — всех DPS или выбранного игрока. Вкладки результата переключаются без новой загрузки, Excel — один на всё">Разобрать бой</button>
+        <button class="btn" id="progBtn" type="button" title="Бой гильдии, которая первой в мире убила этого босса на этой сложности (рейтинг прогресса Warcraft Logs): урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения — просто посмотреть, как это сделали лучшие">Топ прогресса</button>
         <label class="chk" title="Когда часовой лимит WCL кончится, не останавливаться, а дождаться сброса и продолжить (можно оставить на ночь)"><input type="checkbox" id="waitLimit"> Кончится лимит — ждать и продолжать</label>
         <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
@@ -648,8 +649,8 @@ function syncAllMode(){
   const all = allFights(), one = $("#player").value && $("#player").value !== "all";
   $("#allHint").hidden = !all;
   /* на всех боссах ротация всегда против топ-1: остаётся выбор «с ротацией / без» */
-  [...$("#ref").options].forEach(o => { if (o.value === "top3" || o.value === "top10") o.disabled = all; });
-  if (all && ($("#ref").value === "top3" || $("#ref").value === "top10")) { REF_BEFORE_ALL = $("#ref").value; $("#ref").value = "top1"; }
+  [...$("#ref").options].forEach(o => { if (o.value === "top3") o.disabled = all; });
+  if (all && $("#ref").value === "top3") { REF_BEFORE_ALL = $("#ref").value; $("#ref").value = "top1"; }
   else if (!all && REF_BEFORE_ALL) { if ($("#ref").value === "top1") $("#ref").value = REF_BEFORE_ALL; REF_BEFORE_ALL = null; }
   $("#pickBy").disabled = all || one; $("#pickMax").disabled = all || one || !$("#pickBy").value;
   updatePickInfo();
@@ -661,7 +662,12 @@ $("#runBtn").onclick = () => run({mode:"fight", url:$("#url").value.trim(), figh
   ref:$("#ref").value, pick: allFights() ? null : (pickValue() || null), mythic: $("#mythicToo").checked, wait: $("#waitLimit").checked});
 $("#player").addEventListener("change", syncAllMode);
 $("#demoBtn").onclick = () => run({demo:true});
-$("#demoRaidBtn").onclick = () => run({mode:"fight", demo:true, ref:"top10"});
+$("#demoRaidBtn").onclick = () => run({mode:"fight", demo:true, ref:"top3"});
+/* «Топ прогресса»: бой гильдии, первой в мире убившей этого босса на этой сложности, — без сравнения */
+$("#progBtn").onclick = () => {
+  if (allFights()) return showErr("Для «Топ прогресса» выберите в списке «Бой» конкретного босса.");
+  run({mode:"progress", url:$("#url").value.trim(), fight:$("#fight").value, wait: $("#waitLimit").checked});
+};
 /* Отбор игроков по рейтингу с учётом экипировки (WCL bracketPercent): место среди игроков спека с тем же уровнем предметов */
 function pickValue(){
   const by = $("#pickBy").value, n = parseInt($("#pickMax").value, 10);
@@ -686,7 +692,7 @@ function updatePickInfo(){
 $("#pickBy").addEventListener("change", updatePickInfo);
 $("#ref").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
-const RUN_BTNS = ["#runBtn"];
+const RUN_BTNS = ["#runBtn", "#progBtn"];
 
 /* ---------- анализ ---------- */
 async function run(params, path="/api/analyze"){
@@ -797,6 +803,7 @@ function histTitle(R){
   if (R.mode === "raidrot") return `Разбор ротации рейда: ${I.boss}, ${I.difficulty} (${R.players.length} DPS)`;
   if (R.mode === "playerall") return `${R.everyone ? "Все игроки" : (I.name || "Игрок")} — все боссы (${R.bosses.length}${(R.pending||[]).length?`, ещё ${R.pending.length} ждут лимита`:""})`;
   if (R.mode === "saves") return `Сейвы на всех боссов: ${I.boss || I.title} (${R.bosses.length} ${plural(R.bosses.length,"босс","босса","боссов")})`;
+  if (R.mode === "raid" && I.top_progress) return `Топ прогресса: ${I.top_progress.guild} (${I.top_progress.rank}-е место) — ${I.boss}, ${I.difficulty}`;
   return R.mode === "raid" ? `Рейд: ${I.boss}, ${I.difficulty}, пулл ${R.summary.pull_n} (${I.kill?"килл":"вайп"})`
                            : `${I.name}, ${who(I.cls, I.spec)} — ${I.boss}, ${I.difficulty}`;
 }
@@ -1516,6 +1523,7 @@ function renderRaid(R){
     ${I.demo?'<div class="demo-flag">Демо: синтетический рейд, не реальный лог</div>':""}
     <div class="hero">
       <div>
+        ${I.top_progress ? `<div class="tp-flag">Топ прогресса: ${I.top_progress.rank}-е место в мире — ${esc(I.top_progress.guild)}${I.top_progress.server ? ` (${esc(I.top_progress.server)}${I.top_progress.region ? "-" + esc(I.top_progress.region) : ""})` : ""}. Разбор их боя, без сравнения.</div>` : ""}
         <div class="who"><strong>${esc(I.boss)}, ${esc(I.difficulty)}: ${outcome} за ${I.duration}</strong>
           Пулл ${S.pull_n} из ${S.pulls}. Состав: ${I.tanks} танка, ${I.healers} лекаря, ${I.dps} DPS.</div>
         <div class="dps">${num(S.raid_dps)} <small>DPS рейда, ${num(S.raid_hps)} HPS</small></div>

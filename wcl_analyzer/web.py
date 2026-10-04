@@ -145,6 +145,8 @@ def _run_job(job: dict, params: dict, creds) -> None:
         mode = params.get("mode")
         if mode == "fight":
             _run_fight(job, params, creds, log)
+        elif mode == "progress":
+            _run_top_progress(job, params, creds, log)
         elif mode == "raid":
             _run_raid(job, params, creds, log)
         elif mode == "raidrot":
@@ -216,7 +218,7 @@ def _max_age_s(params: dict) -> float:
 
 
 MYTHIC = 5
-# Размер эталона: топ-1, топ-3 или топ-10 (по умолчанию)
+# Размер эталона: топ-1 или топ-3 (по умолчанию); топ-10 — только для старых разборов из истории
 REF_SIZES = {"top1": 1, "top3": 3, "top10": 10}
 
 
@@ -290,7 +292,7 @@ def _run_fight(job: dict, params: dict, creds, log) -> None:
     браузер показывает её сразу (job["partial"]), ротация досчитывается следом. Кончился лимит WCL на
     ротации — готовые вкладки остаются, во вкладке ротации — причина и «Продолжить». Excel — один на всё."""
     allb = params.get("fight") == "all"
-    ref = params.get("ref") or "top10"
+    ref = params.get("ref") or "top3"
     actor = params.get("actor")
     demo = bool(params.get("demo"))
     parts: dict = {}
@@ -508,7 +510,7 @@ def _boss_fights(report: dict) -> list[dict]:
 def _player_ref(client, me, difficulty: int, params: dict, log, meta: dict):
     from .collect import collect_reference
     from .config import DIFFICULTY_NAMES
-    n = REF_SIZES.get(params.get("ref") or "top10", 10)
+    n = REF_SIZES.get(params.get("ref") or "top3", 3)
     log(f"Собираю эталон: топ-{n} {spec_ru(me.cls, me.spec)} на этом боссе, сложность — "
         f"{DIFFICULTY_NAMES.get(int(difficulty or 0), difficulty)}. Первый раз это занимает несколько минут, дальше быстрее.")
     if params.get("refresh"):
@@ -651,6 +653,63 @@ def _run_saves(job: dict, params: dict, creds, log) -> None:
     log("Готово.")
 
 
+def _run_top_progress(job: dict, params: dict, creds, log) -> None:
+    """«Топ прогресса»: бой гильдии, первой убившей этого босса на этой сложности (рейтинг WCL по прогрессу),
+    разобранный как обычный бой рейда — урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения
+    с вашим боем и с другими киллами: просто посмотреть, как это сделали лучшие."""
+    from .config import DIFFICULTY_NAMES, SITE_URL
+    from .excel_raid import write_raid_workbook
+    from .logs import parse_report_url
+    from .raid import run_raid
+
+    if params.get("demo"):
+        from .raid_demo import DEMO_URL, FakeRaidClient
+        client, enc, diff = FakeRaidClient(), None, None
+        cands = [{"url": DEMO_URL, "fight": None, "guild": "Демо-гильдия", "rank": 1}]
+    else:
+        client = _client(creds, job, log, wait=bool(params.get("wait")))
+        code, url_fight, _ = parse_report_url(params["url"])
+        report = client.report(code)
+        fid = params.get("fight") if params.get("fight") not in (None, "", "all") else url_fight
+        fights = [f for f in report.get("fights") or [] if int(f.get("encounterID") or 0)]
+        f = next((f for f in fights if str(f["id"]) == str(fid)), None) or (fights[-1] if fights else None)
+        if not f:
+            raise LookupError("В отчёте нет боёв с боссами — не понятно, чей топ прогресса искать")
+        enc, diff = int(f["encounterID"]), int(f.get("difficulty") or 0)
+        log(f"{f.get('name')} ({DIFFICULTY_NAMES.get(diff, '')}): ищу первые киллы в мире (рейтинг WCL по прогрессу)…")
+        ranks = client.fight_rankings(enc, diff, "progress")
+        cands = []
+        for i, rk in enumerate(ranks[:5]):
+            rep = rk.get("report") or {}
+            if rep.get("code"):
+                g = rk.get("guild") or {}
+                srv = rk.get("server") or {}
+                cands.append({"url": f"{SITE_URL}/reports/{rep['code']}", "fight": int(rep.get("fightID") or rep.get("fightId") or 0),
+                              "guild": g.get("name") or rk.get("name") or rep["code"], "rank": i + 1,
+                              "server": srv.get("name"), "region": srv.get("region"), "start": rk.get("startTime")})
+        if not cands:
+            raise LookupError("У этого босса на этой сложности пока нет рейтинга прогресса в Warcraft Logs")
+    job["progress"] = 0.1
+    last = None
+    for c in cands[:3]:  # закрытый или битый лог первой гильдии — берём следующую
+        log(f"Место {c['rank']}: {c['guild']} — разбираю их бой…")
+        try:
+            R = run_raid(client, c["url"], c["fight"], log=lambda m: log("    " + m), compare_top=False, mythic=False,
+                         talent_data=[] if params.get("demo") else None, save_talents=not SERVER["public"],
+                         avoidable=set(_avoidable_list()),
+                         progress=lambda x: job.__setitem__("progress", max(job["progress"], min(0.95, 0.1 + 0.85 * x))))
+            break
+        except Exception as e:  # noqa: BLE001
+            last = e
+            log(f"    не получилось: {_friendly(e)}")
+    else:
+        raise LookupError(f"Не удалось открыть бои лучших гильдий: {_friendly(last) if last else 'нет данных'}")
+    R["info"]["top_progress"] = {k: c.get(k) for k in ("rank", "guild", "server", "region", "start")}
+    _excel_bytes(job, f"Топ_прогресса_{R['info']['boss']}_{c['guild']}", write_raid_workbook, R)
+    job["result"] = {**R, "excel": f"/api/report/{job['id']}", "source_url": c["url"]}
+    log("Готово.")
+
+
 def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:
     """Каждый DPS боя против топа своего спека; эталон собирается один раз на спек."""
     from .excel_report import write_raid_rotation_workbook
@@ -660,7 +719,7 @@ def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:
     def progress(x: float) -> None:
         job["progress"] = max(job["progress"], min(0.95, x))
 
-    n = REF_SIZES.get(params.get("ref") or "top10", 10)
+    n = REF_SIZES.get(params.get("ref") or "top3", 3)
     log(f"Эталон для каждого спека: топ-{n} (размер — в списке «Сравнить с»).")
     if params.get("demo"):
         R = run_demo(25, log=log, progress=progress)
@@ -1013,7 +1072,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "units", "prev", "wait",
                                                    "refresh", "max_age_days", "pick", "mythic")}
-                if params["mode"] not in (None, "fight", "raid", "raidrot", "saves", "allbosses"):
+                if params["mode"] not in (None, "fight", "progress", "raid", "raidrot", "saves", "allbosses"):
                     params["mode"] = None
                 return self._json({"job": start_job(creds, params)})
             if path == "/api/refs/refresh":

@@ -404,8 +404,11 @@
         "id": 1304459
        },
        {
-        "name": "Splitting Clot",
-        "id": 1286631
+        "name": "Splitting Cot",
+        "id": 1286631,
+        "aka": [
+         "Splitting Clot"
+        ]
        },
        {
         "name": "Siphoning Infection",
@@ -450,8 +453,11 @@
         "id": 1283164
        },
        {
-        "name": "Splitting Clot",
-        "id": 1286631
+        "name": "Splitting Cot",
+        "id": 1286631,
+        "aka": [
+         "Splitting Clot"
+        ]
        },
        {
         "name": "Siphoning Infection",
@@ -496,8 +502,11 @@
         "id": 1283164
        },
        {
-        "name": "Splitting Clot",
-        "id": 1286631
+        "name": "Splitting Cot",
+        "id": 1286631,
+        "aka": [
+         "Splitting Clot"
+        ]
        },
        {
         "name": "Siphoning Infection",
@@ -1068,10 +1077,6 @@
         "id": 1288624
        },
        {
-        "name": "Soulbinding",
-        "id": null
-       },
-       {
         "name": "Fragment of Malacrass",
         "id": 1287722
        },
@@ -1090,6 +1095,10 @@
        {
         "name": "Soulbound",
         "id": 1309987
+       },
+       {
+        "name": "Soulbinding",
+        "id": null
        }
       ],
       "heroic": [
@@ -1146,10 +1155,6 @@
         "id": 1288624
        },
        {
-        "name": "Soulbinding",
-        "id": null
-       },
-       {
         "name": "Fragment of Malacrass",
         "id": 1287722
        },
@@ -1168,6 +1173,10 @@
        {
         "name": "Soulbound",
         "id": 1309987
+       },
+       {
+        "name": "Soulbinding",
+        "id": null
        }
       ],
       "normal": [
@@ -1220,10 +1229,6 @@
         "id": 1288624
        },
        {
-        "name": "Soulbinding",
-        "id": null
-       },
-       {
         "name": "Fragment of Malacrass",
         "id": 1287722
        },
@@ -1242,6 +1247,10 @@
        {
         "name": "Soulbound",
         "id": 1309987
+       },
+       {
+        "name": "Soulbinding",
+        "id": null
        }
       ]
      }
@@ -1518,6 +1527,3916 @@
        {
         "name": "Vicious Echoes",
         "id": 1310764
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "slug": "siege-of-orgrimmar",
+   "name": "Siege of Orgrimmar",
+   "bosses": [
+    {
+     "slug": "immerseus",
+     "name": "Immerseus",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Sha Bolt",
+        "id": 143295
+       },
+       {
+        "name": "Sha Splash",
+        "id": 143297
+       },
+       {
+        "name": "Swirl",
+        "id": 143309
+       },
+       {
+        "name": "Swelling Corruption",
+        "id": 143574
+       },
+       {
+        "name": "Corrosive Blast",
+        "id": 143436
+       },
+       {
+        "name": "Seeping Sha",
+        "id": 143286
+       },
+       {
+        "name": "Sha Pool",
+        "id": 143460
+       },
+       {
+        "name": "Congealing",
+        "id": 143540
+       },
+       {
+        "name": "Purified Residue",
+        "id": 143524
+       },
+       {
+        "name": "Sha Residue",
+        "id": 143459
+       },
+       {
+        "name": "Erupting Sha",
+        "id": 143498
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Sha Bolt",
+        "id": 143295
+       },
+       {
+        "name": "Sha Splash",
+        "id": 143297
+       },
+       {
+        "name": "Swirl",
+        "id": 143309
+       },
+       {
+        "name": "Swelling Corruption",
+        "id": 143574
+       },
+       {
+        "name": "Corrosive Blast",
+        "id": 143436
+       },
+       {
+        "name": "Seeping Sha",
+        "id": 143286
+       },
+       {
+        "name": "Sha Pool",
+        "id": 143460
+       },
+       {
+        "name": "Congealing",
+        "id": 143540
+       },
+       {
+        "name": "Purified Residue",
+        "id": 143524
+       },
+       {
+        "name": "Sha Residue",
+        "id": 143459
+       },
+       {
+        "name": "Erupting Sha",
+        "id": 143498
+       }
+      ],
+      "normal": [
+       {
+        "name": "Sha Bolt",
+        "id": 143295
+       },
+       {
+        "name": "Sha Splash",
+        "id": 143297
+       },
+       {
+        "name": "Swirl",
+        "id": 143309
+       },
+       {
+        "name": "Corrosive Blast",
+        "id": 143436
+       },
+       {
+        "name": "Seeping Sha",
+        "id": 143286
+       },
+       {
+        "name": "Sha Residue",
+        "id": 143459
+       },
+       {
+        "name": "Erupting Sha",
+        "id": 143498
+       },
+       {
+        "name": "Congealing",
+        "id": 143540
+       },
+       {
+        "name": "Purified Residue",
+        "id": 143524
+       }
+      ]
+     }
+    },
+    {
+     "slug": "fallen-protectors",
+     "name": "Fallen Protectors",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Corrupted Brew",
+        "id": 143019
+       },
+       {
+        "name": "Debilitation",
+        "id": 147383
+       },
+       {
+        "name": "Calamity",
+        "id": 143491
+       },
+       {
+        "name": "Bond of the Golden Lotus",
+        "id": 143497
+       },
+       {
+        "name": "Clash",
+        "id": 143027
+       },
+       {
+        "name": "Corruption Kick",
+        "id": 143007
+       },
+       {
+        "name": "Vengeful Strikes",
+        "id": 144396
+       },
+       {
+        "name": "Defiled Ground",
+        "id": 143959
+       },
+       {
+        "name": "Corruption Shock",
+        "id": 144018
+       },
+       {
+        "name": "Shared Torment",
+        "id": 145655
+       },
+       {
+        "name": "Inferno Strike",
+        "id": 143962
+       },
+       {
+        "name": "Noxious Poison",
+        "id": 143239
+       },
+       {
+        "name": "Garrote",
+        "id": 703
+       },
+       {
+        "name": "Instant Poison",
+        "id": 143224
+       },
+       {
+        "name": "Gouge",
+        "id": 12540
+       },
+       {
+        "name": "Mark of Anguish",
+        "id": 143812
+       },
+       {
+        "name": "Shadow Weakness",
+        "id": 144176
+       },
+       {
+        "name": "Dark Meditation",
+        "id": 143745
+       },
+       {
+        "name": "Meditative Field",
+        "id": 143564
+       },
+       {
+        "name": "Sha Sear",
+        "id": 143423
+       },
+       {
+        "name": "Shadow Word: Bane",
+        "id": 143434
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Corrupted Brew",
+        "id": 143019
+       },
+       {
+        "name": "Debilitation",
+        "id": 147383
+       },
+       {
+        "name": "Calamity",
+        "id": 143491
+       },
+       {
+        "name": "Bond of the Golden Lotus",
+        "id": 143497
+       },
+       {
+        "name": "Clash",
+        "id": 143027
+       },
+       {
+        "name": "Corruption Kick",
+        "id": 143007
+       },
+       {
+        "name": "Vengeful Strikes",
+        "id": 144396
+       },
+       {
+        "name": "Defiled Ground",
+        "id": 143959
+       },
+       {
+        "name": "Corruption Shock",
+        "id": 144018
+       },
+       {
+        "name": "Shared Torment",
+        "id": 145655
+       },
+       {
+        "name": "Inferno Strike",
+        "id": 143962
+       },
+       {
+        "name": "Noxious Poison",
+        "id": 143239
+       },
+       {
+        "name": "Garrote",
+        "id": 703
+       },
+       {
+        "name": "Instant Poison",
+        "id": 143224
+       },
+       {
+        "name": "Gouge",
+        "id": 12540
+       },
+       {
+        "name": "Mark of Anguish",
+        "id": 143812
+       },
+       {
+        "name": "Shadow Weakness",
+        "id": 144176
+       },
+       {
+        "name": "Dark Meditation",
+        "id": 143745
+       },
+       {
+        "name": "Meditative Field",
+        "id": 143564
+       },
+       {
+        "name": "Sha Sear",
+        "id": 143423
+       },
+       {
+        "name": "Shadow Word: Bane",
+        "id": 143434
+       }
+      ],
+      "normal": [
+       {
+        "name": "Bond of the Golden Lotus",
+        "id": 143497
+       },
+       {
+        "name": "Corrupted Brew",
+        "id": 143019
+       },
+       {
+        "name": "Clash",
+        "id": 143027
+       },
+       {
+        "name": "Corruption Kick",
+        "id": 143007
+       },
+       {
+        "name": "Vengeful Strikes",
+        "id": 144396
+       },
+       {
+        "name": "Inferno Strike",
+        "id": 143962
+       },
+       {
+        "name": "Defiled Ground",
+        "id": 143959
+       },
+       {
+        "name": "Corruption Shock",
+        "id": 144018
+       },
+       {
+        "name": "Noxious Poison",
+        "id": 143239
+       },
+       {
+        "name": "Garrote",
+        "id": 703
+       },
+       {
+        "name": "Mark of Anguish",
+        "id": 143812
+       },
+       {
+        "name": "Debilitation",
+        "id": 147383
+       },
+       {
+        "name": "Shadow Weakness",
+        "id": 144176
+       },
+       {
+        "name": "Gouge",
+        "id": 12540
+       },
+       {
+        "name": "Dark Meditation",
+        "id": 143745
+       },
+       {
+        "name": "Meditative Field",
+        "id": 143564
+       },
+       {
+        "name": "Sha Sear",
+        "id": 143423
+       },
+       {
+        "name": "Calamity",
+        "id": 143491
+       },
+       {
+        "name": "Shadow Word: Bane",
+        "id": 143434
+       }
+      ]
+     }
+    },
+    {
+     "slug": "norushen",
+     "name": "Norushen",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Purified",
+        "id": 146022
+       },
+       {
+        "name": "Residual Corruption",
+        "id": 145073
+       },
+       {
+        "name": "Blind Hatred",
+        "id": 145226
+       },
+       {
+        "name": "Corruption",
+        "id": 145052
+       },
+       {
+        "name": "Unleashed Anger",
+        "id": 145214
+       },
+       {
+        "name": "Icy Fear",
+        "id": 145733
+       },
+       {
+        "name": "Look Within",
+        "id": 144724
+       },
+       {
+        "name": "Test of Serenity",
+        "id": 144849
+       },
+       {
+        "name": "Tear Reality",
+        "id": 144482
+       },
+       {
+        "name": "Expel Corruption",
+        "id": 145064
+       },
+       {
+        "name": "Test of Reliance",
+        "id": 144850
+       },
+       {
+        "name": "Disheartening Laugh",
+        "id": 146707
+       },
+       {
+        "name": "Bottomless Pit",
+        "id": 146703
+       },
+       {
+        "name": "Lingering Corruption",
+        "id": 144514
+       },
+       {
+        "name": "Test of Confidence",
+        "id": 144851
+       },
+       {
+        "name": "Titanic Smash",
+        "id": 144628
+       },
+       {
+        "name": "Hurl Corruption",
+        "id": 144649
+       },
+       {
+        "name": "Burst of Corruption",
+        "id": 144654
+       },
+       {
+        "name": "Piercing Corruption",
+        "id": 144657
+       },
+       {
+        "name": "Burst of Anger",
+        "id": 147082
+       },
+       {
+        "name": "Fusion",
+        "id": 145132
+       },
+       {
+        "name": "Quarantine Safety Measures",
+        "id": 145779
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Purified",
+        "id": 146022
+       },
+       {
+        "name": "Residual Corruption",
+        "id": 145073
+       },
+       {
+        "name": "Blind Hatred",
+        "id": 145226
+       },
+       {
+        "name": "Corruption",
+        "id": 145052
+       },
+       {
+        "name": "Unleashed Anger",
+        "id": 145214
+       },
+       {
+        "name": "Icy Fear",
+        "id": 145733
+       },
+       {
+        "name": "Look Within",
+        "id": 144724
+       },
+       {
+        "name": "Test of Serenity",
+        "id": 144849
+       },
+       {
+        "name": "Tear Reality",
+        "id": 144482
+       },
+       {
+        "name": "Expel Corruption",
+        "id": 145064
+       },
+       {
+        "name": "Test of Reliance",
+        "id": 144850
+       },
+       {
+        "name": "Disheartening Laugh",
+        "id": 146707
+       },
+       {
+        "name": "Bottomless Pit",
+        "id": 146703
+       },
+       {
+        "name": "Lingering Corruption",
+        "id": 144514
+       },
+       {
+        "name": "Test of Confidence",
+        "id": 144851
+       },
+       {
+        "name": "Titanic Smash",
+        "id": 144628
+       },
+       {
+        "name": "Hurl Corruption",
+        "id": 144649
+       },
+       {
+        "name": "Burst of Corruption",
+        "id": 144654
+       },
+       {
+        "name": "Piercing Corruption",
+        "id": 144657
+       },
+       {
+        "name": "Burst of Anger",
+        "id": 147082
+       },
+       {
+        "name": "Fusion",
+        "id": 145132
+       },
+       {
+        "name": "Quarantine Safety Measures",
+        "id": 145779
+       }
+      ],
+      "normal": [
+       {
+        "name": "Purified",
+        "id": 146022
+       },
+       {
+        "name": "Blind Hatred",
+        "id": 145226
+       },
+       {
+        "name": "Corruption",
+        "id": 145052
+       },
+       {
+        "name": "Unleashed Anger",
+        "id": 145214
+       },
+       {
+        "name": "Icy Fear",
+        "id": 145733
+       },
+       {
+        "name": "Look Within",
+        "id": 144724
+       },
+       {
+        "name": "Test of Serenity",
+        "id": 144849
+       },
+       {
+        "name": "Tear Reality",
+        "id": 144482
+       },
+       {
+        "name": "Expel Corruption",
+        "id": 145064
+       },
+       {
+        "name": "Test of Reliance",
+        "id": 144850
+       },
+       {
+        "name": "Disheartening Laugh",
+        "id": 146707
+       },
+       {
+        "name": "Bottomless Pit",
+        "id": 146703
+       },
+       {
+        "name": "Lingering Corruption",
+        "id": 144514
+       },
+       {
+        "name": "Test of Confidence",
+        "id": 144851
+       },
+       {
+        "name": "Titanic Smash",
+        "id": 144628
+       },
+       {
+        "name": "Hurl Corruption",
+        "id": 144649
+       },
+       {
+        "name": "Burst of Corruption",
+        "id": 144654
+       },
+       {
+        "name": "Piercing Corruption",
+        "id": 144657
+       },
+       {
+        "name": "Burst of Anger",
+        "id": 147082
+       },
+       {
+        "name": "Residual Corruption",
+        "id": 145073
+       },
+       {
+        "name": "Fusion",
+        "id": 145132
+       },
+       {
+        "name": "Quarantine Safety Measures",
+        "id": 145779
+       }
+      ]
+     }
+    },
+    {
+     "slug": "sha-of-pride",
+     "name": "Sha of Pride",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Power of the Titans",
+        "id": 144364
+       },
+       {
+        "name": "Gift of the Titans",
+        "id": 144359
+       },
+       {
+        "name": "Swelling Pride",
+        "id": 144400
+       },
+       {
+        "name": "Bursting Pride",
+        "id": 144911
+       },
+       {
+        "name": "Projection",
+        "id": 145066
+       },
+       {
+        "name": "Aura of Pride",
+        "id": 146817
+       },
+       {
+        "name": "Overcome",
+        "id": 144843
+       },
+       {
+        "name": "Mocking Blast",
+        "id": 144379
+       },
+       {
+        "name": "Upon death, the 2 closest players also gain 5 Pride .",
+        "id": 144370
+       },
+       {
+        "name": "Self-Reflection",
+        "id": 144800
+       },
+       {
+        "name": "Corrupted Prison",
+        "id": 144574
+       },
+       {
+        "name": "Banishment",
+        "id": 145215
+       },
+       {
+        "name": "Orbs of Light",
+        "id": 145345
+       },
+       {
+        "name": "Ethereal Corruption",
+        "id": 149031
+       },
+       {
+        "name": "Unstable Corruption",
+        "id": 147198
+       },
+       {
+        "name": "Weakened Resolve",
+        "id": 147207
+       },
+       {
+        "name": "Wounded Pride",
+        "id": 144358
+       },
+       {
+        "name": "Reaching Attack",
+        "id": 119775
+       },
+       {
+        "name": "Mark of Arrogance",
+        "id": 144351
+       },
+       {
+        "name": "Unleashed",
+        "id": 144832
+       },
+       {
+        "name": "Final Gift",
+        "id": 144854
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Power of the Titans",
+        "id": 144364
+       },
+       {
+        "name": "Gift of the Titans",
+        "id": 144359
+       },
+       {
+        "name": "Swelling Pride",
+        "id": 144400
+       },
+       {
+        "name": "Bursting Pride",
+        "id": 144911
+       },
+       {
+        "name": "Projection",
+        "id": 145066
+       },
+       {
+        "name": "Aura of Pride",
+        "id": 146817
+       },
+       {
+        "name": "Overcome",
+        "id": 144843
+       },
+       {
+        "name": "Mocking Blast",
+        "id": 144379
+       },
+       {
+        "name": "Upon death, the 2 closest players also gain 5 Pride .",
+        "id": 144370
+       },
+       {
+        "name": "Self-Reflection",
+        "id": 144800
+       },
+       {
+        "name": "Corrupted Prison",
+        "id": 144574
+       },
+       {
+        "name": "Banishment",
+        "id": 145215
+       },
+       {
+        "name": "Orbs of Light",
+        "id": 145345
+       },
+       {
+        "name": "Ethereal Corruption",
+        "id": 149031
+       },
+       {
+        "name": "Unstable Corruption",
+        "id": 147198
+       },
+       {
+        "name": "Weakened Resolve",
+        "id": 147207
+       },
+       {
+        "name": "Wounded Pride",
+        "id": 144358
+       },
+       {
+        "name": "Reaching Attack",
+        "id": 119775
+       },
+       {
+        "name": "Mark of Arrogance",
+        "id": 144351
+       },
+       {
+        "name": "Unleashed",
+        "id": 144832
+       },
+       {
+        "name": "Final Gift",
+        "id": 144854
+       }
+      ],
+      "normal": [
+       {
+        "name": "Power of the Titans",
+        "id": 144364
+       },
+       {
+        "name": "Gift of the Titans",
+        "id": 144359
+       },
+       {
+        "name": "Swelling Pride",
+        "id": 144400
+       },
+       {
+        "name": "Bursting Pride",
+        "id": 144911
+       },
+       {
+        "name": "Projection",
+        "id": 145066
+       },
+       {
+        "name": "Aura of Pride",
+        "id": 146817
+       },
+       {
+        "name": "Overcome",
+        "id": 144843
+       },
+       {
+        "name": "Mocking Blast",
+        "id": 144379
+       },
+       {
+        "name": "Upon death, the 2 closest players also gain 5 Pride .",
+        "id": 144370
+       },
+       {
+        "name": "Self-Reflection",
+        "id": 144800
+       },
+       {
+        "name": "Corrupted Prison",
+        "id": 144574
+       },
+       {
+        "name": "Wounded Pride",
+        "id": 144358
+       },
+       {
+        "name": "Reaching Attack",
+        "id": 119775
+       },
+       {
+        "name": "Mark of Arrogance",
+        "id": 144351
+       },
+       {
+        "name": "Unleashed",
+        "id": 144832
+       },
+       {
+        "name": "Final Gift",
+        "id": 144854
+       }
+      ]
+     }
+    },
+    {
+     "slug": "galakras",
+     "name": "Galakras",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Shadow Assault",
+        "id": 146868
+       },
+       {
+        "name": "War Banner",
+        "id": 146735
+       },
+       {
+        "name": "Bombard",
+        "id": 148310
+       },
+       {
+        "name": "Healing Tide Totem",
+        "id": 108280
+       },
+       {
+        "name": "Tidal Wave",
+        "id": 148522
+       },
+       {
+        "name": "Fracture",
+        "id": 146901
+       },
+       {
+        "name": "Shattering Roar",
+        "id": 147204
+       },
+       {
+        "name": "Flame Arrows",
+        "id": 147552
+       },
+       {
+        "name": "Flame Breath",
+        "id": 146776
+       },
+       {
+        "name": "Chain Heal",
+        "id": 146757
+       },
+       {
+        "name": "Shadow Stalk",
+        "id": 146864
+       },
+       {
+        "name": "Dragonmaw Strike",
+        "id": 146747
+       },
+       {
+        "name": "Throw Axe",
+        "id": 147669
+       },
+       {
+        "name": "Curse of Venom",
+        "id": 147711
+       },
+       {
+        "name": "a stacking debuff",
+        "id": 146902
+       },
+       {
+        "name": "Venom Bolt Volley",
+        "id": 147713
+       },
+       {
+        "name": "Poison Cloud",
+        "id": 147705
+       },
+       {
+        "name": "Crusher's Call",
+        "id": 146769
+       },
+       {
+        "name": "Skull Cracker",
+        "id": 146848
+       },
+       {
+        "name": "Shattering Cleave",
+        "id": 146849
+       },
+       {
+        "name": "Arcing Smash",
+        "id": 147688
+       },
+       {
+        "name": "Thunder Clap",
+        "id": 6343
+       },
+       {
+        "name": "Muzzle Spray",
+        "id": 147824
+       },
+       {
+        "name": "Shoot",
+        "id": 16572
+       },
+       {
+        "name": "Flames of Galakrond",
+        "id": 147029
+       },
+       {
+        "name": "Pulsing Flames",
+        "id": 147042
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Shadow Assault",
+        "id": 146868
+       },
+       {
+        "name": "War Banner",
+        "id": 146735
+       },
+       {
+        "name": "Bombard",
+        "id": 148310
+       },
+       {
+        "name": "Healing Tide Totem",
+        "id": 108280
+       },
+       {
+        "name": "Tidal Wave",
+        "id": 148522
+       },
+       {
+        "name": "Fracture",
+        "id": 146901
+       },
+       {
+        "name": "Shattering Roar",
+        "id": 147204
+       },
+       {
+        "name": "Flame Arrows",
+        "id": 147552
+       },
+       {
+        "name": "Flame Breath",
+        "id": 146776
+       },
+       {
+        "name": "Chain Heal",
+        "id": 146757
+       },
+       {
+        "name": "Shadow Stalk",
+        "id": 146864
+       },
+       {
+        "name": "Dragonmaw Strike",
+        "id": 146747
+       },
+       {
+        "name": "Throw Axe",
+        "id": 147669
+       },
+       {
+        "name": "Curse of Venom",
+        "id": 147711
+       },
+       {
+        "name": "a stacking debuff",
+        "id": 146902
+       },
+       {
+        "name": "Venom Bolt Volley",
+        "id": 147713
+       },
+       {
+        "name": "Poison Cloud",
+        "id": 147705
+       },
+       {
+        "name": "Crusher's Call",
+        "id": 146769
+       },
+       {
+        "name": "Skull Cracker",
+        "id": 146848
+       },
+       {
+        "name": "Shattering Cleave",
+        "id": 146849
+       },
+       {
+        "name": "Arcing Smash",
+        "id": 147688
+       },
+       {
+        "name": "Thunder Clap",
+        "id": 6343
+       },
+       {
+        "name": "Muzzle Spray",
+        "id": 147824
+       },
+       {
+        "name": "Shoot",
+        "id": 16572
+       },
+       {
+        "name": "Flames of Galakrond",
+        "id": 147029
+       },
+       {
+        "name": "Pulsing Flames",
+        "id": 147042
+       }
+      ],
+      "normal": [
+       {
+        "name": "Shadow Assault",
+        "id": 146868
+       },
+       {
+        "name": "War Banner",
+        "id": 146735
+       },
+       {
+        "name": "Bombard",
+        "id": 148310
+       },
+       {
+        "name": "Healing Tide Totem",
+        "id": 108280
+       },
+       {
+        "name": "Tidal Wave",
+        "id": 148522
+       },
+       {
+        "name": "Fracture",
+        "id": 146901
+       },
+       {
+        "name": "Shattering Roar",
+        "id": 147204
+       },
+       {
+        "name": "Flame Arrows",
+        "id": 147552
+       },
+       {
+        "name": "Flame Breath",
+        "id": 146776
+       },
+       {
+        "name": "Chain Heal",
+        "id": 146757
+       },
+       {
+        "name": "Shadow Stalk",
+        "id": 146864
+       },
+       {
+        "name": "Dragonmaw Strike",
+        "id": 146747
+       },
+       {
+        "name": "Throw Axe",
+        "id": 147669
+       },
+       {
+        "name": "Curse of Venom",
+        "id": 147711
+       },
+       {
+        "name": "a stacking debuff",
+        "id": 146902
+       },
+       {
+        "name": "Venom Bolt Volley",
+        "id": 147713
+       },
+       {
+        "name": "Poison Cloud",
+        "id": 147705
+       },
+       {
+        "name": "Crusher's Call",
+        "id": 146769
+       },
+       {
+        "name": "Skull Cracker",
+        "id": 146848
+       },
+       {
+        "name": "Shattering Cleave",
+        "id": 146849
+       },
+       {
+        "name": "Arcing Smash",
+        "id": 147688
+       },
+       {
+        "name": "Thunder Clap",
+        "id": 6343
+       },
+       {
+        "name": "Muzzle Spray",
+        "id": 147824
+       },
+       {
+        "name": "Shoot",
+        "id": 16572
+       },
+       {
+        "name": "Flames of Galakrond",
+        "id": 147029
+       },
+       {
+        "name": "Pulsing Flames",
+        "id": 147042
+       }
+      ]
+     }
+    },
+    {
+     "slug": "iron-juggernaut",
+     "name": "Iron Juggernaut",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Ricochet",
+        "id": 144327
+       },
+       {
+        "name": "Mortar Barrage",
+        "id": 144553
+       },
+       {
+        "name": "Borer Drill",
+        "id": 144218
+       },
+       {
+        "name": "Crawler Mine Blast",
+        "id": 144766
+       },
+       {
+        "name": "Mortar Blast",
+        "id": 144316
+       },
+       {
+        "name": "Flame Vents",
+        "id": 144464
+       },
+       {
+        "name": "stacking debuff",
+        "id": 144467
+       },
+       {
+        "name": "Laser Burn",
+        "id": 144459
+       },
+       {
+        "name": "Shock Pulse",
+        "id": 144485
+       },
+       {
+        "name": "Explosive Tar",
+        "id": 144498
+       },
+       {
+        "name": "Cutter Laser",
+        "id": 144918
+       },
+       {
+        "name": "Demolisher Cannons",
+        "id": 144154
+       },
+       {
+        "name": "Seismic Activity",
+        "id": 144557
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Ricochet",
+        "id": 144327
+       },
+       {
+        "name": "Mortar Barrage",
+        "id": 144553
+       },
+       {
+        "name": "Borer Drill",
+        "id": 144218
+       },
+       {
+        "name": "Crawler Mine Blast",
+        "id": 144766
+       },
+       {
+        "name": "Mortar Blast",
+        "id": 144316
+       },
+       {
+        "name": "Flame Vents",
+        "id": 144464
+       },
+       {
+        "name": "stacking debuff",
+        "id": 144467
+       },
+       {
+        "name": "Laser Burn",
+        "id": 144459
+       },
+       {
+        "name": "Shock Pulse",
+        "id": 144485
+       },
+       {
+        "name": "Explosive Tar",
+        "id": 144498
+       },
+       {
+        "name": "Cutter Laser",
+        "id": 144918
+       },
+       {
+        "name": "Demolisher Cannons",
+        "id": 144154
+       },
+       {
+        "name": "Seismic Activity",
+        "id": 144557
+       }
+      ],
+      "normal": [
+       {
+        "name": "Borer Drill",
+        "id": 144218
+       },
+       {
+        "name": "Crawler Mine Blast",
+        "id": 144766
+       },
+       {
+        "name": "Mortar Blast",
+        "id": 144316
+       },
+       {
+        "name": "Flame Vents",
+        "id": 144464
+       },
+       {
+        "name": "stacking debuff",
+        "id": 144467
+       },
+       {
+        "name": "Laser Burn",
+        "id": 144459
+       },
+       {
+        "name": "Shock Pulse",
+        "id": 144485
+       },
+       {
+        "name": "Explosive Tar",
+        "id": 144498
+       },
+       {
+        "name": "Cutter Laser",
+        "id": 144918
+       },
+       {
+        "name": "Demolisher Cannons",
+        "id": 144154
+       },
+       {
+        "name": "Seismic Activity",
+        "id": 144557
+       }
+      ]
+     }
+    },
+    {
+     "slug": "korkron-dark-shaman",
+     "name": "Kor'kron Dark Shaman",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Iron Tomb",
+        "id": 144328
+       },
+       {
+        "name": "Iron Prison",
+        "id": 144330
+       },
+       {
+        "name": "Froststorm Strike",
+        "id": 144215
+       },
+       {
+        "name": "Toxic Mist",
+        "id": 144089
+       },
+       {
+        "name": "Foul Stream",
+        "id": 144090
+       },
+       {
+        "name": "Ashen Wall",
+        "id": 144070
+       },
+       {
+        "name": "Swipe",
+        "id": 136463
+       },
+       {
+        "name": "Rend",
+        "id": 144304
+       },
+       {
+        "name": "Spirit Link",
+        "id": 98021
+       },
+       {
+        "name": "Froststorm Bolt",
+        "id": 144214
+       },
+       {
+        "name": "Bloodlust",
+        "id": 71975
+       },
+       {
+        "name": "Toxic Storm",
+        "id": 144005
+       },
+       {
+        "name": "Toxic Tornado",
+        "id": 144029
+       },
+       {
+        "name": "Toxicity",
+        "id": 144107
+       },
+       {
+        "name": "Foul Geyser",
+        "id": 143990
+       },
+       {
+        "name": "Foulness",
+        "id": 144064
+       },
+       {
+        "name": "Falling Ash",
+        "id": 143973
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Iron Tomb",
+        "id": 144328
+       },
+       {
+        "name": "Iron Prison",
+        "id": 144330
+       },
+       {
+        "name": "Froststorm Strike",
+        "id": 144215
+       },
+       {
+        "name": "Toxic Mist",
+        "id": 144089
+       },
+       {
+        "name": "Foul Stream",
+        "id": 144090
+       },
+       {
+        "name": "Ashen Wall",
+        "id": 144070
+       },
+       {
+        "name": "Swipe",
+        "id": 136463
+       },
+       {
+        "name": "Rend",
+        "id": 144304
+       },
+       {
+        "name": "Spirit Link",
+        "id": 98021
+       },
+       {
+        "name": "Froststorm Bolt",
+        "id": 144214
+       },
+       {
+        "name": "Bloodlust",
+        "id": 71975
+       },
+       {
+        "name": "Toxic Storm",
+        "id": 144005
+       },
+       {
+        "name": "Toxic Tornado",
+        "id": 144029
+       },
+       {
+        "name": "Toxicity",
+        "id": 144107
+       },
+       {
+        "name": "Foul Geyser",
+        "id": 143990
+       },
+       {
+        "name": "Foulness",
+        "id": 144064
+       },
+       {
+        "name": "Falling Ash",
+        "id": 143973
+       }
+      ],
+      "normal": [
+       {
+        "name": "Froststorm Strike",
+        "id": 144215
+       },
+       {
+        "name": "Toxic Mist",
+        "id": 144089
+       },
+       {
+        "name": "Foul Stream",
+        "id": 144090
+       },
+       {
+        "name": "Ashen Wall",
+        "id": 144070
+       },
+       {
+        "name": "Spirit Link",
+        "id": 98021
+       },
+       {
+        "name": "Froststorm Bolt",
+        "id": 144214
+       },
+       {
+        "name": "Bloodlust",
+        "id": 71975
+       },
+       {
+        "name": "Swipe",
+        "id": 136463
+       },
+       {
+        "name": "Rend",
+        "id": 144304
+       },
+       {
+        "name": "Toxic Storm",
+        "id": 144005
+       },
+       {
+        "name": "Toxic Tornado",
+        "id": 144029
+       },
+       {
+        "name": "Toxicity",
+        "id": 144107
+       },
+       {
+        "name": "Foul Geyser",
+        "id": 143990
+       },
+       {
+        "name": "Foulness",
+        "id": 144064
+       },
+       {
+        "name": "Falling Ash",
+        "id": 143973
+       }
+      ]
+     }
+    },
+    {
+     "slug": "general-nazgrim",
+     "name": "General Nazgrim",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Defensive Stance",
+        "id": 71
+       },
+       {
+        "name": "Execute",
+        "id": 143502
+       },
+       {
+        "name": "Battle Stance",
+        "id": 7165
+       },
+       {
+        "name": "Berserker Stance",
+        "id": 143594
+       },
+       {
+        "name": "Bonecracker",
+        "id": 143638
+       },
+       {
+        "name": "Sundering Blow",
+        "id": 143494
+       },
+       {
+        "name": "Heroic Shockwave",
+        "id": 143716
+       },
+       {
+        "name": "Aftershock",
+        "id": 143712
+       },
+       {
+        "name": "Kor'kron Banner",
+        "id": 143501
+       },
+       {
+        "name": "War Song",
+        "id": 143503
+       },
+       {
+        "name": "Ravager",
+        "id": 143872
+       },
+       {
+        "name": "Cooling Off",
+        "id": 143484
+       },
+       {
+        "name": "Empowered Chain Heal",
+        "id": 143473
+       },
+       {
+        "name": "Healing Tide Totem",
+        "id": 108280
+       },
+       {
+        "name": "Earth Shield",
+        "id": 974
+       },
+       {
+        "name": "Ironstorm",
+        "id": 143420
+       },
+       {
+        "name": "Last Stand",
+        "id": 12975
+       },
+       {
+        "name": "Hunter's Mark",
+        "id": 31615
+       },
+       {
+        "name": "Shoot",
+        "id": 143884
+       },
+       {
+        "name": "Multi-Shot",
+        "id": 143887
+       },
+       {
+        "name": "Arcane Shock",
+        "id": 143432
+       },
+       {
+        "name": "Unstable Blink",
+        "id": 143433
+       },
+       {
+        "name": "Magistrike",
+        "id": 143431
+       },
+       {
+        "name": "Assassin's Mark",
+        "id": 143480
+       },
+       {
+        "name": "Stealth",
+        "id": 1784
+       },
+       {
+        "name": "Backstab",
+        "id": 53
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Defensive Stance",
+        "id": 71
+       },
+       {
+        "name": "Execute",
+        "id": 143502
+       },
+       {
+        "name": "Battle Stance",
+        "id": 7165
+       },
+       {
+        "name": "Berserker Stance",
+        "id": 143594
+       },
+       {
+        "name": "Bonecracker",
+        "id": 143638
+       },
+       {
+        "name": "Sundering Blow",
+        "id": 143494
+       },
+       {
+        "name": "Heroic Shockwave",
+        "id": 143716
+       },
+       {
+        "name": "Aftershock",
+        "id": 143712
+       },
+       {
+        "name": "Kor'kron Banner",
+        "id": 143501
+       },
+       {
+        "name": "War Song",
+        "id": 143503
+       },
+       {
+        "name": "Ravager",
+        "id": 143872
+       },
+       {
+        "name": "Cooling Off",
+        "id": 143484
+       },
+       {
+        "name": "Empowered Chain Heal",
+        "id": 143473
+       },
+       {
+        "name": "Healing Tide Totem",
+        "id": 108280
+       },
+       {
+        "name": "Earth Shield",
+        "id": 974
+       },
+       {
+        "name": "Ironstorm",
+        "id": 143420
+       },
+       {
+        "name": "Last Stand",
+        "id": 12975
+       },
+       {
+        "name": "Hunter's Mark",
+        "id": 31615
+       },
+       {
+        "name": "Shoot",
+        "id": 143884
+       },
+       {
+        "name": "Multi-Shot",
+        "id": 143887
+       },
+       {
+        "name": "Arcane Shock",
+        "id": 143432
+       },
+       {
+        "name": "Unstable Blink",
+        "id": 143433
+       },
+       {
+        "name": "Magistrike",
+        "id": 143431
+       },
+       {
+        "name": "Assassin's Mark",
+        "id": 143480
+       },
+       {
+        "name": "Stealth",
+        "id": 1784
+       },
+       {
+        "name": "Backstab",
+        "id": 53
+       }
+      ],
+      "normal": [
+       {
+        "name": "Defensive Stance",
+        "id": 71
+       },
+       {
+        "name": "Battle Stance",
+        "id": 7165
+       },
+       {
+        "name": "Berserker Stance",
+        "id": 143594
+       },
+       {
+        "name": "Bonecracker",
+        "id": 143638
+       },
+       {
+        "name": "Sundering Blow",
+        "id": 143494
+       },
+       {
+        "name": "Heroic Shockwave",
+        "id": 143716
+       },
+       {
+        "name": "Aftershock",
+        "id": 143712
+       },
+       {
+        "name": "Kor'kron Banner",
+        "id": 143501
+       },
+       {
+        "name": "War Song",
+        "id": 143503
+       },
+       {
+        "name": "Ravager",
+        "id": 143872
+       },
+       {
+        "name": "Cooling Off",
+        "id": 143484
+       },
+       {
+        "name": "Empowered Chain Heal",
+        "id": 143473
+       },
+       {
+        "name": "Healing Tide Totem",
+        "id": 108280
+       },
+       {
+        "name": "Earth Shield",
+        "id": 974
+       },
+       {
+        "name": "Ironstorm",
+        "id": 143420
+       },
+       {
+        "name": "Last Stand",
+        "id": 12975
+       },
+       {
+        "name": "Arcane Shock",
+        "id": 143432
+       },
+       {
+        "name": "Unstable Blink",
+        "id": 143433
+       },
+       {
+        "name": "Magistrike",
+        "id": 143431
+       },
+       {
+        "name": "Assassin's Mark",
+        "id": 143480
+       },
+       {
+        "name": "Stealth",
+        "id": 1784
+       },
+       {
+        "name": "Backstab",
+        "id": 53
+       }
+      ]
+     }
+    },
+    {
+     "slug": "malkorok",
+     "name": "Malkorok",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Fatal Strike",
+        "id": 142990
+       },
+       {
+        "name": "Arcing Smash",
+        "id": 142826
+       },
+       {
+        "name": "Imploding Energy",
+        "id": 142986
+       },
+       {
+        "name": "Seismic Slam",
+        "id": 142851
+       },
+       {
+        "name": "Essence of Y'Shaarj",
+        "id": 143857
+       },
+       {
+        "name": "Displaced Energy",
+        "id": 142913
+       },
+       {
+        "name": "Ancient Barrier",
+        "id": 142862
+       },
+       {
+        "name": "Ancient Miasma",
+        "id": 142861
+       },
+       {
+        "name": "Eradicate",
+        "id": 143916
+       },
+       {
+        "name": "Languish",
+        "id": 143919
+       },
+       {
+        "name": "Breath of Y'Shaarj",
+        "id": 142842
+       },
+       {
+        "name": "Blood Rage",
+        "id": 142879
+       },
+       {
+        "name": "Relentless Assault",
+        "id": 143261
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Fatal Strike",
+        "id": 142990
+       },
+       {
+        "name": "Arcing Smash",
+        "id": 142826
+       },
+       {
+        "name": "Imploding Energy",
+        "id": 142986
+       },
+       {
+        "name": "Seismic Slam",
+        "id": 142851
+       },
+       {
+        "name": "Essence of Y'Shaarj",
+        "id": 143857
+       },
+       {
+        "name": "Displaced Energy",
+        "id": 142913
+       },
+       {
+        "name": "Ancient Barrier",
+        "id": 142862
+       },
+       {
+        "name": "Ancient Miasma",
+        "id": 142861
+       },
+       {
+        "name": "Eradicate",
+        "id": 143916
+       },
+       {
+        "name": "Languish",
+        "id": 143919
+       },
+       {
+        "name": "Breath of Y'Shaarj",
+        "id": 142842
+       },
+       {
+        "name": "Blood Rage",
+        "id": 142879
+       },
+       {
+        "name": "Relentless Assault",
+        "id": 143261
+       }
+      ],
+      "normal": [
+       {
+        "name": "Fatal Strike",
+        "id": 142990
+       },
+       {
+        "name": "Arcing Smash",
+        "id": 142826
+       },
+       {
+        "name": "Imploding Energy",
+        "id": 142986
+       },
+       {
+        "name": "Ancient Miasma",
+        "id": 142861
+       },
+       {
+        "name": "Ancient Barrier",
+        "id": 142862
+       },
+       {
+        "name": "Eradicate",
+        "id": 143916
+       },
+       {
+        "name": "Seismic Slam",
+        "id": 142851
+       },
+       {
+        "name": "Breath of Y'Shaarj",
+        "id": 142842
+       },
+       {
+        "name": "Blood Rage",
+        "id": 142879
+       },
+       {
+        "name": "Relentless Assault",
+        "id": 143261
+       },
+       {
+        "name": "Displaced Energy",
+        "id": 142913
+       }
+      ]
+     }
+    },
+    {
+     "slug": "spoils-of-pandaria",
+     "name": "Spoils of Pandaria",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Unstable Defense System",
+        "id": 145688
+       },
+       {
+        "name": "Supernova",
+        "id": 146815
+       },
+       {
+        "name": "Gusting Crane Kick",
+        "id": 146180
+       },
+       {
+        "name": "Keg Toss",
+        "id": 146213
+       },
+       {
+        "name": "Breath of Fire",
+        "id": 115181
+       },
+       {
+        "name": "Path of Blossoms",
+        "id": 146253
+       },
+       {
+        "name": "Claw of Burning Anger",
+        "id": 146141
+       },
+       {
+        "name": "Staff of Resonating Water",
+        "id": 146099
+       },
+       {
+        "name": "Blade of the Hundred Steps",
+        "id": 146068
+       },
+       {
+        "name": "Crimson Reconstitution",
+        "id": 145271
+       },
+       {
+        "name": "Matter Scramble",
+        "id": 145288
+       },
+       {
+        "name": "Mogu Rune of Power",
+        "id": 145458
+       },
+       {
+        "name": "Torment",
+        "id": 142983
+       },
+       {
+        "name": "Forbidden Magic",
+        "id": 145230
+       },
+       {
+        "name": "Harden Flesh",
+        "id": 145218
+       },
+       {
+        "name": "Earthen Shard",
+        "id": 144923
+       },
+       {
+        "name": "Sparks",
+        "id": 142694
+       },
+       {
+        "name": "Return to Stone",
+        "id": 145489
+       },
+       {
+        "name": "Strength of the Stone",
+        "id": 145998
+       },
+       {
+        "name": "Shadow Volley",
+        "id": 148515
+       },
+       {
+        "name": "Molten Fist",
+        "id": 148518
+       },
+       {
+        "name": "Jade Tempest",
+        "id": 148582
+       },
+       {
+        "name": "Fracture",
+        "id": 148513
+       },
+       {
+        "name": "Carnivorous Bite",
+        "id": 144853
+       },
+       {
+        "name": "Set to Blow",
+        "id": 145996
+       },
+       {
+        "name": "Residue",
+        "id": 145790
+       },
+       {
+        "name": "Rage of the Empress",
+        "id": 145813
+       },
+       {
+        "name": "Enraged",
+        "id": 145692
+       },
+       {
+        "name": "Windstorm",
+        "id": 145286
+       },
+       {
+        "name": "Encapsulated Pheromone",
+        "id": 142524
+       },
+       {
+        "name": "Pheromone Cloud",
+        "id": 148762
+       },
+       {
+        "name": "Throw Explosives",
+        "id": 145702
+       },
+       {
+        "name": "Mantid Swarm",
+        "id": 142539
+       },
+       {
+        "name": "Gusting Bomb",
+        "id": 145712
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Unstable Defense System",
+        "id": 145688
+       },
+       {
+        "name": "Supernova",
+        "id": 146815
+       },
+       {
+        "name": "Gusting Crane Kick",
+        "id": 146180
+       },
+       {
+        "name": "Keg Toss",
+        "id": 146213
+       },
+       {
+        "name": "Breath of Fire",
+        "id": 115181
+       },
+       {
+        "name": "Path of Blossoms",
+        "id": 146253
+       },
+       {
+        "name": "Claw of Burning Anger",
+        "id": 146141
+       },
+       {
+        "name": "Staff of Resonating Water",
+        "id": 146099
+       },
+       {
+        "name": "Blade of the Hundred Steps",
+        "id": 146068
+       },
+       {
+        "name": "Crimson Reconstitution",
+        "id": 145271
+       },
+       {
+        "name": "Matter Scramble",
+        "id": 145288
+       },
+       {
+        "name": "Mogu Rune of Power",
+        "id": 145458
+       },
+       {
+        "name": "Torment",
+        "id": 142983
+       },
+       {
+        "name": "Forbidden Magic",
+        "id": 145230
+       },
+       {
+        "name": "Harden Flesh",
+        "id": 145218
+       },
+       {
+        "name": "Earthen Shard",
+        "id": 144923
+       },
+       {
+        "name": "Sparks",
+        "id": 142694
+       },
+       {
+        "name": "Return to Stone",
+        "id": 145489
+       },
+       {
+        "name": "Strength of the Stone",
+        "id": 145998
+       },
+       {
+        "name": "Shadow Volley",
+        "id": 148515
+       },
+       {
+        "name": "Molten Fist",
+        "id": 148518
+       },
+       {
+        "name": "Jade Tempest",
+        "id": 148582
+       },
+       {
+        "name": "Fracture",
+        "id": 148513
+       },
+       {
+        "name": "Carnivorous Bite",
+        "id": 144853
+       },
+       {
+        "name": "Set to Blow",
+        "id": 145996
+       },
+       {
+        "name": "Residue",
+        "id": 145790
+       },
+       {
+        "name": "Rage of the Empress",
+        "id": 145813
+       },
+       {
+        "name": "Enraged",
+        "id": 145692
+       },
+       {
+        "name": "Windstorm",
+        "id": 145286
+       },
+       {
+        "name": "Encapsulated Pheromone",
+        "id": 142524
+       },
+       {
+        "name": "Pheromone Cloud",
+        "id": 148762
+       },
+       {
+        "name": "Throw Explosives",
+        "id": 145702
+       },
+       {
+        "name": "Mantid Swarm",
+        "id": 142539
+       },
+       {
+        "name": "Gusting Bomb",
+        "id": 145712
+       }
+      ],
+      "normal": [
+       {
+        "name": "Unstable Defense System",
+        "id": 145688
+       },
+       {
+        "name": "Gusting Crane Kick",
+        "id": 146180
+       },
+       {
+        "name": "Keg Toss",
+        "id": 146213
+       },
+       {
+        "name": "Breath of Fire",
+        "id": 115181
+       },
+       {
+        "name": "Path of Blossoms",
+        "id": 146253
+       },
+       {
+        "name": "Claw of Burning Anger",
+        "id": 146141
+       },
+       {
+        "name": "Staff of Resonating Water",
+        "id": 146099
+       },
+       {
+        "name": "Blade of the Hundred Steps",
+        "id": 146068
+       },
+       {
+        "name": "Crimson Reconstitution",
+        "id": 145271
+       },
+       {
+        "name": "Matter Scramble",
+        "id": 145288
+       },
+       {
+        "name": "Mogu Rune of Power",
+        "id": 145458
+       },
+       {
+        "name": "Torment",
+        "id": 142983
+       },
+       {
+        "name": "Forbidden Magic",
+        "id": 145230
+       },
+       {
+        "name": "Harden Flesh",
+        "id": 145218
+       },
+       {
+        "name": "Earthen Shard",
+        "id": 144923
+       },
+       {
+        "name": "Sparks",
+        "id": 142694
+       },
+       {
+        "name": "Return to Stone",
+        "id": 145489
+       },
+       {
+        "name": "Strength of the Stone",
+        "id": 145998
+       },
+       {
+        "name": "Shadow Volley",
+        "id": 148515
+       },
+       {
+        "name": "Molten Fist",
+        "id": 148518
+       },
+       {
+        "name": "Jade Tempest",
+        "id": 148582
+       },
+       {
+        "name": "Fracture",
+        "id": 148513
+       },
+       {
+        "name": "Carnivorous Bite",
+        "id": 144853
+       },
+       {
+        "name": "Set to Blow",
+        "id": 145996
+       },
+       {
+        "name": "Residue",
+        "id": 145790
+       },
+       {
+        "name": "Rage of the Empress",
+        "id": 145813
+       },
+       {
+        "name": "Enraged",
+        "id": 145692
+       },
+       {
+        "name": "Windstorm",
+        "id": 145286
+       },
+       {
+        "name": "Encapsulated Pheromone",
+        "id": 142524
+       },
+       {
+        "name": "Pheromone Cloud",
+        "id": 148762
+       },
+       {
+        "name": "Throw Explosives",
+        "id": 145702
+       },
+       {
+        "name": "Mantid Swarm",
+        "id": 142539
+       },
+       {
+        "name": "Gusting Bomb",
+        "id": 145712
+       }
+      ]
+     }
+    },
+    {
+     "slug": "thok-the-bloodthirsty",
+     "name": "Thok the Bloodthirsty",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Deafening Screech",
+        "id": 143343
+       },
+       {
+        "name": "Bloodied",
+        "id": 143452
+       },
+       {
+        "name": "Fearsome Roar",
+        "id": 143426
+       },
+       {
+        "name": "Tail Lash",
+        "id": 23364
+       },
+       {
+        "name": "Shock Blast",
+        "id": 143707
+       },
+       {
+        "name": "Blood Frenzy",
+        "id": 143442
+       },
+       {
+        "name": "Fixate",
+        "id": 133042
+       },
+       {
+        "name": "Vampiric Frenzy",
+        "id": 147978
+       },
+       {
+        "name": "Wrecking Ball",
+        "id": 147906
+       },
+       {
+        "name": "Acid Breath",
+        "id": 143780
+       },
+       {
+        "name": "Corrosive Blood",
+        "id": 143791
+       },
+       {
+        "name": "Scorching Breath",
+        "id": 143767
+       },
+       {
+        "name": "Burning Blood",
+        "id": 82660
+       },
+       {
+        "name": "Icy Blood",
+        "id": 143800
+       },
+       {
+        "name": "Freezing Breath",
+        "id": 143773
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Deafening Screech",
+        "id": 143343
+       },
+       {
+        "name": "Bloodied",
+        "id": 143452
+       },
+       {
+        "name": "Fearsome Roar",
+        "id": 143426
+       },
+       {
+        "name": "Tail Lash",
+        "id": 23364
+       },
+       {
+        "name": "Shock Blast",
+        "id": 143707
+       },
+       {
+        "name": "Blood Frenzy",
+        "id": 143442
+       },
+       {
+        "name": "Fixate",
+        "id": 133042
+       },
+       {
+        "name": "Vampiric Frenzy",
+        "id": 147978
+       },
+       {
+        "name": "Wrecking Ball",
+        "id": 147906
+       },
+       {
+        "name": "Acid Breath",
+        "id": 143780
+       },
+       {
+        "name": "Corrosive Blood",
+        "id": 143791
+       },
+       {
+        "name": "Scorching Breath",
+        "id": 143767
+       },
+       {
+        "name": "Burning Blood",
+        "id": 82660
+       },
+       {
+        "name": "Icy Blood",
+        "id": 143800
+       },
+       {
+        "name": "Freezing Breath",
+        "id": 143773
+       }
+      ],
+      "normal": [
+       {
+        "name": "Deafening Screech",
+        "id": 143343
+       },
+       {
+        "name": "Bloodied",
+        "id": 143452
+       },
+       {
+        "name": "Fearsome Roar",
+        "id": 143426
+       },
+       {
+        "name": "Tail Lash",
+        "id": 23364
+       },
+       {
+        "name": "Shock Blast",
+        "id": 143707
+       },
+       {
+        "name": "Blood Frenzy",
+        "id": 143442
+       },
+       {
+        "name": "Fixate",
+        "id": 133042
+       },
+       {
+        "name": "Acid Breath",
+        "id": 143780
+       },
+       {
+        "name": "Corrosive Blood",
+        "id": 143791
+       },
+       {
+        "name": "Scorching Breath",
+        "id": 143767
+       },
+       {
+        "name": "Burning Blood",
+        "id": 82660
+       },
+       {
+        "name": "Icy Blood",
+        "id": 143800
+       },
+       {
+        "name": "Freezing Breath",
+        "id": 143773
+       }
+      ]
+     }
+    },
+    {
+     "slug": "siegecrafter-blackfuse",
+     "name": "Siegecrafter Blackfuse",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Launch Sawblade",
+        "id": 143291
+       },
+       {
+        "name": "Magnetic Crush",
+        "id": 144466
+       },
+       {
+        "name": "Serrated Slash",
+        "id": 143327
+       },
+       {
+        "name": "Reactive Armor",
+        "id": 143387
+       },
+       {
+        "name": "Electrostatic Charge",
+        "id": 143385
+       },
+       {
+        "name": "Death from Above",
+        "id": 142232
+       },
+       {
+        "name": "Overload",
+        "id": 145444
+       },
+       {
+        "name": "Automatic Repair Beam",
+        "id": 144213
+       },
+       {
+        "name": "Energized Defensive Matrix",
+        "id": 148990
+       },
+       {
+        "name": "Protective Frenzy",
+        "id": 116982
+       },
+       {
+        "name": "Pattern Recognition",
+        "id": 144236
+       },
+       {
+        "name": "Matter Purification Beam",
+        "id": 144335
+       },
+       {
+        "name": "Shockwave Missile",
+        "id": 143639
+       },
+       {
+        "name": "Superheated",
+        "id": 143856
+       },
+       {
+        "name": "Detonate!",
+        "id": 143002
+       },
+       {
+        "name": "Break-in Period",
+        "id": 145269
+       },
+       {
+        "name": "Ready to Go!",
+        "id": 145580
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Launch Sawblade",
+        "id": 143291
+       },
+       {
+        "name": "Magnetic Crush",
+        "id": 144466
+       },
+       {
+        "name": "Serrated Slash",
+        "id": 143327
+       },
+       {
+        "name": "Reactive Armor",
+        "id": 143387
+       },
+       {
+        "name": "Electrostatic Charge",
+        "id": 143385
+       },
+       {
+        "name": "Death from Above",
+        "id": 142232
+       },
+       {
+        "name": "Overload",
+        "id": 145444
+       },
+       {
+        "name": "Automatic Repair Beam",
+        "id": 144213
+       },
+       {
+        "name": "Energized Defensive Matrix",
+        "id": 148990
+       },
+       {
+        "name": "Protective Frenzy",
+        "id": 116982
+       },
+       {
+        "name": "Pattern Recognition",
+        "id": 144236
+       },
+       {
+        "name": "Matter Purification Beam",
+        "id": 144335
+       },
+       {
+        "name": "Shockwave Missile",
+        "id": 143639
+       },
+       {
+        "name": "Superheated",
+        "id": 143856
+       },
+       {
+        "name": "Detonate!",
+        "id": 143002
+       },
+       {
+        "name": "Break-in Period",
+        "id": 145269
+       },
+       {
+        "name": "Ready to Go!",
+        "id": 145580
+       }
+      ],
+      "normal": [
+       {
+        "name": "Launch Sawblade",
+        "id": 143291
+       },
+       {
+        "name": "Magnetic Crush",
+        "id": 144466
+       },
+       {
+        "name": "Serrated Slash",
+        "id": 143327
+       },
+       {
+        "name": "Reactive Armor",
+        "id": 143387
+       },
+       {
+        "name": "Electrostatic Charge",
+        "id": 143385
+       },
+       {
+        "name": "Death from Above",
+        "id": 142232
+       },
+       {
+        "name": "Overload",
+        "id": 145444
+       },
+       {
+        "name": "Automatic Repair Beam",
+        "id": 144213
+       },
+       {
+        "name": "Energized Defensive Matrix",
+        "id": 148990
+       },
+       {
+        "name": "Protective Frenzy",
+        "id": 116982
+       },
+       {
+        "name": "Pattern Recognition",
+        "id": 144236
+       },
+       {
+        "name": "Matter Purification Beam",
+        "id": 144335
+       },
+       {
+        "name": "Shockwave Missile",
+        "id": 143639
+       },
+       {
+        "name": "Superheated",
+        "id": 143856
+       },
+       {
+        "name": "Detonate!",
+        "id": 143002
+       },
+       {
+        "name": "Break-in Period",
+        "id": 145269
+       },
+       {
+        "name": "Ready to Go!",
+        "id": 145580
+       }
+      ]
+     }
+    },
+    {
+     "slug": "paragons-of-the-klaxxi",
+     "name": "Paragons of the Klaxxi",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Paragon's Purpose",
+        "id": 143483
+       },
+       {
+        "name": "Ready to Fight",
+        "id": 143542
+       },
+       {
+        "name": "Bloodletting",
+        "id": 138693
+       },
+       {
+        "name": "Hewn",
+        "id": 143275
+       },
+       {
+        "name": "Bloodthirsty",
+        "id": 141851
+       },
+       {
+        "name": "Mutate",
+        "id": 143337
+       },
+       {
+        "name": "Claw",
+        "id": 143338
+       },
+       {
+        "name": "Swipe",
+        "id": 143378
+       },
+       {
+        "name": "Sting",
+        "id": 143376
+       },
+       {
+        "name": "Prey",
+        "id": 144286
+       },
+       {
+        "name": "Faulty Mutation",
+        "id": 148589
+       },
+       {
+        "name": "Injection",
+        "id": 143339
+       },
+       {
+        "name": "Genetic Alteration",
+        "id": 143278
+       },
+       {
+        "name": "Genetic Modifications",
+        "id": 143355
+       },
+       {
+        "name": "Mad Scientist",
+        "id": 141857
+       },
+       {
+        "name": "Encase in Amber",
+        "id": 142564
+       },
+       {
+        "name": "Shield Bash",
+        "id": 35178
+       },
+       {
+        "name": "Vicious Assault",
+        "id": 143977
+       },
+       {
+        "name": "Master of Amber",
+        "id": 142616
+       },
+       {
+        "name": "Rapid Fire",
+        "id": 143243
+       },
+       {
+        "name": "Aim",
+        "id": 142948
+       },
+       {
+        "name": "Multi-Shot",
+        "id": 21390
+       },
+       {
+        "name": "Compound Eye",
+        "id": 141852
+       },
+       {
+        "name": "Snipe",
+        "id": 143217
+       },
+       {
+        "name": "Marked for Death",
+        "id": 141854
+       },
+       {
+        "name": "Toxic Injection",
+        "id": 142528
+       },
+       {
+        "name": "Catalyst: Orange",
+        "id": 142728
+       },
+       {
+        "name": "Catalyst: Green",
+        "id": 142730
+       },
+       {
+        "name": "Catalyst: Purple",
+        "id": 142729
+       },
+       {
+        "name": "Tenderizing Strikes",
+        "id": 142929
+       },
+       {
+        "name": "Caustic Blood",
+        "id": 142315
+       },
+       {
+        "name": "Bloody Explosion",
+        "id": 142317
+       },
+       {
+        "name": "Vast Apothecarial Knowledge",
+        "id": 141856
+       },
+       {
+        "name": "Volatile Poultice",
+        "id": 142877
+       },
+       {
+        "name": "Insane Calculation: Fiery Edge",
+        "id": 142416
+       },
+       {
+        "name": "Calculate",
+        "id": 142514
+       },
+       {
+        "name": "Ingenious",
+        "id": 141858
+       },
+       {
+        "name": "Diminish",
+        "id": 143666
+       },
+       {
+        "name": "Devour",
+        "id": 142649
+       },
+       {
+        "name": "Devour Whole",
+        "id": 142645
+       },
+       {
+        "name": "Thick Shell",
+        "id": 142667
+       },
+       {
+        "name": "Molt",
+        "id": 142651
+       },
+       {
+        "name": "Swipe",
+        "id": 142655
+       },
+       {
+        "name": "Sonic Projection",
+        "id": 143768
+       },
+       {
+        "name": "Master of Puppets",
+        "id": 127351
+       },
+       {
+        "name": "Death from Above",
+        "id": 142232
+       },
+       {
+        "name": "Reave",
+        "id": 148681
+       },
+       {
+        "name": "Exposed Veins",
+        "id": 142931
+       },
+       {
+        "name": "Reave",
+        "id": 142270
+       },
+       {
+        "name": "Gouge",
+        "id": 12540
+       },
+       {
+        "name": "Mutilate",
+        "id": 143941
+       },
+       {
+        "name": "Hurls Amber",
+        "id": 143733
+       },
+       {
+        "name": "Flash",
+        "id": 143709
+       },
+       {
+        "name": "Whirling",
+        "id": 143701
+       },
+       {
+        "name": "Caustic Amber",
+        "id": 143735
+       },
+       {
+        "name": "Strong Legs",
+        "id": 143964
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Paragon's Purpose",
+        "id": 143483
+       },
+       {
+        "name": "Ready to Fight",
+        "id": 143542
+       },
+       {
+        "name": "Bloodletting",
+        "id": 138693
+       },
+       {
+        "name": "Hewn",
+        "id": 143275
+       },
+       {
+        "name": "Bloodthirsty",
+        "id": 141851
+       },
+       {
+        "name": "Mutate",
+        "id": 143337
+       },
+       {
+        "name": "Claw",
+        "id": 143338
+       },
+       {
+        "name": "Swipe",
+        "id": 143378
+       },
+       {
+        "name": "Sting",
+        "id": 143376
+       },
+       {
+        "name": "Prey",
+        "id": 144286
+       },
+       {
+        "name": "Faulty Mutation",
+        "id": 148589
+       },
+       {
+        "name": "Injection",
+        "id": 143339
+       },
+       {
+        "name": "Genetic Alteration",
+        "id": 143278
+       },
+       {
+        "name": "Genetic Modifications",
+        "id": 143355
+       },
+       {
+        "name": "Mad Scientist",
+        "id": 141857
+       },
+       {
+        "name": "Encase in Amber",
+        "id": 142564
+       },
+       {
+        "name": "Shield Bash",
+        "id": 35178
+       },
+       {
+        "name": "Vicious Assault",
+        "id": 143977
+       },
+       {
+        "name": "Master of Amber",
+        "id": 142616
+       },
+       {
+        "name": "Rapid Fire",
+        "id": 143243
+       },
+       {
+        "name": "Aim",
+        "id": 142948
+       },
+       {
+        "name": "Multi-Shot",
+        "id": 21390
+       },
+       {
+        "name": "Compound Eye",
+        "id": 141852
+       },
+       {
+        "name": "Snipe",
+        "id": 143217
+       },
+       {
+        "name": "Marked for Death",
+        "id": 141854
+       },
+       {
+        "name": "Toxic Injection",
+        "id": 142528
+       },
+       {
+        "name": "Catalyst: Orange",
+        "id": 142728
+       },
+       {
+        "name": "Catalyst: Green",
+        "id": 142730
+       },
+       {
+        "name": "Catalyst: Purple",
+        "id": 142729
+       },
+       {
+        "name": "Tenderizing Strikes",
+        "id": 142929
+       },
+       {
+        "name": "Caustic Blood",
+        "id": 142315
+       },
+       {
+        "name": "Bloody Explosion",
+        "id": 142317
+       },
+       {
+        "name": "Vast Apothecarial Knowledge",
+        "id": 141856
+       },
+       {
+        "name": "Volatile Poultice",
+        "id": 142877
+       },
+       {
+        "name": "Insane Calculation: Fiery Edge",
+        "id": 142416
+       },
+       {
+        "name": "Calculate",
+        "id": 142514
+       },
+       {
+        "name": "Ingenious",
+        "id": 141858
+       },
+       {
+        "name": "Diminish",
+        "id": 143666
+       },
+       {
+        "name": "Devour",
+        "id": 142649
+       },
+       {
+        "name": "Devour Whole",
+        "id": 142645
+       },
+       {
+        "name": "Thick Shell",
+        "id": 142667
+       },
+       {
+        "name": "Molt",
+        "id": 142651
+       },
+       {
+        "name": "Swipe",
+        "id": 142655
+       },
+       {
+        "name": "Sonic Projection",
+        "id": 143768
+       },
+       {
+        "name": "Master of Puppets",
+        "id": 127351
+       },
+       {
+        "name": "Death from Above",
+        "id": 142232
+       },
+       {
+        "name": "Reave",
+        "id": 148681
+       },
+       {
+        "name": "Exposed Veins",
+        "id": 142931
+       },
+       {
+        "name": "Reave",
+        "id": 142270
+       },
+       {
+        "name": "Gouge",
+        "id": 12540
+       },
+       {
+        "name": "Mutilate",
+        "id": 143941
+       },
+       {
+        "name": "Hurls Amber",
+        "id": 143733
+       },
+       {
+        "name": "Flash",
+        "id": 143709
+       },
+       {
+        "name": "Whirling",
+        "id": 143701
+       },
+       {
+        "name": "Caustic Amber",
+        "id": 143735
+       },
+       {
+        "name": "Strong Legs",
+        "id": 143964
+       }
+      ],
+      "normal": [
+       {
+        "name": "Paragon's Purpose",
+        "id": 143483
+       },
+       {
+        "name": "Ready to Fight",
+        "id": 143542
+       },
+       {
+        "name": "Bloodletting",
+        "id": 138693
+       },
+       {
+        "name": "Hewn",
+        "id": 143275
+       },
+       {
+        "name": "Bloodthirsty",
+        "id": 141851
+       },
+       {
+        "name": "Mutate",
+        "id": 143337
+       },
+       {
+        "name": "Claw",
+        "id": 143338
+       },
+       {
+        "name": "Swipe",
+        "id": 143378
+       },
+       {
+        "name": "Sting",
+        "id": 143376
+       },
+       {
+        "name": "Prey",
+        "id": 144286
+       },
+       {
+        "name": "Injection",
+        "id": 143339
+       },
+       {
+        "name": "Genetic Alteration",
+        "id": 143278
+       },
+       {
+        "name": "Genetic Modifications",
+        "id": 143355
+       },
+       {
+        "name": "Mad Scientist",
+        "id": 141857
+       },
+       {
+        "name": "Encase in Amber",
+        "id": 142564
+       },
+       {
+        "name": "Shield Bash",
+        "id": 35178
+       },
+       {
+        "name": "Vicious Assault",
+        "id": 143977
+       },
+       {
+        "name": "Master of Amber",
+        "id": 142616
+       },
+       {
+        "name": "Rapid Fire",
+        "id": 143243
+       },
+       {
+        "name": "Aim",
+        "id": 142948
+       },
+       {
+        "name": "Multi-Shot",
+        "id": 21390
+       },
+       {
+        "name": "Compound Eye",
+        "id": 141852
+       },
+       {
+        "name": "Snipe",
+        "id": 143217
+       },
+       {
+        "name": "Marked for Death",
+        "id": 141854
+       },
+       {
+        "name": "Toxic Injection",
+        "id": 142528
+       },
+       {
+        "name": "Catalyst: Red",
+        "id": 142726
+       },
+       {
+        "name": "Catalyst: Blue",
+        "id": 142725
+       },
+       {
+        "name": "Catalyst: Yellow",
+        "id": 142727
+       },
+       {
+        "name": "Tenderizing Strikes",
+        "id": 142929
+       },
+       {
+        "name": "Caustic Blood",
+        "id": 142315
+       },
+       {
+        "name": "Bloody Explosion",
+        "id": 142317
+       },
+       {
+        "name": "Vast Apothecarial Knowledge",
+        "id": 141856
+       },
+       {
+        "name": "Volatile Poultice",
+        "id": 142877
+       },
+       {
+        "name": "Insane Calculation: Fiery Edge",
+        "id": 142416
+       },
+       {
+        "name": "Calculate",
+        "id": 142514
+       },
+       {
+        "name": "Ingenious",
+        "id": 141858
+       },
+       {
+        "name": "Diminish",
+        "id": 143666
+       },
+       {
+        "name": "Devour",
+        "id": 142649
+       },
+       {
+        "name": "Devour Whole",
+        "id": 142645
+       },
+       {
+        "name": "Thick Shell",
+        "id": 142667
+       },
+       {
+        "name": "Molt",
+        "id": 142651
+       },
+       {
+        "name": "Swipe",
+        "id": 142655
+       },
+       {
+        "name": "Sonic Projection",
+        "id": 143768
+       },
+       {
+        "name": "Master of Puppets",
+        "id": 127351
+       },
+       {
+        "name": "Death from Above",
+        "id": 142232
+       },
+       {
+        "name": "Exposed Veins",
+        "id": 142931
+       },
+       {
+        "name": "Reave",
+        "id": 142270
+       },
+       {
+        "name": "Gouge",
+        "id": 12540
+       },
+       {
+        "name": "Mutilate",
+        "id": 143941
+       },
+       {
+        "name": "Hurls Amber",
+        "id": 143733
+       },
+       {
+        "name": "Flash",
+        "id": 143709
+       },
+       {
+        "name": "Whirling",
+        "id": 143701
+       },
+       {
+        "name": "Caustic Amber",
+        "id": 143735
+       },
+       {
+        "name": "Strong Legs",
+        "id": 143964
+       }
+      ]
+     }
+    },
+    {
+     "slug": "garrosh-hellscream",
+     "name": "Garrosh Hellscream",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Empowering Corruption",
+        "id": 149536
+       },
+       {
+        "name": "Exploding Iron Stars",
+        "id": 144798
+       },
+       {
+        "name": "impact",
+        "id": 144653
+       },
+       {
+        "name": "Desecrate",
+        "id": 144748
+       },
+       {
+        "name": "Hellscream's Warsong",
+        "id": 73818
+       },
+       {
+        "name": "Ancestral Chain Heal",
+        "id": 144583
+       },
+       {
+        "name": "Chain Lightning",
+        "id": 103637
+       },
+       {
+        "name": "Ancestral Fury",
+        "id": 144585
+       },
+       {
+        "name": "Hamstring",
+        "id": 1715
+       },
+       {
+        "name": "fixate",
+        "id": 147300
+       },
+       {
+        "name": "Annihilate",
+        "id": 144969
+       },
+       {
+        "name": "Once he is engaged, he starts casting",
+        "id": 144945
+       },
+       {
+        "name": "Consumed Faith",
+        "id": 149033
+       },
+       {
+        "name": "Embodied Doubt",
+        "id": 149347
+       },
+       {
+        "name": "Consumed Courage",
+        "id": 149011
+       },
+       {
+        "name": "Crushing Fear",
+        "id": 147324
+       },
+       {
+        "name": "Consumed Hope",
+        "id": 149032
+       },
+       {
+        "name": "Ultimate Despair",
+        "id": 147341
+       },
+       {
+        "name": "Whirling Corruption",
+        "id": 144985
+       },
+       {
+        "name": "Empowered",
+        "id": 145037
+       },
+       {
+        "name": "Touch of Y'Shaarj",
+        "id": 145065
+       },
+       {
+        "name": "Empowered Touch of Y'Shaarj",
+        "id": 145171
+       },
+       {
+        "name": "Desecrate becomes Empowered",
+        "id": 144816
+       },
+       {
+        "name": "Gripping Despair",
+        "id": 145183
+       },
+       {
+        "name": "Empowered Gripping Despair",
+        "id": 145195
+       },
+       {
+        "name": "Explosive Despair",
+        "id": 145199
+       },
+       {
+        "name": "Manifest Rage",
+        "id": 147011
+       },
+       {
+        "name": "Malice",
+        "id": 147209
+       },
+       {
+        "name": "Malicious Blast",
+        "id": 147235
+       },
+       {
+        "name": "Bombardment",
+        "id": 147135
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Empowering Corruption",
+        "id": 149536
+       },
+       {
+        "name": "Exploding Iron Stars",
+        "id": 144798
+       },
+       {
+        "name": "impact",
+        "id": 144653
+       },
+       {
+        "name": "Desecrate",
+        "id": 144748
+       },
+       {
+        "name": "Hellscream's Warsong",
+        "id": 73818
+       },
+       {
+        "name": "Ancestral Chain Heal",
+        "id": 144583
+       },
+       {
+        "name": "Chain Lightning",
+        "id": 103637
+       },
+       {
+        "name": "Ancestral Fury",
+        "id": 144585
+       },
+       {
+        "name": "Hamstring",
+        "id": 1715
+       },
+       {
+        "name": "fixate",
+        "id": 147300
+       },
+       {
+        "name": "Annihilate",
+        "id": 144969
+       },
+       {
+        "name": "Once he is engaged, he starts casting",
+        "id": 144945
+       },
+       {
+        "name": "Consumed Faith",
+        "id": 149033
+       },
+       {
+        "name": "Embodied Doubt",
+        "id": 149347
+       },
+       {
+        "name": "Consumed Courage",
+        "id": 149011
+       },
+       {
+        "name": "Crushing Fear",
+        "id": 147324
+       },
+       {
+        "name": "Consumed Hope",
+        "id": 149032
+       },
+       {
+        "name": "Ultimate Despair",
+        "id": 147341
+       },
+       {
+        "name": "Whirling Corruption",
+        "id": 144985
+       },
+       {
+        "name": "Empowered",
+        "id": 145037
+       },
+       {
+        "name": "Touch of Y'Shaarj",
+        "id": 145065
+       },
+       {
+        "name": "Empowered Touch of Y'Shaarj",
+        "id": 145171
+       },
+       {
+        "name": "Desecrate becomes Empowered",
+        "id": 144816
+       },
+       {
+        "name": "Gripping Despair",
+        "id": 145183
+       },
+       {
+        "name": "Empowered Gripping Despair",
+        "id": 145195
+       },
+       {
+        "name": "Explosive Despair",
+        "id": 145199
+       },
+       {
+        "name": "Manifest Rage",
+        "id": 147011
+       },
+       {
+        "name": "Malice",
+        "id": 147209
+       },
+       {
+        "name": "Malicious Blast",
+        "id": 147235
+       },
+       {
+        "name": "Bombardment",
+        "id": 147135
+       }
+      ],
+      "normal": [
+       {
+        "name": "Exploding Iron Stars",
+        "id": 144798
+       },
+       {
+        "name": "impact",
+        "id": 144653
+       },
+       {
+        "name": "Desecrate",
+        "id": 144748
+       },
+       {
+        "name": "Hellscream's Warsong",
+        "id": 73818
+       },
+       {
+        "name": "Ancestral Chain Heal",
+        "id": 144583
+       },
+       {
+        "name": "Chain Lightning",
+        "id": 103637
+       },
+       {
+        "name": "Ancestral Fury",
+        "id": 144585
+       },
+       {
+        "name": "Hamstring",
+        "id": 1715
+       },
+       {
+        "name": "Annihilate",
+        "id": 144969
+       },
+       {
+        "name": "Once he is engaged, he starts casting",
+        "id": 144945
+       },
+       {
+        "name": "Consumed Faith",
+        "id": 149033
+       },
+       {
+        "name": "Consumed Courage",
+        "id": 149011
+       },
+       {
+        "name": "Consumed Hope",
+        "id": 149032
+       },
+       {
+        "name": "Whirling Corruption",
+        "id": 144985
+       },
+       {
+        "name": "Empowered",
+        "id": 145037
+       },
+       {
+        "name": "Minion of Y'Shaarj",
+        "id": 149536
+       },
+       {
+        "name": "Touch of Y'Shaarj",
+        "id": 145065
+       },
+       {
+        "name": "Empowered Touch of Y'Shaarj",
+        "id": 145171
+       },
+       {
+        "name": "Desecrate becomes Empowered",
+        "id": 144816
+       },
+       {
+        "name": "Gripping Despair",
+        "id": 145183
+       },
+       {
+        "name": "Empowered Gripping Despair",
+        "id": 145195
+       },
+       {
+        "name": "Explosive Despair",
+        "id": 145199
        }
       ]
      }

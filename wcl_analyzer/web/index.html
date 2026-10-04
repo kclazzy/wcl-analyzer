@@ -351,7 +351,7 @@ dialog label.check input{width:auto;margin:0}
       <p class="hint" id="allHint" hidden style="grid-column:1/-1;margin:0;font-size:14px">Выбраны <b>все боссы отчёта</b> — по одному бою на босса (последний килл, без киллов — лучший пулл): план сейвов на каждого босса (героик и эпохальный) и ротация по боссам против топ-1, чтобы хватило лимита WCL.</p>
       <div class="runrow">
         <button class="btn you" id="runBtn" type="button" title="Одна кнопка — весь разбор: сначала урон, сейвы и смерти (готово через несколько секунд), затем ротация — всех DPS или выбранного игрока. Вкладки результата переключаются без новой загрузки, Excel — один на всё">Разобрать бой</button>
-        <button class="btn" id="progBtn" type="button" title="Бой гильдии, которая первой в мире убила этого босса на этой сложности (рейтинг прогресса Warcraft Logs): урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения — просто посмотреть, как это сделали лучшие">Топ прогресса</button>
+        <button class="btn" id="progBtn" type="button" title="Бой гильдии, которая первой в мире убила этого босса на этой сложности (рейтинг прогресса Warcraft Logs): урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения — просто посмотреть, как это сделали лучшие. С «Все боссы отчёта» — на каждого босса отчёта, вкладка на босса">Топ прогресса</button>
         <label class="chk" title="Когда часовой лимит WCL кончится, не останавливаться, а дождаться сброса и продолжить (можно оставить на ночь)"><input type="checkbox" id="waitLimit"> Кончится лимит — ждать и продолжать</label>
         <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
@@ -665,7 +665,6 @@ $("#demoBtn").onclick = () => run({demo:true});
 $("#demoRaidBtn").onclick = () => run({mode:"fight", demo:true, ref:"top3"});
 /* «Топ прогресса»: бой гильдии, первой в мире убившей этого босса на этой сложности, — без сравнения */
 $("#progBtn").onclick = () => {
-  if (allFights()) return showErr("Для «Топ прогресса» выберите в списке «Бой» конкретного босса.");
   run({mode:"progress", url:$("#url").value.trim(), fight:$("#fight").value, wait: $("#waitLimit").checked});
 };
 /* Отбор игроков по рейтингу с учётом экипировки (WCL bracketPercent): место среди игроков спека с тем же уровнем предметов */
@@ -795,6 +794,8 @@ async function onDone(job, R){
 }
 function histTitle(R){
   const I = R.info;
+  if (R.mode === "fight" && R.variant === "progress_all")
+    return `Топ прогресса — все боссы: ${I.boss} (${Object.keys(R.parts||{}).length} из ${(R.order||[]).length})`;
   if (R.mode === "fight") {
     const P = R.parts || {}, rot = P.rot ? ` + ротация (${P.rot.players.length} DPS)` : P.player ? ` + ${P.player.info.name}` : P.pall ? " + ротация по боссам" : "";
     return R.all_bosses ? `Все боссы: ${I.boss || I.title || I.zone}${rot}` : `Бой: ${I.boss}, ${I.difficulty}, пулл ${(P.raid && P.raid.summary || {}).pull_n || "?"} (${I.kill?"килл":"вайп"})${rot}`;
@@ -828,6 +829,7 @@ function quietScroll(fn){  // перерисовка вкладки не дол�
 }
 function fightLabel(R, k){
   const P = R.parts || {};
+  if ((R.kinds || {})[k]) return (R.titles || {})[k] || k;
   if (k === "rot") return P.rot ? `Ротация рейда (${P.rot.players.length})` : "Ротация рейда";
   if (k === "player") return P.player ? `Игрок: ${P.player.info.name}` : "Разбор игрока";
   return (R.titles || {})[k] || k;
@@ -840,7 +842,7 @@ function renderFight(R){
   if (!order.includes(FIGHT_STATE.tab)) FIGHT_STATE.tab = order[0];
   host.hidden = false;
   host.innerHTML = `<div class="ftabs" role="tablist" aria-label="Части разбора">${order.map(k => {
-      const st = R.parts[k] ? "" : (R.errors || {})[k] ? " — не досчитано" : R.pending === k ? " — считается…" : "";
+      const st = R.parts[k] ? "" : (R.errors || {})[k] ? " — не досчитано" : R.pending === k ? " — считается…" : (R.queued || []).includes(k) ? " — в очереди" : "";
       return `<button type="button" role="tab" data-ft="${k}" aria-selected="${k === FIGHT_STATE.tab}">${esc(fightLabel(R, k) + st)}</button>`;
     }).join("")}</div><div id="fightPane"></div>`;
   host.querySelectorAll("[data-ft]").forEach(b => b.onclick = () => { FIGHT_STATE.tab = b.dataset.ft; showFightTab(true); });
@@ -857,12 +859,14 @@ function showFightTab(userClick){
     if (part) {
       const sub = {...part, excel: live ? "#excel-pending" : "#excel-" + R._hid, _hid: R._hid, _created: R._created};
       if (sub.alt) sub.alt = {...sub.alt, excel: live ? "#excelalt-pending" : "#excelalt-" + R._hid};
-      ({raid: renderRaid, rot: renderRaidRot, player: render, saves: renderSaves, pall: renderPlayerAll})[k](sub);
+      ({raid: renderRaid, rot: renderRaidRot, player: render, saves: renderSaves, pall: renderPlayerAll})[(R.kinds || {})[k] || k](sub);
     } else if ((R.errors || {})[k]) {
       pane.innerHTML = box(fightLabel(R, k) + ": не досчитано", "", `<p>${esc(R.errors[k])}</p>
         <p class="hint">Остальные вкладки готовы. «Продолжить» запустит разбор снова — уже скачанное лимит WCL повторно не тратит.</p>
         <button type="button" class="btn you" id="fightAgain">Продолжить</button>`);
-      $("#fightAgain").onclick = () => run({mode: "fight", ...R.params, wait: $("#waitLimit").checked});
+      $("#fightAgain").onclick = () => run({mode: "fight", ...R.params, wait: $("#waitLimit").checked});  // params.mode есть у «Топ прогресса»
+    } else if ((R.queued || []).includes(k)) {
+      pane.innerHTML = box(fightLabel(R, k), "В очереди — посчитается после текущего босса, вкладка заполнится сама.", "");
     } else {
       pane.innerHTML = box(fightLabel(R, k), "Считается — вкладка заполнится сама, нажимать ничего не нужно.",
         `<div class="fbar" role="progressbar" aria-label="Готовность"><i id="fightBar" style="width:${Math.round((FIGHT_STATE.p || 0) * 100)}%"></i></div>`);
@@ -1147,7 +1151,7 @@ function renderTalents(T, el){
    и что в те же моменты жмут лучшие гильдии */
 function renderRaidPeaks(P, el){
   if (!P) { el.innerHTML = box("Рейдовые кулдауны в пики урона", "", '<p class="empty">Нет данных: урон по рейду для этого боя не загрузился. </p>'); return; }
-  const X = P.extras || {}, V = X.vs_top, H = X.heaviest || [];
+  const X = P.extras || {}, V = X.vs_top, H = X.heaviest || [], TP = (P.info || {}).top_progress;
   el.innerHTML = `
     ${(P.brief||[]).length ? `<div class="box brief"><ul class="lines">${P.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
     ${box("Урон по рейду и рейдовые кулдауны", "Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники — рейдовые кулдауны вашего рейда (красная обводка — нажат вне пиков)" + (V ? ", полые бирюзовые — что жмут лучшие киллы." : "."),
@@ -1164,9 +1168,11 @@ function renderRaidPeaks(P, el){
         r.top_share==null ? "—" : pct(r.top_share,0),
         r.top_raid!==undefined ? scopeCell(r.top_raid, r.top_self||[], false) : esc((r.top_cds||[]).join(", ")||"—")]),
         {num:[3], cls:"wide", flag:i=>{const r=V.rows[i]; return r.my!=null && !r.my.length && (r.top_share||0)>=0.5;}}) + "</div>" : ""}
-    ${box("Самые тяжёлые моменты вашего боя", "5 секунд с наибольшим уроном по рейду. Кулдаун засчитан, если нажат за 8 с до момента или во время него.",
+    ${box(TP ? `Самые тяжёлые моменты боя ${TP.guild}` : "Самые тяжёлые моменты вашего боя", "5 секунд с наибольшим уроном по рейду. Кулдаун засчитан, если нажат за 8 с до момента или во время него."
+        + ((X.heaviest_mrt||[]).length ? " «Скопировать для MRT» — заметка с этими нажатиями: кто и какой кулдаун, время — от первого нажатия." : ""),
       table(["Когда","Урон за 5 с","Доля боя","Механики","Нажатые рейдовые кулдауны"], H.map(h=>[h.time, num(h.damage), pct(h.share,0), esc(h.abilities.join(", ")),
-        h.cds.length?esc(h.cds.join(", ")):'<span class="worse">ничего</span>']), {num:[1,2], empty:"Нет данных об уроне.", flag:i=>!H[i].cds.length}))}
+        h.cds.length?esc([...new Set(h.cds)].join(", ")):'<span class="worse">ничего</span>']), {num:[1,2], empty:"Нет данных об уроне.", flag:i=>!H[i].cds.length})
+      + mrtBlock(X.heaviest_mrt || [], (TP ? TP.guild + " — " : "") + ((P.info||{}).boss || "")))}
     ${(X.roster_cds||[]).length ? box("Рейдовые кулдауны состава", "У кого какой рейдовый кулдаун есть и сколько раз его можно нажать за бой при этой перезарядке. Красным — ни разу не нажат.",
       table(["Игрок","Кулдаун","Откат","Нажато","Можно за бой","Откуда известно"], X.roster_cds.map(c=>[`${esc(c.player)} <span style="color:var(--muted);font-size:13.5px">${esc(who(c.cls, c.spec))}</span>`,
         esc(c.name), mmss(c.cd).replace(/,0$/,""), num(c.used), c.max_uses==null?"—":num(c.max_uses), esc(c.source)]), {num:[2,3,4], flag:i=>!X.roster_cds[i].used})) : ""}`;

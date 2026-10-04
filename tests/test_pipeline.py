@@ -288,7 +288,7 @@ def test_top_progress():
     class C(FakeRaidClient):
         def fight_rankings(self, enc, diff, metric="speed", **k):
             self.metric = metric
-            fid = int([f for f in self.report(CODE)["fights"] if f.get("encounterID")][-1]["id"])
+            fid = int([f for f in FakeRaidClient.report(self, CODE)["fights"] if f.get("encounterID")][-1]["id"])
             return [{"report": {"code": "PRIVATE00001", "fightID": 1}, "guild": {"name": "Закрытые"}},
                     {"report": {"code": CODE, "fightID": fid}, "guild": {"name": "Echo"},
                      "server": {"name": "Tarren Mill", "region": "EU"}}]
@@ -304,7 +304,41 @@ def test_top_progress():
     assert cl.metric == "progress", cl.metric
     assert R["info"]["top_progress"]["guild"] == "Echo" and R["info"]["top_progress"]["rank"] == 2, R["info"]["top_progress"]
     assert R["extras"].get("vs_top") is None and job.get("xlsx")       # без сравнения, Excel есть
-    print("OK топ прогресса: первый килл по рейтингу прогресса, закрытый лог — следующая гильдия, без сравнения")
+    # заметка MRT по самым тяжёлым моментам: их нажатия, без повторов способности в строке
+    assert R["extras"]["heaviest_mrt"] and all(x["mrt"].startswith("{time:") for x in R["extras"]["heaviest_mrt"])
+    for h in R["extras"]["heaviest"]:
+        assert len(h["cds"]) == len(set(h["cds"])), h["cds"]
+
+    # все боссы отчёта: вкладка на босса, второй босс упёрся в лимит — первый остаётся, у второго «Продолжить»
+    import copy
+    rep = copy.deepcopy(cl.report(CODE))
+    boss_f = [f for f in rep["fights"] if f.get("encounterID")]
+    extra = {**copy.deepcopy(boss_f[-1]), "id": 999, "encounterID": int(boss_f[-1]["encounterID"]) + 1, "name": "Второй босс",
+             "startTime": float(boss_f[-1].get("startTime") or 0) + 1}
+    rep["fights"].append(extra)
+
+    class C2(C):
+        def report(self, code):
+            return rep if code == CODE else super().report(code)
+
+        def fight_rankings(self, enc, diff, metric="speed", **k):
+            if enc == extra["encounterID"]:
+                from wcl_analyzer.api import WCLError
+                raise WCLError("Закончился часовой лимит запросов Warcraft Logs для вашего ключа — разбор остановлен.")
+            return super().fight_rankings(enc, diff, metric, **k)
+    cl2 = C2()
+    web.CLIENT_FACTORY = lambda creds: cl2
+    try:
+        job = {"id": "tpa", "log": [], "progress": 0.0, "state": "running"}
+        web._run_top_progress(job, {"mode": "progress", "url": DEMO_URL, "fight": "all"}, None, job["log"].append)
+    finally:
+        web.CLIENT_FACTORY = orig
+    R2 = job["result"]
+    assert R2["variant"] == "progress_all" and R2["order"] == ["b0", "b1"] and list(R2["parts"]) == ["b0"], R2["order"]
+    assert "лимит" in R2["errors"]["b1"] and R2["params"]["mode"] == "progress" and job.get("xlsx")
+    assert R2["parts"]["b0"]["info"]["top_progress"]["guild"] == "Echo"
+    print("OK топ прогресса: первый килл по рейтингу прогресса, закрытый лог — следующая гильдия, без сравнения; "
+          "все боссы — вкладка на босса; заметка MRT по тяжёлым моментам")
 
 
 def test_player_all_bosses():

@@ -443,11 +443,14 @@ def mrt_line(t: float, mechanic: str, picks: list[dict], phase: int | None = Non
     Название механики — только если её id неизвестен. Пустая строка, если на пик нет кулдауна."""
     if not picks:
         return ""
-    who = []
+    by: dict = {}  # один игрок с двумя кулдаунами — имя один раз, за ним обе иконки
     for p in picks:
         color = CLASS_COLOR.get(p.get("cls") or "")
         name = f"|cff{color}{p['player']}|r" if color else p["player"]
-        who.append(f"{name} {{spell:{p['id']}}}" if p.get("id") else f"{name} {p['cd']}")
+        mark = f"{{spell:{p['id']}}}" if p.get("id") else p["cd"]
+        if mark not in by.setdefault(name, []):
+            by[name].append(mark)
+    who = [f"{name} " + " ".join(marks) for name, marks in by.items()]
     tm = f"{_mrt_time(phase_t)},p{phase}" if phase and phase_t is not None else _mrt_time(t)
     mech = f"{{spell:{mech_id}}}" if mech_id and int(mech_id) > 0 else mechanic.replace("«", "").replace("»", "")
     return f"{{time:{tm}}}{mech} - " + "  ".join(who)

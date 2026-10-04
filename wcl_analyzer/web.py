@@ -653,61 +653,157 @@ def _run_saves(job: dict, params: dict, creds, log) -> None:
     log("Готово.")
 
 
-def _run_top_progress(job: dict, params: dict, creds, log) -> None:
-    """«Топ прогресса»: бой гильдии, первой убившей этого босса на этой сложности (рейтинг WCL по прогрессу),
-    разобранный как обычный бой рейда — урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения
-    с вашим боем и с другими киллами: просто посмотреть, как это сделали лучшие."""
-    from .config import DIFFICULTY_NAMES, SITE_URL
-    from .excel_raid import write_raid_workbook
-    from .logs import parse_report_url
-    from .raid import run_raid
+def _progress_cands(client, enc: int, diff: int) -> list[dict]:
+    """Первые киллы босса в мире (рейтинг WCL по прогрессу): до 5 мест с открытым логом."""
+    from .config import SITE_URL
+    cands = []
+    for i, rk in enumerate(client.fight_rankings(enc, diff, "progress")[:5]):
+        rep = rk.get("report") or {}
+        if rep.get("code"):
+            g, srv = rk.get("guild") or {}, rk.get("server") or {}
+            cands.append({"url": f"{SITE_URL}/reports/{rep['code']}", "fight": int(rep.get("fightID") or rep.get("fightId") or 0),
+                          "guild": g.get("name") or rk.get("name") or rep["code"], "rank": i + 1,
+                          "server": srv.get("name"), "region": srv.get("region"), "start": rk.get("startTime")})
+    return cands
 
-    if params.get("demo"):
-        from .raid_demo import DEMO_URL, FakeRaidClient
-        client, enc, diff = FakeRaidClient(), None, None
-        cands = [{"url": DEMO_URL, "fight": None, "guild": "Демо-гильдия", "rank": 1}]
-    else:
-        client = _client(creds, job, log, wait=bool(params.get("wait")))
-        code, url_fight, _ = parse_report_url(params["url"])
-        report = client.report(code)
-        fid = params.get("fight") if params.get("fight") not in (None, "", "all") else url_fight
-        fights = [f for f in report.get("fights") or [] if int(f.get("encounterID") or 0)]
-        f = next((f for f in fights if str(f["id"]) == str(fid)), None) or (fights[-1] if fights else None)
-        if not f:
-            raise LookupError("В отчёте нет боёв с боссами — не понятно, чей топ прогресса искать")
-        enc, diff = int(f["encounterID"]), int(f.get("difficulty") or 0)
-        log(f"{f.get('name')} ({DIFFICULTY_NAMES.get(diff, '')}): ищу первые киллы в мире (рейтинг WCL по прогрессу)…")
-        ranks = client.fight_rankings(enc, diff, "progress")
-        cands = []
-        for i, rk in enumerate(ranks[:5]):
-            rep = rk.get("report") or {}
-            if rep.get("code"):
-                g = rk.get("guild") or {}
-                srv = rk.get("server") or {}
-                cands.append({"url": f"{SITE_URL}/reports/{rep['code']}", "fight": int(rep.get("fightID") or rep.get("fightId") or 0),
-                              "guild": g.get("name") or rk.get("name") or rep["code"], "rank": i + 1,
-                              "server": srv.get("name"), "region": srv.get("region"), "start": rk.get("startTime")})
-        if not cands:
-            raise LookupError("У этого босса на этой сложности пока нет рейтинга прогресса в Warcraft Logs")
-    job["progress"] = 0.1
+
+def _progress_one(job, client, cands: list[dict], params: dict, log, lo: float, hi: float) -> dict:
+    """Разбор боя лучшей гильдии из cands: закрытый или битый лог — следующая (до 3-го места). Без сравнения."""
+    from .api import WCLError
+    from .raid import run_raid
     last = None
-    for c in cands[:3]:  # закрытый или битый лог первой гильдии — берём следующую
+    for c in cands[:3]:
         log(f"Место {c['rank']}: {c['guild']} — разбираю их бой…")
         try:
             R = run_raid(client, c["url"], c["fight"], log=lambda m: log("    " + m), compare_top=False, mythic=False,
                          talent_data=[] if params.get("demo") else None, save_talents=not SERVER["public"],
                          avoidable=set(_avoidable_list()),
-                         progress=lambda x: job.__setitem__("progress", max(job["progress"], min(0.95, 0.1 + 0.85 * x))))
-            break
+                         progress=lambda x: job.__setitem__("progress", max(job["progress"], min(hi, lo + (hi - lo) * x))))
+        except WCLError as e:
+            if "лимит" in str(e).lower():
+                raise
+            last = e
+            log(f"    не получилось: {_friendly(e)}")
+            continue
         except Exception as e:  # noqa: BLE001
             last = e
             log(f"    не получилось: {_friendly(e)}")
-    else:
-        raise LookupError(f"Не удалось открыть бои лучших гильдий: {_friendly(last) if last else 'нет данных'}")
-    R["info"]["top_progress"] = {k: c.get(k) for k in ("rank", "guild", "server", "region", "start")}
-    _excel_bytes(job, f"Топ_прогресса_{R['info']['boss']}_{c['guild']}", write_raid_workbook, R)
-    job["result"] = {**R, "excel": f"/api/report/{job['id']}", "source_url": c["url"]}
+            continue
+        R["info"]["top_progress"] = {k: c.get(k) for k in ("rank", "guild", "server", "region", "start")}
+        return {**R, "source_url": c["url"]}
+    raise LookupError(f"Не удалось открыть бои лучших гильдий: {_friendly(last) if last else 'нет данных'}")
+
+
+def _run_top_progress(job: dict, params: dict, creds, log) -> None:
+    """«Топ прогресса»: бой гильдии, первой убившей этого босса на этой сложности (рейтинг WCL по прогрессу),
+    разобранный как обычный бой рейда — урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения
+    с вашим боем и с другими киллами: просто посмотреть, как это сделали лучшие.
+    «Все боссы отчёта» — так же для каждого босса отчёта, вкладка на босса."""
+    from .config import DIFFICULTY_NAMES
+    from .excel_raid import write_raid_workbook
+    from .logs import parse_report_url
+
+    if params.get("demo"):
+        from .raid_demo import DEMO_URL, FakeRaidClient
+        client = FakeRaidClient()
+        R = _progress_one(job, client, [{"url": DEMO_URL, "fight": None, "guild": "Демо-гильдия", "rank": 1}], params, log, 0.1, 0.95)
+        _excel_bytes(job, f"Топ_прогресса_{R['info']['boss']}", write_raid_workbook, R)
+        job["result"] = {**R, "excel": f"/api/report/{job['id']}"}
+        log("Готово.")
+        return
+    client = _client(creds, job, log, wait=bool(params.get("wait")))
+    code, url_fight, _ = parse_report_url(params["url"])
+    report = client.report(code)
+    fights = [f for f in report.get("fights") or [] if int(f.get("encounterID") or 0)]
+    if not fights:
+        raise LookupError("В отчёте нет боёв с боссами — не понятно, чей топ прогресса искать")
+    if params.get("fight") == "all":
+        return _run_top_progress_all(job, params, client, fights, log)
+    fid = params.get("fight") if params.get("fight") not in (None, "") else url_fight
+    f = next((f for f in fights if str(f["id"]) == str(fid)), None) or fights[-1]
+    enc, diff = int(f["encounterID"]), int(f.get("difficulty") or 0)
+    log(f"{f.get('name')} ({DIFFICULTY_NAMES.get(diff, '')}): ищу первые киллы в мире (рейтинг WCL по прогрессу)…")
+    cands = _progress_cands(client, enc, diff)
+    if not cands:
+        raise LookupError("У этого босса на этой сложности пока нет рейтинга прогресса в Warcraft Logs")
+    job["progress"] = 0.1
+    R = _progress_one(job, client, cands, params, log, 0.1, 0.95)
+    _excel_bytes(job, f"Топ_прогресса_{R['info']['boss']}_{R['info']['top_progress']['guild']}", write_raid_workbook, R)
+    job["result"] = {**R, "excel": f"/api/report/{job['id']}"}
     log("Готово.")
+
+
+def _run_top_progress_all(job: dict, params: dict, client, fights: list[dict], log) -> None:
+    """Топ прогресса на каждого босса отчёта (по сложностям из отчёта): вкладка на босса, готовые боссы
+    видны сразу, пока считаются следующие. Кончился лимит WCL — остальные боссы с «Продолжить»
+    (уже разобранное лимит повторно не тратит). Excel — один, листы подписаны именем босса."""
+    from .config import DIFFICULTY_NAMES
+    from .excel_raid import write_raid_workbook
+    seen, bosses = set(), []
+    for f in sorted(fights, key=lambda x: float(x.get("startTime") or 0)):
+        k = (int(f["encounterID"]), int(f.get("difficulty") or 0))
+        if k not in seen:
+            seen.add(k)
+            bosses.append((k[0], k[1], f.get("name", "")))
+    multi = len({b[1] for b in bosses}) > 1
+    order = [f"b{i}" for i in range(len(bosses))]
+    titles = {f"b{i}": name + (f" ({DIFFICULTY_NAMES.get(d, '')[:4]}.)" if multi else "") for i, (_, d, name) in enumerate(bosses)}
+    parts, errors, writers = {}, {}, []
+    log(f"Боссов в отчёте: {len(bosses)}. На каждого — бой гильдии с первым киллом в мире.")
+
+    def combined(pending=None):
+        return {"mode": "fight", "variant": "progress_all", "all_bosses": True,
+                "info": {"boss": report_title, "title": report_title, "zone": report_title}, "parts": dict(parts),
+                "order": order, "errors": dict(errors), "pending": pending, "titles": titles,
+                "kinds": {k: "raid" for k in order}, "queued": [k for k in order if k not in parts and k not in errors and k != pending],
+                "excel": f"/api/report/{job['id']}",
+                "params": {"mode": "progress", "url": params.get("url"), "fight": "all"}}
+    report_title = (client.report(_report_code(params["url"])).get("zone") or {}).get("name") or "Все боссы"
+    for i, (enc, diff, name) in enumerate(bosses):
+        key, lo = order[i], i / len(bosses)
+        job["partial"], job["partial_v"] = combined(pending=key), job.get("partial_v", 0) + 1
+        log(f"[{i + 1}/{len(bosses)}] {name} ({DIFFICULTY_NAMES.get(diff, '')})")
+        try:
+            cands = _progress_cands(client, enc, diff)
+            if not cands:
+                raise LookupError("пока нет рейтинга прогресса в Warcraft Logs")
+            R = _progress_one(job, client, cands, params, lambda m: log("  " + m), lo, lo + 1 / len(bosses))
+        except Exception as e:  # noqa: BLE001
+            msg = _friendly(e)
+            if "лимит" in msg.lower():
+                for k in order[i:]:
+                    errors[k] = "Не хватило часового лимита WCL — нажмите «Продолжить» после сброса."
+                log("Закончился часовой лимит WCL — остальные боссы после сброса.")
+                break
+            errors[key] = msg
+            log(f"  {name}: {msg}")
+            continue
+        R["excel"] = f"/api/report/{job['id']}"
+        parts[key] = R
+        writers.append((titles[key], write_raid_workbook, R))
+    if not parts:
+        raise LookupError("Ни для одного босса не удалось разобрать топ прогресса: " + "; ".join(dict.fromkeys(errors.values())))
+
+    def write_all(_data, path):
+        wb = _new_wb()
+        for prefix, writer, data in writers:
+            before = set(wb.sheetnames)
+            writer(data, None, wb=wb)
+            for ws in wb.worksheets:  # листы каждого босса — с его именем: «Sszorak — Выжимка»
+                if ws.title not in before:
+                    base = re.sub(r"\d+$", "", ws.title) if re.sub(r"\d+$", "", ws.title) in before else ws.title
+                    ws.title = f"{prefix[:14]} — {base}"[:31]
+        wb.save(path)
+        return path
+    _excel_bytes(job, f"Топ_прогресса_{report_title}", write_all, None)
+    job.pop("partial", None)
+    job["result"] = combined()
+    log("Готово.")
+
+
+def _report_code(url: str) -> str:
+    from .logs import parse_report_url
+    return parse_report_url(url)[0]
 
 
 def _run_raid_rotation(job: dict, params: dict, creds, log) -> None:

@@ -187,6 +187,37 @@ def fight_phases(f: dict, meta: list | None, dur: float) -> list[dict]:
     return out
 
 
+def _uniq_cds(cds: list[dict]) -> list[dict]:
+    """Кулдауны в окне момента без повторов: один и тот же кулдаун одного игрока (два события, два нажатия
+    подряд) — одна запись, по первому нажатию."""
+    seen, out = set(), []
+    for c in cds:
+        k = (c.get("pid"), c.get("id"), c.get("name"))
+        if k not in seen:
+            seen.add(k)
+            out.append(c)
+    return out
+
+
+def heaviest_mrt(heaviest: list[dict], phases: list[dict]) -> list[dict]:
+    """Заметка MRT по самым тяжёлым моментам: какие рейдовые кулдауны нажал этот рейд — по времени первого
+    нажатия, со 2-й фазы — от начала фазы. Для разбора топа — готовая расстановка лучших гильдий."""
+    from .raid_top import mrt_line
+    out = []
+    for h in sorted(heaviest or [], key=lambda x: x["t"]):
+        picks = h.get("cd_list") or []
+        if not picks:
+            continue
+        t0 = min(p["t"] for p in picks)
+        ph = phase_at(phases, t0)
+        n = ph["n"] if ph and (ph.get("n") or 0) > 1 else None
+        line = mrt_line(t0, "«" + (h["abilities"][0] if h.get("abilities") else "Пик") + "»", picks, n,
+                        round(t0 - ph["t"], 1) if n else None, mech_id=h.get("ability_id"))
+        if line:
+            out.append({"t": t0, "time": _fmt_t(t0), "mrt": line})
+    return out
+
+
 def phase_at(phases: list[dict], t: float) -> dict | None:
     cur = None
     for ph in phases or []:
@@ -537,6 +568,7 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
         "best_pct": min((p["boss_pct"] for p in pulls if p["boss_pct"] is not None), default=None),
     }
     phases = fight_phases(f, raw.get("phase_meta"), dur)
+    extras["heaviest_mrt"] = heaviest_mrt(extras.get("heaviest"), phases)
     for sp in extras.get("spikes", []):  # фаза пика и время от её начала: следующая фаза может прийти раньше или позже
         ph = phase_at(phases, sp["t"])
         sp["phase"] = ph["n"] if ph else None
@@ -748,7 +780,7 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
         # Секунда самого сильного удара внутри пика — от неё считается время нажатия в плане
         sp["peak_t"] = float(max(range(int(sp["t"]), int(sp["t"]) + 5 + SPIKE_GAP_S),
                                  key=lambda x: per_s.get(x, 0.0)))
-        cov = [c for c in raid_cds if sp["t"] - lo <= c["t"] <= sp["t"] + 5 + hi]
+        cov = _uniq_cds([c for c in raid_cds if sp["t"] - lo <= c["t"] <= sp["t"] + 5 + hi])
         sp["covered_by"] = [f"{c['name']} ({c['player']})" for c in cov]
         sp["covered_ids"] = sorted({c["id"] for c in cov})
         sp["covered_self"] = [f"{c['name']} ({c['player']})" for c in cov if _gd.scope(c["id"]) == "self"]
@@ -794,10 +826,14 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
             for t, ab, a in hits:
                 if i <= t < i + 5:
                     main[ab] += a
-        cds = [c for c in raid_cds if i - lo <= c["t"] <= i + 5 + hi]
+        cds = _uniq_cds([c for c in raid_cds if i - lo <= c["t"] <= i + 5 + hi])
         heavy.append({"t": float(i), "time": _fmt_t(i), "damage": round(win[i]), "share": round(win[i] / total_nt, 4),
                       "abilities": [nm(ab) for ab, _ in main.most_common(2)],
-                      "cds": [f"{c['name']} ({c['player']})" for c in cds]})
+                      "ability_id": main.most_common(1)[0][0] if main else None,
+                      "cds": [f"{c['name']} ({c['player']})" for c in cds],
+                      # для заметки MRT: кто, что и когда нажал (класс — для цвета имени)
+                      "cd_list": [{"cd": c["name"], "player": c["player"], "id": c["id"], "t": round(c["t"], 1),
+                                   "cls": (players.get(c["pid"]) or {}).get("cls", "")} for c in cds]})
     out["heaviest"] = sorted(heavy, key=lambda x: -x["damage"])
 
     # 3. Переключение на аддов

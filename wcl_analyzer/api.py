@@ -11,6 +11,7 @@ import json
 import sqlite3
 import threading
 import time
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -23,8 +24,14 @@ class WCLError(RuntimeError):
     pass
 
 
+CACHE_MAX_AGE_DAYS = 21    # ответы старше — удаляются при запуске (понадобятся — скачаются заново)
+CACHE_MAX_MB = 500         # и не больше 500 МБ: сверх — удаляются самые старые
+_Z = b"z1"                 # метка сжатого ответа (старые записи — обычный текст JSON)
+
+
 class Cache:
-    """Общий кэш ответов API. Данные WCL публичные, поэтому кэш общий для всех пользователей."""
+    """Общий кэш ответов API. Данные WCL публичные, поэтому кэш общий для всех пользователей.
+    Ответы хранятся сжатыми (zlib, в 5–10 раз меньше). Старые и лишние записи чистит prune()."""
 
     def __init__(self, path: Path):
         self.path = Path(path)
@@ -43,6 +50,18 @@ class Cache:
         raw = query.strip() + "\n" + json.dumps(variables, sort_keys=True)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def _pack(response: Any):
+        raw = json.dumps(response, separators=(",", ":")).encode("utf-8")
+        return sqlite3.Binary(_Z + zlib.compress(raw, 6)) if len(raw) > 1024 else raw.decode("utf-8")
+
+    @staticmethod
+    def _unpack(data) -> Any:
+        if isinstance(data, (bytes, memoryview)):
+            data = bytes(data)
+            return json.loads(zlib.decompress(data[len(_Z):]) if data.startswith(_Z) else data)
+        return json.loads(data)
+
     def get(self, key: str, max_age_s: float | None = None) -> Any | None:
         with self.lock:
             row = self.db.execute(
@@ -52,7 +71,7 @@ class Cache:
             return None
         if max_age_s is not None and time.time() - row[1] > max_age_s:
             return None
-        return json.loads(row[0])
+        return self._unpack(row[0])
 
     def fetched_at(self, key: str) -> float | None:
         with self.lock:
@@ -66,10 +85,64 @@ class Cache:
     def _put(self, key: str, query: str, variables: dict, response: Any) -> None:
         self.db.execute(
             "INSERT OR REPLACE INTO api_cache VALUES (?, ?, ?, ?, ?)",
-            (key, query, json.dumps(variables, sort_keys=True),
-             json.dumps(response), time.time()),
+            (key, "", json.dumps(variables, sort_keys=True), self._pack(response), time.time()),
         )
         self.db.commit()
+
+    def size_mb(self) -> float:
+        try:
+            return self.path.stat().st_size / 1048576
+        except OSError:
+            return 0.0
+
+    def info(self) -> dict:
+        with self.lock:
+            n = self.db.execute("SELECT COUNT(*) FROM api_cache").fetchone()[0]
+        return {"path": str(self.path.resolve()), "size_mb": round(self.size_mb(), 1), "rows": n,
+                "max_age_days": CACHE_MAX_AGE_DAYS, "max_mb": CACHE_MAX_MB}
+
+    def prune(self, max_age_days: float = CACHE_MAX_AGE_DAYS, max_mb: float = CACHE_MAX_MB,
+              compress_old: bool = True) -> dict:
+        """Удаляет ответы старше max_age_days и самые старые сверх max_mb, дожимает старые несжатые записи
+        и возвращает место на диске (VACUUM). Свои эталоны и настройки (другие таблицы) не трогает."""
+        before = self.size_mb()
+        with self.lock:
+            cur = self.db.execute("DELETE FROM api_cache WHERE fetched_at < ?", (time.time() - max_age_days * 86400,))
+            removed = cur.rowcount or 0
+            if compress_old:  # записи прежних версий — текстом и с полным текстом запроса
+                rows = self.db.execute("SELECT key, response FROM api_cache WHERE typeof(response) = 'text' "
+                                       "AND length(response) > 1024").fetchall()
+                for k, resp in rows:
+                    self.db.execute("UPDATE api_cache SET response = ?, query = '' WHERE key = ?",
+                                    (self._pack(json.loads(resp)), k))
+                self.db.execute("UPDATE api_cache SET query = '' WHERE query != ''")
+            total = self.db.execute("SELECT COALESCE(SUM(length(response)), 0) FROM api_cache").fetchone()[0]
+            limit = max_mb * 1048576
+            if total > limit:  # сверх лимита — самые старые
+                acc, cut = 0, None
+                for k, ln, fa in self.db.execute("SELECT key, length(response), fetched_at FROM api_cache "
+                                                 "ORDER BY fetched_at DESC"):
+                    acc += ln or 0
+                    if acc > limit * 0.9:
+                        cut = fa
+                        break
+                if cut is not None:
+                    removed += self.db.execute("DELETE FROM api_cache WHERE fetched_at <= ?", (cut,)).rowcount or 0
+            self.db.commit()
+            try:
+                self.db.execute("VACUUM")
+            except sqlite3.OperationalError:
+                pass
+        return {"removed": removed, "before_mb": round(before, 1), "after_mb": round(self.size_mb(), 1)}
+
+    def clear(self) -> dict:
+        """Очистить кэш целиком (эталоны и настройки остаются)."""
+        before = self.size_mb()
+        with self.lock:
+            self.db.execute("DELETE FROM api_cache")
+            self.db.commit()
+            self.db.execute("VACUUM")
+        return {"before_mb": round(before, 1), "after_mb": round(self.size_mb(), 1)}
 
 
 class MemoryCache:

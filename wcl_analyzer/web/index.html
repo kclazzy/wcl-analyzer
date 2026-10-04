@@ -439,7 +439,9 @@ dialog label.check input{width:auto;margin:0}
       <button class="mini" id="saveReset" type="button">Сбросить</button>
     </div>
     <p class="hint" id="cacheInfo" hidden style="margin:12px 0 0;overflow-wrap:anywhere">Скачанные с Warcraft Logs логи сюда не сохраняются: программа держит их в своей базе-кэше, чтобы повторный разбор не тратил лимит запросов. Это не файлы для чтения, а один файл базы:
-      <b id="cachePath"></b> <button class="mini" id="cacheOpen" type="button">Открыть папку кэша</button></p>
+      <b id="cachePath"></b> <span id="cacheSize"></span> <button class="mini" id="cacheOpen" type="button">Открыть папку кэша</button>
+      <button class="mini" id="cacheClear" type="button">Очистить кэш</button><br>
+      Кэш чистится сам при каждом запуске программы: удаляется скачанное больше 3 недель назад, и он не растёт больше 500 МБ (сверх — удаляется самое старое). Данные хранятся сжатыми. Эталоны, история и настройки при очистке не пропадают — понадобятся логи, скачаются заново (это потратит лимит запросов WCL).</p>
   </section>
 
   <section class="refs" id="mydata" aria-labelledby="dataTitle">
@@ -1917,6 +1919,7 @@ async function renderSaveDir(){
   $("#savePick").hidden = !(canPickDir() || DESK());
   $("#saveOpen").hidden = !DESK();
   $("#cacheInfo").hidden = !STATUS.cache; $("#cachePath").textContent = STATUS.cache || "";
+  $("#cacheSize").textContent = STATUS.cache_mb != null ? `— ${String(STATUS.cache_mb).replace(".", ",")} МБ` : "";
   $("#saveTextWrap").hidden = !mode;
   if (mode === "android") { $("#saveTextLabel").textContent = "Папка в «Загрузках»"; $("#saveText").placeholder = "WCL Analyzer"; $("#saveText").value = P.save_sub || ""; }
   if (mode === "path") { $("#saveTextLabel").textContent = "Путь к папке (полностью)"; $("#saveText").value = P.save_path || STATUS.downloads || ""; }
@@ -1948,6 +1951,13 @@ $("#saveTextOk").onclick = () => {
   const v = $("#saveText").value.trim();
   store.set("wclPrefs", {...prefs(), ...(textSaveMode() === "android" ? {save_sub: v.replace(/[\\:*?"<>|]+/g, "_")} : {save_path: v})});
   showOk(v ? `Папка сохранена: ${v}` : "Папка сброшена — файлы пойдут в «Загрузки»."); renderSaveDir();
+};
+$("#cacheClear").onclick = async () => {
+  if (!confirm("Удалить все скачанные с Warcraft Logs данные? Эталоны, история и настройки останутся; при следующих разборах логи скачаются заново.")) return;
+  try { const r = await api("/api/cache/clear", {});
+        showOk(`Кэш очищен: было ${String(r.before_mb).replace(".", ",")} МБ, стало ${String(r.after_mb).replace(".", ",")} МБ.`);
+        STATUS.cache_mb = r.after_mb; renderSaveDir(); }
+  catch(e){ showErr("Кэш не очищен: " + e.message); }
 };
 $("#cacheOpen").onclick = () => api("/api/opendir", {cache: true}).catch(e => showErr(e.message));
 $("#saveOpen").onclick = () => api("/api/opendir", {dir: prefs().save_path || STATUS.downloads || ""}).catch(e => showErr(e.message));

@@ -278,6 +278,44 @@ def test_plan_own_timings():
     print("OK план с топом: таймеры MRT — по вашему бою, пики «по топу» в заметку не входят")
 
 
+def test_cache_prune():
+    """Кэш WCL не растёт бесконечно: ответы сжаты, старые (3 недели) и лишние (сверх лимита) удаляются,
+    записи прежних версий (текстом) дожимаются; другие таблицы (эталоны, настройки) не трогаются."""
+    import json
+    import sqlite3
+    import tempfile
+    import time
+    from pathlib import Path
+    from wcl_analyzer.api import Cache
+    with tempfile.TemporaryDirectory() as d:
+        c = Cache(Path(d) / "c.sqlite")
+        c.db.execute("CREATE TABLE user_refs (x TEXT)"); c.db.execute("INSERT INTO user_refs VALUES ('мой эталон')")
+        big = {"events": [{"t": i, "a": "Ледяная волна", "v": i * 3} for i in range(3000)]}
+        c.put("new", "q", {}, big)
+        assert c.get("new") == big
+        # запись прежней версии: текст JSON, полный запрос
+        c.db.execute("INSERT INTO api_cache VALUES (?,?,?,?,?)", ("old_text", "query{...}", "{}", json.dumps(big), time.time()))
+        c.db.execute("INSERT INTO api_cache VALUES (?,?,?,?,?)", ("stale", "q", "{}", json.dumps(big), time.time() - 40 * 86400))
+        c.db.commit()
+        r = c.prune()
+        assert r["removed"] == 1 and c.get("stale") is None and c.get("old_text") == big, r
+        typ = c.db.execute("SELECT typeof(response) FROM api_cache WHERE key='old_text'").fetchone()[0]
+        assert typ == "blob"
+        raw = len(json.dumps(big))
+        stored = c.db.execute("SELECT length(response) FROM api_cache WHERE key='new'").fetchone()[0]
+        assert stored * 4 < raw, (stored, raw)            # сжато в разы
+        for i in range(30):
+            c.db.execute("INSERT INTO api_cache VALUES (?,?,?,?,?)", (f"k{i}", "", "{}", Cache._pack({"i": i, **big}), time.time() - 100 + i))
+        c.db.commit()
+        c.prune(max_mb=stored * 10 / 1048576)              # лимит ≈ 10 записей: остаются самые свежие
+        keys = {k for (k,) in c.db.execute("SELECT key FROM api_cache")}
+        assert "k29" in keys and "k0" not in keys and len(keys) <= 10, keys
+        assert c.db.execute("SELECT x FROM user_refs").fetchone()[0] == "мой эталон"
+        c.clear()
+        assert c.info()["rows"] == 0 and c.db.execute("SELECT COUNT(*) FROM user_refs").fetchone()[0] == 1
+    print("OK кэш WCL: сжатие, удаление старого (3 недели) и лишнего (лимит), эталоны не трогаются")
+
+
 def test_save_dir_full_path():
     """«Куда сохранять файлы» на компьютере: «Загрузки» — полным путём, выбранная папка — полным путём."""
     from pathlib import Path
@@ -742,6 +780,7 @@ if __name__ == "__main__":
     test_plan_own_timings()
     test_roster_plan()
     test_save_dir_full_path()
+    test_cache_prune()
     test_plan_healer_cds()
     test_saves_all_bosses()
     test_gear_and_trinkets()

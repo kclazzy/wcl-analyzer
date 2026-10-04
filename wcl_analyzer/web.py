@@ -456,6 +456,15 @@ def _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titl
         raise LookupError("Ни один бой не удалось разобрать: " + "; ".join(dict.fromkeys(errors.values())))
 
 
+def _prune_cache() -> None:
+    try:
+        r = _shared_cache().prune()
+        if r["removed"] or r["before_mb"] - r["after_mb"] > 1:
+            print(f"Кэш WCL: удалено старых записей — {r['removed']}, размер {r['before_mb']} → {r['after_mb']} МБ")
+    except Exception as e:  # noqa: BLE001 — уборка кэша необязательна
+        print(f"Кэш WCL не очищен: {e}")
+
+
 def _cache_file() -> Path:
     from .config import cache_path
     return Path(cache_path()).resolve()
@@ -1303,7 +1312,8 @@ class Handler(BaseHTTPRequestHandler):
                         # программа на этом компьютере: полный путь «Загрузок» — папка по умолчанию
                         "downloads": str(downloads_dir()) if desk else None,
                         # где лежат скачанные с WCL данные (кэш) — полным путём
-                        "cache": str(_cache_file()) if desk else None})
+                        "cache": str(_cache_file()) if desk else None,
+                        "cache_mb": round(_cache_file().stat().st_size / 1048576, 1) if desk and _cache_file().exists() else None})
         elif path == "/api/phone":
             # Только локальная программа и только на самом компьютере: адрес для телефона в Wi-Fi сети
             if SERVER["public"] or not self._is_local():
@@ -1370,6 +1380,10 @@ class Handler(BaseHTTPRequestHandler):
                     if job and job["state"] != "running":
                         JOBS.pop(job["id"], None)
                 return self._json({"ok": True})
+            if path == "/api/cache/clear" and not SERVER["public"] and self._is_local():
+                if any(j["state"] == "running" for j in list(JOBS.values())):
+                    raise ValueError("Сейчас идёт разбор — очистите кэш, когда он закончится")
+                return self._json(_shared_cache().clear())
             if path in ("/api/pickdir", "/api/opendir") and app_mode_is_desktop() and not SERVER["public"] and self._is_local():
                 # Окно выбора папки и «Открыть папку» — на этом же компьютере; путь — полностью
                 from .platform_support import downloads_dir, open_folder, pick_folder
@@ -1492,6 +1506,8 @@ def serve(port: int = 8765, open_browser: bool = True, local_only: bool = False,
                 raise
             time.sleep(0.3)
     httpd.daemon_threads = True
+    if not public and not same_port:  # кэш скачанного с WCL: старое и лишнее — удалить, старые записи — сжать
+        threading.Thread(target=_prune_cache, daemon=True).start()
     SERVER.update(port=httpd.server_address[1], lan=not local_only and not public, public=public,
                   httpd=httpd, restart=False, seen=False)
     # После перезапуска (обновление .exe целиком) браузер уже открыт — страница сама переподключится.

@@ -259,6 +259,37 @@ def test_shared_fight_data():
     print("OK общие данные боя — один раз на всех игроков, без событий урона в облегчённом режиме")
 
 
+def test_cache_reuse_between_modes():
+    """«Разобрать всех боссов» (без событий урона) → «Разбор ротации рейда» / «Разобрать игрока»:
+    основной запрос игрока и общие данные боя одинаковы — повторно скачиваются только события урона."""
+    import json as _json
+    from wcl_analyzer.collect import shared_cache
+    client = FakeClient()
+    seen, new = set(), []
+
+    def em(code, fid, s, e, specs, tables=None):
+        key = _json.dumps([fid, specs, tables or {}], sort_keys=True)
+        if key not in seen:
+            seen.add(key)
+            new.append(sorted(specs))
+        raw = client.raws[code]
+        m = {"Casts": "casts", "Buffs": "buffs", "Debuffs": "debuffs", "Resources": "resources",
+             "DamageTaken": "dmg_taken", "Deaths": "deaths", "CombatantInfo": "combatant", "DamageDone": "dmg_done"}
+        out = {k: raw.get("boss_casts" if v.get("hostility") == "Enemies" and v["data_type"] == "Casts"
+                          else m[v["data_type"]], []) for k, v in specs.items()}
+        out.update({k: raw["dmg_table"] for k in (tables or {})})
+        return out
+    client.events_multi = em
+    url = "https://www.warcraftlogs.com/reports/MYREPORT0001"
+    load_my_log(client, url, None, actor_id=7, shared=shared_cache(client), damage_events=False)   # все боссы
+    first = len(new)
+    load_my_log(client, url, None, actor_id=7, shared=shared_cache(client))                        # ротация рейда
+    assert new[first:] == [["dmg_done"]], new[first:]
+    load_my_log(client, url, None, actor_id=7)                                                     # разобрать игрока
+    assert len(new) == first + 1, new[first:]
+    print("OK кэш между режимами: после «всех боссов» ротация и разбор игрока докачивают только события урона")
+
+
 def test_saves_all_bosses():
     from wcl_analyzer.excel_raid import write_saves_workbook
     from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
@@ -283,6 +314,7 @@ def test_saves_all_bosses():
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
+    test_cache_reuse_between_modes()
     test_player_all_bosses()
     test_plan_long_fight()
     test_saves_all_bosses()

@@ -190,8 +190,9 @@ class WCLClient:
             if r.status_code == 429:
                 wait = self._reset_wait()
                 if self.max_wait_s is not None and wait > self.max_wait_s:
-                    raise WCLError(f"Закончился часовой лимит запросов Warcraft Logs для вашего ключа. "
-                                   f"Сброс примерно через {max(1, round(wait / 60))} мин — тогда попробуйте снова.")
+                    raise WCLError(f"Закончился часовой лимит запросов Warcraft Logs для вашего ключа — разбор остановлен. "
+                                   f"Сброс примерно через {max(1, round(wait / 60))} мин — тогда запустите снова: "
+                                   "уже скачанное сохранено и лимит повторно не тратит.")
                 self._log(f"Лимит очков исчерпан, жду {wait:.0f} с до сброса…")
                 if self.on_wait:
                     try:

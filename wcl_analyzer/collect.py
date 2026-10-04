@@ -58,6 +58,11 @@ def load_my_log(client: WCLClient, url: str, fight: str | int | None = None,
     actor, cls, spec = find_player(client, report, f, name=player, actor_id=actor_id)
     if callable(shared):  # общие данные боя: функция бой → данные (кэш на стороне вызывающего)
         shared = shared(report, f)
+    elif shared is None and hasattr(client, "events_multi"):
+        # общие данные боя всегда отдельным запросом: тогда запросы одинаковы во всех режимах
+        # и уже скачанное (кэш) переиспользуется между «Разобрать игрока», ротацией рейда и всеми боссами
+        from .logs import fetch_shared
+        shared = fetch_shared(client, report, f)
     raw = fetch_raw(client, report, f, int(actor["id"]), with_damage_events=damage_events, shared=shared)
     return ensure_talents(client, build_player_log(report, f, actor, raw, spec=spec, cls=cls), gear_names=True)
 

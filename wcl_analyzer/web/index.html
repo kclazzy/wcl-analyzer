@@ -1129,7 +1129,7 @@ function bindAllNav(el, R, curFid){
 }
 function openAllDetail(R, b){ render({...b.detail, excel: R.excel, _back: R, _navFid: b.fight_id, _navActor: b.actor}); }
 
-function renderPlayerAll(R, bossFid){
+function renderPlayerAll(R, bossFid, noScroll){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, B = R.bosses || [], P = R.pending || [], BS = allBosses(R);
   const el = $("#result");
@@ -1149,16 +1149,28 @@ function renderPlayerAll(R, bossFid){
     // средний «рейтинг с учётом экипировки» (WCL, только киллы) по всем боссам — общий отыгрыш за вечер
     const avgIlvl = actor => { const v = B.filter(b=>b.actor===actor && b.ilvl_pct!=null).map(b=>b.ilvl_pct);
       return v.length ? {avg: v.reduce((a,c)=>a+c,0)/v.length, n: v.length} : null; };
-    const players = [...new Map(B.map(b=>[b.actor, b])).values()]
+    const F = R._flt || (R._flt = {op: "all", v: 50});
+    const allPlayers = [...new Map(B.map(b=>[b.actor, b])).values()]
       .sort((a,b)=>((avgIlvl(b.actor)||{avg:-1}).avg - (avgIlvl(a.actor)||{avg:-1}).avg) || a.player.localeCompare(b.player));
+    // фильтр по среднему отыгрышу: «не выше» — кто отстаёт, «не ниже» — кто играет хорошо
+    const players = allPlayers.filter(pl => { if (F.op === "all") return true; const a = avgIlvl(pl.actor);
+      return a != null && (F.op === "le" ? a.avg <= F.v : a.avg >= F.v); });
+    const fltBar = `<div class="fltbar" style="margin:0 0 12px"><div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end">
+      <label style="display:flex;flex-direction:column;gap:2px;font-size:13.5px;color:var(--muted)">Показать игроков
+        <select id="fltOp" style="padding:7px 8px"><option value="all" ${F.op==="all"?"selected":""}>всех</option>
+          <option value="le" ${F.op==="le"?"selected":""}>средний отыгрыш не выше</option>
+          <option value="ge" ${F.op==="ge"?"selected":""}>средний отыгрыш не ниже</option></select></label>
+      <label style="display:flex;flex-direction:column;gap:2px;font-size:13.5px;color:var(--muted)">Порог
+        <input id="fltV" type="number" min="0" max="100" step="1" value="${F.v}" list="pickPresets" style="width:80px;padding:6px 8px" ${F.op==="all"?"disabled":""}></label>
+      <span class="gsub" style="padding-bottom:6px">Показано: ${players.length} из ${allPlayers.length}</span></div></div>`;
     body = box("Сводка: игроки × боссы", "В ячейке — разница DPS с топ-1 своего спека на этом боссе и рейтинг WCL с учётом экипировки (только киллы). «Средний отыгрыш» — среднее этого рейтинга по всем боссам; игроки — от лучшего. Нажмите на ячейку — откроется полный разбор.",
-      table(["Игрок", "Средний отыгрыш (с учётом экип.)", ...BS.map(x=>x.boss)], players.map(pl => [
+      fltBar + table(["Игрок", "Средний отыгрыш (с учётом экип.)", ...BS.map(x=>x.boss)], players.map(pl => [
         `<b>${esc(pl.player)}</b><div class="gsub">${esc(who(pl.cls, pl.spec))}</div>`,
         (a => a ? `${pctChip(a.avg)}<div class="gsub">${a.n} ${plural(a.n,"босс","босса","боссов")}</div>` : '<span class="gsub">нет рейтинга</span>')(avgIlvl(pl.actor)),
         ...BS.map(x => { const r = x.rows.find(r=>r.actor===pl.actor);
           return r ? `<button class="linkbtn ${gapCls(gapOf(r))}" type="button" data-b="${B.indexOf(r)}" style="font-weight:600">${gapOf(r)==null?"—":sgn(gapOf(r),v=>pct(v,0))}</button>`
             + (r.ilvl_pct!=null ? `<div class="gsub">экип. ${Math.floor(r.ilvl_pct)}</div>` : "") : '<span class="gsub">—</span>'; })]),
-        {num: BS.map((_,i)=>i+2), cls:"wide", empty:"Пока ничего не разобрано."}));
+        {num: BS.map((_,i)=>i+2), cls:"wide", empty: allPlayers.length ? "Под этот фильтр игроков нет." : "Пока ничего не разобрано."}));
   } else {
     const iv = B.filter(b=>b.ilvl_pct!=null).map(b=>b.ilvl_pct), avg = iv.length ? iv.reduce((a,c)=>a+c,0)/iv.length : null;
     body = box("Сводка по боссам", `Разница — к DPS топ-1 на этом боссе. «С учётом экип.» — рейтинг WCL среди игроков спека с тем же уровнем предметов (только киллы)${avg!=null?`; средний отыгрыш по ${iv.length} ${plural(iv.length,"боссу","боссам","боссам")} — ${Math.floor(avg)}`:""}. Вкладки сверху или «Подробно» — полный разбор.`,
@@ -1187,13 +1199,17 @@ function renderPlayerAll(R, bossFid){
     ${(R.skipped||[]).length && bossFid == null ? box("Пропущены", "", `<ul class="lines">${R.skipped.map(x=>`<li>${esc(x.boss)}: ${esc(x.reason)}</li>`).join("")}</ul>`) : ""}`;
   el.hidden = false;
   bindAllNav(el, R, bossFid);
+  if ($("#fltOp")) {
+    $("#fltOp").onchange = () => { R._flt.op = $("#fltOp").value; renderPlayerAll(R, undefined, true); };
+    $("#fltV").onchange = () => { const v = parseInt($("#fltV").value, 10); if (!isNaN(v)) R._flt.v = Math.max(0, Math.min(100, v)); renderPlayerAll(R, undefined, true); };
+  }
   el.querySelectorAll("[data-b]").forEach(b => b.onclick = () => openAllDetail(R, B[+b.dataset.b]));
   if ($("#contAll")) $("#contAll").onclick = () => {
     CONTINUE_ALL = R._hid || null;
     const prev = B.map(b => ({boss: b.boss, difficulty: b.difficulty, kill: b.kill, dps: b.dps, ref_dps: b.ref_dps, actions: b.actions, player: b.player, ilvl_pct: b.ilvl_pct}));
     run({mode: "allbosses", url: R.params.url, actor: R.params.actor, units: P.map(p=>[p.fight_id, p.actor]), prev, wait: $("#waitLimit") && $("#waitLimit").checked});
   };
-  el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+  if (!noScroll) el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
 }
 
 function renderSaves(R){

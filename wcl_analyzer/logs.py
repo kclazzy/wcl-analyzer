@@ -533,8 +533,8 @@ def _fetch_raw_batched(client, report: dict, fight: dict, actor_id: int, with_da
     bosses = boss_actor_ids(report, fight)[:3]
     for i, bid in enumerate(bosses):
         specs[f"boss_debuffs_{i}"] = {"data_type": "Debuffs", "target_id": bid, "hostility": "Enemies"}
-    if with_damage_events:
-        specs["dmg_done"] = {"data_type": "DamageDone", "source_id": actor_id}
+    # События урона — отдельным запросом: основной запрос игрока одинаков во всех режимах,
+    # и кэш срабатывает, например, «Разобрать всех боссов» → «Разбор ротации рейда»
     if shared:  # общие данные боя уже скачаны — в запросе только данные игрока
         for k in list(specs):
             if k in SHARED_KEYS or k.startswith("boss_debuffs_"):
@@ -546,6 +546,9 @@ def _fetch_raw_batched(client, report: dict, fight: dict, actor_id: int, with_da
     else:
         raw["boss_debuffs"] = [ev for i in range(len(bosses)) for ev in got[f"boss_debuffs_{i}"]]
     raw["dmg_table"] = got["dmg_table"]
+    if with_damage_events:
+        raw["dmg_done"] = client.events_multi(code, fid, s, e, {"dmg_done": {"data_type": "DamageDone", "source_id": actor_id}},
+                                              {})["dmg_done"]
     return raw
 
 

@@ -165,9 +165,15 @@ def _run_job(job: dict, params: dict, creds) -> None:
         JOB_SLOTS.release()
 
 
-def _client(creds, job: dict, log):
-    """Клиент WCL для задачи: если кончится часовой лимит API, браузер увидит обратный отсчёт."""
+def _client(creds, job: dict, log, wait: bool = False):
+    """Клиент WCL для задачи. Кончился часовой лимит API — разбор останавливается с понятной ошибкой
+    (уже скачанное остаётся в кэше). wait=True — ждать сброса лимита (галочка «Разобрать всех боссов»)."""
     client = CLIENT_FACTORY(creds)
+    if not wait:
+        try:
+            client.max_wait_s = 0
+        except AttributeError:
+            pass
 
     def on_wait(seconds: float) -> None:
         job["wait_until"] = time.time() + seconds
@@ -261,10 +267,8 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
     from .logs import parse_report_url
 
     from .collect import shared_cache
-    client = _client(creds, job, log)
     wait = bool(params.get("wait"))
-    if not wait:
-        client.max_wait_s = 0  # не ждём сброса лимита — останавливаемся и предлагаем продолжить
+    client = _client(creds, job, log, wait=wait)  # без галочки — не ждём сброса: останавливаемся и предлагаем продолжить
     shared = shared_cache(client)  # общие данные боя — один раз на всех игроков этого боя
     ranks_cache: dict = {}
 

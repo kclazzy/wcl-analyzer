@@ -44,7 +44,7 @@ def _find(rb: list, spell_id, nn: str, want: str) -> str | None:
     for raid, b in rb:
         for diff in (want, "mythic", "heroic", "normal"):  # сначала страница своей сложности
             for a in b.get("abilities", {}).get(diff, []):
-                if (spell_id and a.get("id") == int(spell_id)) or (nn and _norm(a["name"]) == nn):
+                if (spell_id and a.get("id") == int(spell_id)) or (nn and nn in {_norm(x) for x in [a["name"], *a.get("aka", [])]}):
                     return _url(raid, b, diff)
     return None
 

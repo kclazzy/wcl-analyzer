@@ -96,7 +96,9 @@ def _heading_before(page: str, pos: int) -> str:
 
 
 def _title(slug: str) -> str:
-    return " ".join(w.capitalize() for w in slug.split("-"))
+    small = {"of", "the", "and", "in", "on"}
+    words = slug.split("-")
+    return " ".join(w if i and w in small else w.capitalize() for i, w in enumerate(words))
 
 
 SPELL_A = re.compile(r"""<a\b[^>]*href=["']https?://(?:\w+\.)?wowhead\.com/(?:[a-z]{2}/)?spell=(\d+)[^"']*["'][^>]*>(.*?)</a>""",
@@ -144,6 +146,8 @@ def collect(old: dict, only: set | None = None) -> tuple[list[dict], list[str]]:
         raise SystemExit("На главной не нашлось ни одного рейда — похоже, сайт поменял вёрстку. Файл не меняем.")
     if only:
         raids = [r for r in raids if r["slug"] in only]
+    for r in raids:  # название рейда, уже известное по файлу, не меняем
+        r["name"] = next((o["name"] for o in old.get("raids", []) if o["slug"] == r["slug"]), r["name"])
     old_boss = {(r["slug"], b["slug"]): b for r in old.get("raids", []) for b in r.get("bosses", [])}
     notes = []
     for r in raids:
@@ -163,6 +167,16 @@ def collect(old: dict, only: set | None = None) -> tuple[list[dict], list[str]]:
                 ids = {a["id"] for a in got}
                 got = got + [a for a in prev.get(diff, []) if a.get("id") is None
                              and a["name"] not in {x["name"] for x in got} and a["id"] not in ids]
+                # у того же id сменилось название (сайт поправил или опечатался) — прежнее помним в aka,
+                # чтобы поиск по названию находил оба варианта
+                was = {x["id"]: x for x in prev.get(diff, []) if x.get("id")}
+                for x in got:
+                    o = was.get(x["id"])
+                    if o:
+                        aka = set(o.get("aka", [])) | {o["name"]}
+                        aka.discard(x["name"])
+                        if aka:
+                            x["aka"] = sorted(aka)
                 ab[diff] = got
             b["abilities"] = ab
             print(f"  {b['name']}: " + ", ".join(f"{d} {len(v)}" for d, v in ab.items()))

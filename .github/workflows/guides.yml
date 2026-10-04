@@ -1,0 +1,53 @@
+# Ссылки на гайды Mythic Trap: раз в неделю собирает способности боссов актуальных рейдов
+# (tools/update_guides.py) и, если что-то изменилось, сохраняет wcl_analyzer/data/guides.json
+# и запускает обычную сборку — новые ссылки приходят пользователям с обновлением программы.
+# Вручную: Actions → «Ссылки на гайды» → Run workflow (можно включить «Только проверить»).
+name: Ссылки на гайды
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"   # понедельник, 07:17 по Москве
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Только проверить, ничего не сохранять"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: guides
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Собрать ссылки с Mythic Trap
+        run: python tools/update_guides.py ${{ inputs.dry_run && '--dry-run' || '' }}
+      - name: Проверить программу с новыми ссылками
+        if: ${{ !inputs.dry_run }}
+        run: |
+          pip install -r requirements.txt
+          python tests/test_pipeline.py
+      - name: Сохранить и запустить сборку
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- wcl_analyzer/data/guides.json; then
+            echo "Изменений нет — сборка не нужна."; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add wcl_analyzer/data/guides.json
+          git commit -m "Обновлены ссылки на гайды Mythic Trap"
+          git pull --rebase -q && git push
+          # Коммит от github-actions сам сборку не запускает — запускаем её явно
+          gh workflow run build.yml --ref "${GITHUB_REF_NAME}"

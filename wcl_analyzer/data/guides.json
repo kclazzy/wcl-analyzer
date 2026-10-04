@@ -1,1522 +1,1528 @@
 {
- "_about": "Гайды Mythic Trap по боссам: способность (название, id заклинания Wowhead) → страница гайда своей сложности. Собрано вручную со страниц mythictrap.com; программа ничего не скачивает. Кнопка «Share link» на сайте строится скриптом в браузере — её адрес статически не виден, поэтому ссылка ведёт на страницу босса нужной сложности.",
- "version": 1,
+ "_about": "Гайды Mythic Trap по боссам: способность (название, id заклинания Wowhead) → страница гайда своей сложности. Файл обновляет tools/update_guides.py (GitHub Actions «Ссылки на гайды», раз в неделю); программа у пользователя ничего не скачивает. Кнопка «Share link» на сайте строится скриптом в браузере, поэтому ссылка ведёт на страницу босса нужной сложности.",
+ "version": 2,
  "site": "Mythic Trap",
- "base": "https://www.mythictrap.com/en/venomous-abyss/",
- "raid": "The Venomous Abyss",
+ "base": "https://www.mythictrap.com/en/",
  "pages": {
   "mythic": "/mythic",
   "heroic": "/heroic",
   "normal": ""
  },
- "bosses": [
+ "updated": "2026-10-04",
+ "raids": [
   {
-   "slug": "nymrissa-wavecaller",
-   "name": "Nymrissa Wavecaller",
-   "abilities": {
-    "mythic": [
-     {
-      "name": "Alluring Bubble",
-      "id": 1257717
-     },
-     {
-      "name": "Waterfog Shield",
-      "id": 1273091
-     },
-     {
-      "name": "Swirling Whirlpools",
-      "id": 1258668
-     },
-     {
-      "name": "Chilling Frost",
-      "id": 1313393
-     },
-     {
-      "name": "Frost Burst",
-      "id": 1313450
-     },
-     {
-      "name": "Water Jet",
-      "id": 1258901
-     },
-     {
-      "name": "Abyssal Rain",
-      "id": 1260837
-     },
-     {
-      "name": "Iceblade Flurry",
-      "id": 1282937
-     },
-     {
-      "name": "Unending Tides",
-      "id": 1294867
+   "slug": "venomous-abyss",
+   "name": "The Venomous Abyss",
+   "bosses": [
+    {
+     "slug": "nymrissa-wavecaller",
+     "name": "Nymrissa Wavecaller",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Alluring Bubble",
+        "id": 1257717
+       },
+       {
+        "name": "Waterfog Shield",
+        "id": 1273091
+       },
+       {
+        "name": "Swirling Whirlpools",
+        "id": 1258668
+       },
+       {
+        "name": "Chilling Frost",
+        "id": 1313393
+       },
+       {
+        "name": "Frost Burst",
+        "id": 1313450
+       },
+       {
+        "name": "Water Jet",
+        "id": 1258901
+       },
+       {
+        "name": "Abyssal Rain",
+        "id": 1260837
+       },
+       {
+        "name": "Iceblade Flurry",
+        "id": 1282937
+       },
+       {
+        "name": "Unending Tides",
+        "id": 1294867
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Alluring Bubble",
+        "id": 1257717
+       },
+       {
+        "name": "Swirling Whirlpools",
+        "id": 1258668
+       },
+       {
+        "name": "Chilling Frost",
+        "id": 1313393
+       },
+       {
+        "name": "Abyssal Rain",
+        "id": 1260837
+       },
+       {
+        "name": "Iceblade Flurry",
+        "id": 1282937
+       },
+       {
+        "name": "Unending Tides",
+        "id": 1294867
+       }
+      ],
+      "normal": [
+       {
+        "name": "Alluring Bubble",
+        "id": 1257717
+       },
+       {
+        "name": "Swirling Whirlpools",
+        "id": 1258668
+       },
+       {
+        "name": "Chilling Frost",
+        "id": 1313393
+       },
+       {
+        "name": "Abyssal Rain",
+        "id": 1260837
+       },
+       {
+        "name": "Iceblade Flurry",
+        "id": 1282937
+       },
+       {
+        "name": "Unending Tides",
+        "id": 1294867
+       }
+      ]
      }
-    ],
-    "heroic": [
-     {
-      "name": "Alluring Bubble",
-      "id": 1257717
-     },
-     {
-      "name": "Swirling Whirlpools",
-      "id": 1258668
-     },
-     {
-      "name": "Chilling Frost",
-      "id": 1313393
-     },
-     {
-      "name": "Abyssal Rain",
-      "id": 1260837
-     },
-     {
-      "name": "Iceblade Flurry",
-      "id": 1282937
-     },
-     {
-      "name": "Unending Tides",
-      "id": 1294867
+    },
+    {
+     "slug": "nekzali-the-soulcoiler",
+     "name": "Nek'zali the Soulcoiler",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Uncoiled Rage",
+        "id": 1284034
+       },
+       {
+        "name": "Grasping Depths",
+        "id": 1293212
+       },
+       {
+        "name": "Soulcoil Ignition",
+        "id": 1285681
+       },
+       {
+        "name": "Essence Rend",
+        "id": 1287426
+       },
+       {
+        "name": "Soulcoil Well",
+        "id": 1284032
+       },
+       {
+        "name": "Vessel of Awakening",
+        "id": 1295263
+       },
+       {
+        "name": "Possession Barrage",
+        "id": 1284103
+       },
+       {
+        "name": "Corpse Blight",
+        "id": 1294729
+       },
+       {
+        "name": "Hollowing Strikes",
+        "id": 1284110
+       },
+       {
+        "name": "Echo of Jawae",
+        "id": 1289696
+       },
+       {
+        "name": "Soul Transfer",
+        "id": 1292248
+       },
+       {
+        "name": "Hungering Pyre",
+        "id": 1289855
+       },
+       {
+        "name": "Cremation",
+        "id": 1289875
+       },
+       {
+        "name": "Invoke",
+        "id": 1299673
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Uncoiled Rage",
+        "id": 1284034
+       },
+       {
+        "name": "Soulcoil Ignition",
+        "id": 1285681
+       },
+       {
+        "name": "Essence Rend",
+        "id": 1287426
+       },
+       {
+        "name": "Soulcoil Well",
+        "id": 1284032
+       },
+       {
+        "name": "Vessel of Awakening",
+        "id": 1295263
+       },
+       {
+        "name": "Possession Barrage",
+        "id": 1284103
+       },
+       {
+        "name": "Corpse Blight",
+        "id": 1294729
+       },
+       {
+        "name": "Hollowing Strikes",
+        "id": 1284110
+       },
+       {
+        "name": "Echo of Jawae",
+        "id": 1289696
+       },
+       {
+        "name": "Soul Transfer",
+        "id": 1292248
+       },
+       {
+        "name": "Hungering Pyre",
+        "id": 1289855
+       },
+       {
+        "name": "Cremation",
+        "id": 1289875
+       },
+       {
+        "name": "Invoke",
+        "id": 1299673
+       }
+      ],
+      "normal": [
+       {
+        "name": "Uncoiled Rage",
+        "id": 1284034
+       },
+       {
+        "name": "Soulcoil Ignition",
+        "id": 1285681
+       },
+       {
+        "name": "Essence Rend",
+        "id": 1287426
+       },
+       {
+        "name": "Soulcoil Well",
+        "id": 1284032
+       },
+       {
+        "name": "Possession Barrage",
+        "id": 1284103
+       },
+       {
+        "name": "Corpse Blight",
+        "id": 1294729
+       },
+       {
+        "name": "Hollowing Strikes",
+        "id": 1284110
+       },
+       {
+        "name": "Echo of Jawae",
+        "id": 1289696
+       },
+       {
+        "name": "Soul Transfer",
+        "id": 1292248
+       },
+       {
+        "name": "Hungering Pyre",
+        "id": 1289855
+       },
+       {
+        "name": "Invoke",
+        "id": 1299673
+       }
+      ]
      }
-    ],
-    "normal": [
-     {
-      "name": "Alluring Bubble",
-      "id": 1257717
-     },
-     {
-      "name": "Swirling Whirlpools",
-      "id": 1258668
-     },
-     {
-      "name": "Chilling Frost",
-      "id": 1313393
-     },
-     {
-      "name": "Abyssal Rain",
-      "id": 1260837
-     },
-     {
-      "name": "Iceblade Flurry",
-      "id": 1282937
-     },
-     {
-      "name": "Unending Tides",
-      "id": 1294867
+    },
+    {
+     "slug": "entombed-sentinels",
+     "name": "Entombed Sentinels",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Shifting Protovenom",
+        "id": 1296878
+       },
+       {
+        "name": "Living Venom",
+        "id": 1284207
+       },
+       {
+        "name": "Venom Coagulation",
+        "id": 1284251
+       },
+       {
+        "name": "Toxic Droplets",
+        "id": 1284434
+       },
+       {
+        "name": "Blood Venom",
+        "id": 1284208
+       },
+       {
+        "name": "Blighted Blood",
+        "id": 1284471
+       },
+       {
+        "name": "Unstable Miasma",
+        "id": 1288232
+       },
+       {
+        "name": "Empowering Slam",
+        "id": 1284458
+       },
+       {
+        "name": "Bloodvenom Injection",
+        "id": 1284487
+       },
+       {
+        "name": "Helical Toxins",
+        "id": 1284590
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Living Venom",
+        "id": 1284207
+       },
+       {
+        "name": "Venom Coagulation",
+        "id": 1284251
+       },
+       {
+        "name": "Toxic Droplets",
+        "id": 1284434
+       },
+       {
+        "name": "Blood Venom",
+        "id": 1284208
+       },
+       {
+        "name": "Blighted Blood",
+        "id": 1284471
+       },
+       {
+        "name": "Unstable Miasma",
+        "id": 1288232
+       },
+       {
+        "name": "Empowering Slam",
+        "id": 1284458
+       },
+       {
+        "name": "Bloodvenom Injection",
+        "id": 1284487
+       },
+       {
+        "name": "Helical Toxins",
+        "id": 1284590
+       }
+      ],
+      "normal": [
+       {
+        "name": "Venom Coagulation",
+        "id": 1284251
+       },
+       {
+        "name": "Toxic Droplets",
+        "id": 1284434
+       },
+       {
+        "name": "Blighted Blood",
+        "id": 1284471
+       },
+       {
+        "name": "Unstable Miasma",
+        "id": 1288232
+       },
+       {
+        "name": "Empowering Slam",
+        "id": 1284458
+       },
+       {
+        "name": "Bloodvenom Injection",
+        "id": 1284487
+       },
+       {
+        "name": "Helical Toxins",
+        "id": 1284590
+       }
+      ]
      }
-    ]
-   }
-  },
-  {
-   "slug": "nekzali-the-soulcoiler",
-   "name": "Nek'zali the Soulcoiler",
-   "abilities": {
-    "mythic": [
-     {
-      "name": "Uncoiled Rage",
-      "id": 1284034
-     },
-     {
-      "name": "Grasping Depths",
-      "id": 1293212
-     },
-     {
-      "name": "Soulcoil Ignition",
-      "id": 1285681
-     },
-     {
-      "name": "Essence Rend",
-      "id": 1287426
-     },
-     {
-      "name": "Soulcoil Well",
-      "id": 1284032
-     },
-     {
-      "name": "Vessel of Awakening",
-      "id": 1295263
-     },
-     {
-      "name": "Possession Barrage",
-      "id": 1284103
-     },
-     {
-      "name": "Corpse Blight",
-      "id": 1294729
-     },
-     {
-      "name": "Hollowing Strikes",
-      "id": 1284110
-     },
-     {
-      "name": "Echo of Jawae",
-      "id": 1289696
-     },
-     {
-      "name": "Soul Transfer",
-      "id": 1292248
-     },
-     {
-      "name": "Hungering Pyre",
-      "id": 1289855
-     },
-     {
-      "name": "Cremation",
-      "id": 1289875
-     },
-     {
-      "name": "Invoke",
-      "id": 1299673
+    },
+    {
+     "slug": "vashnik-the-malignant",
+     "name": "Vashnik the Malignant",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Imbibe",
+        "id": 1283164
+       },
+       {
+        "name": "Malignant Tumor",
+        "id": 1304459
+       },
+       {
+        "name": "Splitting Clot",
+        "id": 1286631
+       },
+       {
+        "name": "Siphoning Infection",
+        "id": 1299941
+       },
+       {
+        "name": "Miasmic Coating",
+        "id": 1312366
+       },
+       {
+        "name": "Stygian Infection",
+        "id": 1294994
+       },
+       {
+        "name": "Burning Presence",
+        "id": 1305902
+       },
+       {
+        "name": "Exploding Infection",
+        "id": 1295173
+       },
+       {
+        "name": "Plague Froth",
+        "id": 1281907
+       },
+       {
+        "name": "Malignant Catalyst",
+        "id": 1282525
+       },
+       {
+        "name": "Toxic Vapor",
+        "id": 1284561
+       },
+       {
+        "name": "Dripping Fangs",
+        "id": 1280935
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Imbibe",
+        "id": 1283164
+       },
+       {
+        "name": "Splitting Clot",
+        "id": 1286631
+       },
+       {
+        "name": "Siphoning Infection",
+        "id": 1299941
+       },
+       {
+        "name": "Miasmic Coating",
+        "id": 1312366
+       },
+       {
+        "name": "Stygian Infection",
+        "id": 1294994
+       },
+       {
+        "name": "Burning Presence",
+        "id": 1305902
+       },
+       {
+        "name": "Exploding Infection",
+        "id": 1295173
+       },
+       {
+        "name": "Plague Froth",
+        "id": 1281907
+       },
+       {
+        "name": "Malignant Catalyst",
+        "id": 1282525
+       },
+       {
+        "name": "Toxic Vapor",
+        "id": 1284561
+       },
+       {
+        "name": "Dripping Fangs",
+        "id": 1280935
+       }
+      ],
+      "normal": [
+       {
+        "name": "Imbibe",
+        "id": 1283164
+       },
+       {
+        "name": "Splitting Clot",
+        "id": 1286631
+       },
+       {
+        "name": "Siphoning Infection",
+        "id": 1299941
+       },
+       {
+        "name": "Miasmic Coating",
+        "id": 1312366
+       },
+       {
+        "name": "Stygian Infection",
+        "id": 1294994
+       },
+       {
+        "name": "Burning Presence",
+        "id": 1305902
+       },
+       {
+        "name": "Exploding Infection",
+        "id": 1295173
+       },
+       {
+        "name": "Plague Froth",
+        "id": 1281907
+       },
+       {
+        "name": "Toxic Vapor",
+        "id": 1284561
+       },
+       {
+        "name": "Dripping Fangs",
+        "id": 1280935
+       }
+      ]
      }
-    ],
-    "heroic": [
-     {
-      "name": "Uncoiled Rage",
-      "id": 1284034
-     },
-     {
-      "name": "Soulcoil Ignition",
-      "id": 1285681
-     },
-     {
-      "name": "Essence Rend",
-      "id": 1287426
-     },
-     {
-      "name": "Soulcoil Well",
-      "id": 1284032
-     },
-     {
-      "name": "Vessel of Awakening",
-      "id": 1295263
-     },
-     {
-      "name": "Possession Barrage",
-      "id": 1284103
-     },
-     {
-      "name": "Corpse Blight",
-      "id": 1294729
-     },
-     {
-      "name": "Hollowing Strikes",
-      "id": 1284110
-     },
-     {
-      "name": "Echo of Jawae",
-      "id": 1289696
-     },
-     {
-      "name": "Soul Transfer",
-      "id": 1292248
-     },
-     {
-      "name": "Hungering Pyre",
-      "id": 1289855
-     },
-     {
-      "name": "Cremation",
-      "id": 1289875
-     },
-     {
-      "name": "Invoke",
-      "id": 1299673
+    },
+    {
+     "slug": "the-lost-explorers",
+     "name": "The Lost Explorers",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "United Defense",
+        "id": 1297646
+       },
+       {
+        "name": "Dark Whispers",
+        "id": 1295451
+       },
+       {
+        "name": "Explosive Surprise",
+        "id": 1297625
+       },
+       {
+        "name": "Mighty Thud",
+        "id": 1296092
+       },
+       {
+        "name": "Frostfire Volley",
+        "id": 1295893
+       },
+       {
+        "name": "Throw Junk",
+        "id": 1291933
+       },
+       {
+        "name": "Disgusting Fish",
+        "id": 1292490
+       },
+       {
+        "name": "Blink Nova",
+        "id": 1292793
+       },
+       {
+        "name": "Evil Eyes",
+        "id": 1292388
+       },
+       {
+        "name": "Shell Spin",
+        "id": 1296061
+       },
+       {
+        "name": "Icebound Flames",
+        "id": 1286921
+       },
+       {
+        "name": "Steady Strikes",
+        "id": 1291930
+       },
+       {
+        "name": "Shredding Shards",
+        "id": 1295854
+       }
+      ],
+      "heroic": [
+       {
+        "name": "United Defense",
+        "id": 1297646
+       },
+       {
+        "name": "Dark Whispers",
+        "id": 1295451
+       },
+       {
+        "name": "Explosive Surprise",
+        "id": 1297625
+       },
+       {
+        "name": "Mighty Thud",
+        "id": 1296092
+       },
+       {
+        "name": "Frostfire Volley",
+        "id": 1295893
+       },
+       {
+        "name": "Throw Junk",
+        "id": 1291933
+       },
+       {
+        "name": "Disgusting Fish",
+        "id": 1292490
+       },
+       {
+        "name": "Blink Nova",
+        "id": 1292793
+       },
+       {
+        "name": "Evil Eyes",
+        "id": 1292388
+       },
+       {
+        "name": "Shell Spin",
+        "id": 1296061
+       },
+       {
+        "name": "Icebound Flames",
+        "id": 1286921
+       },
+       {
+        "name": "Steady Strikes",
+        "id": 1291930
+       },
+       {
+        "name": "Shredding Shards",
+        "id": 1295854
+       }
+      ],
+      "normal": [
+       {
+        "name": "Dark Whispers",
+        "id": 1295451
+       },
+       {
+        "name": "Explosive Surprise",
+        "id": 1297625
+       },
+       {
+        "name": "Mighty Thud",
+        "id": 1296092
+       },
+       {
+        "name": "Frostfire Volley",
+        "id": 1295893
+       },
+       {
+        "name": "Throw Junk",
+        "id": 1291933
+       },
+       {
+        "name": "Disgusting Fish",
+        "id": 1292490
+       },
+       {
+        "name": "Blink Nova",
+        "id": 1292793
+       },
+       {
+        "name": "Evil Eyes",
+        "id": 1292388
+       },
+       {
+        "name": "Shell Spin",
+        "id": 1296061
+       },
+       {
+        "name": "Icebound Flames",
+        "id": 1286921
+       },
+       {
+        "name": "Steady Strikes",
+        "id": 1291930
+       },
+       {
+        "name": "Shredding Shards",
+        "id": 1295854
+       }
+      ]
      }
-    ],
-    "normal": [
-     {
-      "name": "Uncoiled Rage",
-      "id": 1284034
-     },
-     {
-      "name": "Soulcoil Ignition",
-      "id": 1285681
-     },
-     {
-      "name": "Essence Rend",
-      "id": 1287426
-     },
-     {
-      "name": "Soulcoil Well",
-      "id": 1284032
-     },
-     {
-      "name": "Possession Barrage",
-      "id": 1284103
-     },
-     {
-      "name": "Corpse Blight",
-      "id": 1294729
-     },
-     {
-      "name": "Hollowing Strikes",
-      "id": 1284110
-     },
-     {
-      "name": "Echo of Jawae",
-      "id": 1289696
-     },
-     {
-      "name": "Soul Transfer",
-      "id": 1292248
-     },
-     {
-      "name": "Hungering Pyre",
-      "id": 1289855
-     },
-     {
-      "name": "Invoke",
-      "id": 1299673
+    },
+    {
+     "slug": "sszorak",
+     "name": "Sszorak",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Venomous Surge",
+        "id": 1305959
+       },
+       {
+        "name": "Howling Maelstrom",
+        "id": 1285732
+       },
+       {
+        "name": "Apex Predator",
+        "id": 1277025
+       },
+       {
+        "name": "Ravage",
+        "id": 1277002
+       },
+       {
+        "name": "Mutilate",
+        "id": 1277027
+       },
+       {
+        "name": "Tempest",
+        "id": 1287072
+       },
+       {
+        "name": "Caustic Claws",
+        "id": 1305998
+       },
+       {
+        "name": "Raging Crosswinds",
+        "id": 1285419
+       },
+       {
+        "name": "Serpent's Fury",
+        "id": 1297367
+       },
+       {
+        "name": "Virulence",
+        "id": 1297707
+       },
+       {
+        "name": "Corroding Venom",
+        "id": 1282869
+       },
+       {
+        "name": "Ula'tek's Presence",
+        "id": 1285961
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Venomous Surge",
+        "id": 1305959
+       },
+       {
+        "name": "Howling Maelstrom",
+        "id": 1285732
+       },
+       {
+        "name": "Apex Predator",
+        "id": 1277025
+       },
+       {
+        "name": "Ravage",
+        "id": 1277002
+       },
+       {
+        "name": "Mutilate",
+        "id": 1277027
+       },
+       {
+        "name": "Tempest",
+        "id": 1287072
+       },
+       {
+        "name": "Caustic Claws",
+        "id": 1305998
+       },
+       {
+        "name": "Raging Crosswinds",
+        "id": 1285419
+       },
+       {
+        "name": "Corroding Venom",
+        "id": 1282869
+       },
+       {
+        "name": "Ula'tek's Presence",
+        "id": 1285961
+       }
+      ],
+      "normal": [
+       {
+        "name": "Venomous Surge",
+        "id": 1305959
+       },
+       {
+        "name": "Howling Maelstrom",
+        "id": 1285732
+       },
+       {
+        "name": "Apex Predator",
+        "id": 1277025
+       },
+       {
+        "name": "Ravage",
+        "id": 1277002
+       },
+       {
+        "name": "Mutilate",
+        "id": 1277027
+       },
+       {
+        "name": "Tempest",
+        "id": 1287072
+       },
+       {
+        "name": "Raging Crosswinds",
+        "id": 1285419
+       },
+       {
+        "name": "Corroding Venom",
+        "id": 1282869
+       },
+       {
+        "name": "Ula'tek's Presence",
+        "id": 1285961
+       }
+      ]
      }
-    ]
-   }
-  },
-  {
-   "slug": "entombed-sentinels",
-   "name": "Entombed Sentinels",
-   "abilities": {
-    "mythic": [
-     {
-      "name": "Shifting Protovenom",
-      "id": 1296878
-     },
-     {
-      "name": "Living Venom",
-      "id": 1284207
-     },
-     {
-      "name": "Venom Coagulation",
-      "id": 1284251
-     },
-     {
-      "name": "Toxic Droplets",
-      "id": 1284434
-     },
-     {
-      "name": "Blood Venom",
-      "id": 1284208
-     },
-     {
-      "name": "Blighted Blood",
-      "id": 1284471
-     },
-     {
-      "name": "Unstable Miasma",
-      "id": 1288232
-     },
-     {
-      "name": "Empowering Slam",
-      "id": 1284458
-     },
-     {
-      "name": "Bloodvenom Injection",
-      "id": 1284487
-     },
-     {
-      "name": "Helical Toxins",
-      "id": 1284590
+    },
+    {
+     "slug": "the-twin-fangs",
+     "name": "The Twin Fangs",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Caustic Deluge",
+        "id": 1289192
+       },
+       {
+        "name": "Blood Torrent",
+        "id": 1303230
+       },
+       {
+        "name": "Rouse the Brood",
+        "id": 1308356
+       },
+       {
+        "name": "Venomous Emergence",
+        "id": 1291404
+       },
+       {
+        "name": "Ravenous Feast",
+        "id": 1290516
+       },
+       {
+        "name": "Tainted Blood",
+        "id": 1310099
+       },
+       {
+        "name": "Coiling Ichor",
+        "id": 1290809
+       },
+       {
+        "name": "Stone Breaker",
+        "id": 1288538
+       },
+       {
+        "name": "Stir the Depths",
+        "id": 1290956
+       },
+       {
+        "name": "Vile Flood",
+        "id": 1294293
+       },
+       {
+        "name": "Sanguine Storm",
+        "id": 1306872
+       },
+       {
+        "name": "Clotted Bolt",
+        "id": 1295115
+       },
+       {
+        "name": "Toxic Fumes",
+        "id": 1295049
+       },
+       {
+        "name": "Envenomed",
+        "id": 1310360
+       },
+       {
+        "name": "Uncoiled Wrath",
+        "id": 1308583
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Caustic Deluge",
+        "id": 1289192
+       },
+       {
+        "name": "Venomous Emergence",
+        "id": 1291404
+       },
+       {
+        "name": "Ravenous Feast",
+        "id": 1290516
+       },
+       {
+        "name": "Coiling Ichor",
+        "id": 1290809
+       },
+       {
+        "name": "Stone Breaker",
+        "id": 1288538
+       },
+       {
+        "name": "Stir the Depths",
+        "id": 1290956
+       },
+       {
+        "name": "Vile Flood",
+        "id": 1294293
+       },
+       {
+        "name": "Sanguine Storm",
+        "id": 1306872
+       },
+       {
+        "name": "Clotted Bolt",
+        "id": 1295115
+       },
+       {
+        "name": "Toxic Fumes",
+        "id": 1295049
+       },
+       {
+        "name": "Envenomed",
+        "id": 1310360
+       },
+       {
+        "name": "Uncoiled Wrath",
+        "id": 1308583
+       }
+      ],
+      "normal": [
+       {
+        "name": "Caustic Deluge",
+        "id": 1289192
+       },
+       {
+        "name": "Venomous Emergence",
+        "id": 1291404
+       },
+       {
+        "name": "Ravenous Feast",
+        "id": 1290516
+       },
+       {
+        "name": "Coiling Ichor",
+        "id": 1290809
+       },
+       {
+        "name": "Stone Breaker",
+        "id": 1288538
+       },
+       {
+        "name": "Stir the Depths",
+        "id": 1290956
+       },
+       {
+        "name": "Vile Flood",
+        "id": 1294293
+       },
+       {
+        "name": "Sanguine Storm",
+        "id": 1306872
+       },
+       {
+        "name": "Clotted Bolt",
+        "id": 1295115
+       },
+       {
+        "name": "Toxic Fumes",
+        "id": 1295049
+       },
+       {
+        "name": "Envenomed",
+        "id": 1310360
+       },
+       {
+        "name": "Uncoiled Wrath",
+        "id": 1308583
+       }
+      ]
      }
-    ],
-    "heroic": [
-     {
-      "name": "Living Venom",
-      "id": 1284207
-     },
-     {
-      "name": "Venom Coagulation",
-      "id": 1284251
-     },
-     {
-      "name": "Toxic Droplets",
-      "id": 1284434
-     },
-     {
-      "name": "Blood Venom",
-      "id": 1284208
-     },
-     {
-      "name": "Blighted Blood",
-      "id": 1284471
-     },
-     {
-      "name": "Unstable Miasma",
-      "id": 1288232
-     },
-     {
-      "name": "Empowering Slam",
-      "id": 1284458
-     },
-     {
-      "name": "Bloodvenom Injection",
-      "id": 1284487
-     },
-     {
-      "name": "Helical Toxins",
-      "id": 1284590
+    },
+    {
+     "slug": "the-coiled-altar",
+     "name": "The Coiled Altar",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Fangs of the Coiled Altar",
+        "id": 1282487
+       },
+       {
+        "name": "Coalesced Venom",
+        "id": 1282403
+       },
+       {
+        "name": "Sever",
+        "id": 1299680
+       },
+       {
+        "name": "Virulent Mutation",
+        "id": 1310544
+       },
+       {
+        "name": "Guillotine",
+        "id": 1283594
+       },
+       {
+        "name": "Axegrinder",
+        "id": 1283832
+       },
+       {
+        "name": "Venomfang",
+        "id": 1282287
+       },
+       {
+        "name": "Dreadmarch",
+        "id": 1285643
+       },
+       {
+        "name": "Manifestation of Dread",
+        "id": 1285911
+       },
+       {
+        "name": "Soul Sever",
+        "id": 1286620
+       },
+       {
+        "name": "Eternal Nightfall",
+        "id": 1286918
+       },
+       {
+        "name": "Spiritcackle",
+        "id": 1286441
+       },
+       {
+        "name": "Spirit Shield",
+        "id": 1309105
+       },
+       {
+        "name": "Gloombomb",
+        "id": 1310882
+       },
+       {
+        "name": "Dreadful Presence",
+        "id": 1288624
+       },
+       {
+        "name": "Soulbinding",
+        "id": null
+       },
+       {
+        "name": "Fragment of Malacrass",
+        "id": 1287722
+       },
+       {
+        "name": "Defilement of the Crucible",
+        "id": 1298381
+       },
+       {
+        "name": "Blighted Sever",
+        "id": 1307279
+       },
+       {
+        "name": "Dread Bolt",
+        "id": 1307184
+       },
+       {
+        "name": "Soulbound",
+        "id": 1309987
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Fangs of the Coiled Altar",
+        "id": 1282487
+       },
+       {
+        "name": "Coalesced Venom",
+        "id": 1282403
+       },
+       {
+        "name": "Sever",
+        "id": 1299680
+       },
+       {
+        "name": "Guillotine",
+        "id": 1283594
+       },
+       {
+        "name": "Axegrinder",
+        "id": 1283832
+       },
+       {
+        "name": "Venomfang",
+        "id": 1282287
+       },
+       {
+        "name": "Dreadmarch",
+        "id": 1285643
+       },
+       {
+        "name": "Manifestation of Dread",
+        "id": 1285911
+       },
+       {
+        "name": "Soul Sever",
+        "id": 1286620
+       },
+       {
+        "name": "Eternal Nightfall",
+        "id": 1286918
+       },
+       {
+        "name": "Spiritcackle",
+        "id": 1286441
+       },
+       {
+        "name": "Gloombomb",
+        "id": 1310882
+       },
+       {
+        "name": "Dreadful Presence",
+        "id": 1288624
+       },
+       {
+        "name": "Soulbinding",
+        "id": null
+       },
+       {
+        "name": "Fragment of Malacrass",
+        "id": 1287722
+       },
+       {
+        "name": "Defilement of the Crucible",
+        "id": 1298381
+       },
+       {
+        "name": "Blighted Sever",
+        "id": 1307279
+       },
+       {
+        "name": "Dread Bolt",
+        "id": 1307184
+       },
+       {
+        "name": "Soulbound",
+        "id": 1309987
+       }
+      ],
+      "normal": [
+       {
+        "name": "Fangs of the Coiled Altar",
+        "id": 1282487
+       },
+       {
+        "name": "Coalesced Venom",
+        "id": 1282403
+       },
+       {
+        "name": "Sever",
+        "id": 1299680
+       },
+       {
+        "name": "Guillotine",
+        "id": 1283594
+       },
+       {
+        "name": "Axegrinder",
+        "id": 1283832
+       },
+       {
+        "name": "Venomfang",
+        "id": 1282287
+       },
+       {
+        "name": "Dreadmarch",
+        "id": 1285643
+       },
+       {
+        "name": "Manifestation of Dread",
+        "id": 1285911
+       },
+       {
+        "name": "Soul Sever",
+        "id": 1286620
+       },
+       {
+        "name": "Eternal Nightfall",
+        "id": 1286918
+       },
+       {
+        "name": "Gloombomb",
+        "id": 1310882
+       },
+       {
+        "name": "Dreadful Presence",
+        "id": 1288624
+       },
+       {
+        "name": "Soulbinding",
+        "id": null
+       },
+       {
+        "name": "Fragment of Malacrass",
+        "id": 1287722
+       },
+       {
+        "name": "Defilement of the Crucible",
+        "id": 1298381
+       },
+       {
+        "name": "Blighted Sever",
+        "id": 1307279
+       },
+       {
+        "name": "Dread Bolt",
+        "id": 1307184
+       },
+       {
+        "name": "Soulbound",
+        "id": 1309987
+       }
+      ]
      }
-    ],
-    "normal": [
-     {
-      "name": "Venom Coagulation",
-      "id": 1284251
-     },
-     {
-      "name": "Toxic Droplets",
-      "id": 1284434
-     },
-     {
-      "name": "Blighted Blood",
-      "id": 1284471
-     },
-     {
-      "name": "Unstable Miasma",
-      "id": 1288232
-     },
-     {
-      "name": "Empowering Slam",
-      "id": 1284458
-     },
-     {
-      "name": "Bloodvenom Injection",
-      "id": 1284487
-     },
-     {
-      "name": "Helical Toxins",
-      "id": 1284590
+    },
+    {
+     "slug": "ulatek",
+     "name": "Ula'tek",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Malignant Shell",
+        "id": 1295360
+       },
+       {
+        "name": "Caustic Waves",
+        "id": 1292403
+       },
+       {
+        "name": "Call of the Serpent",
+        "id": 1304012
+       },
+       {
+        "name": "Mephitic Thrash",
+        "id": 1296301
+       },
+       {
+        "name": "Spectral Coils",
+        "id": 1287265
+       },
+       {
+        "name": "Rage of the Shackled",
+        "id": 1286860
+       },
+       {
+        "name": "Rattler Slam",
+        "id": 1299206
+       },
+       {
+        "name": "Mother's Wrath",
+        "id": 1298367
+       },
+       {
+        "name": "Unchecked Rage",
+        "id": 1286945
+       },
+       {
+        "name": "Necrotic Vapors",
+        "id": 1286834
+       },
+       {
+        "name": "Malice",
+        "id": 1290779
+       },
+       {
+        "name": "Grasping Fangs",
+        "id": 1301117
+       },
+       {
+        "name": "Virulent Spit",
+        "id": 1302982
+       },
+       {
+        "name": "Doomscale Cauldron",
+        "id": 1313355
+       },
+       {
+        "name": "Desperate Trash",
+        "id": 1305709
+       },
+       {
+        "name": "Anguished Cry",
+        "id": 1305650
+       },
+       {
+        "name": "Circling Prey",
+        "id": 1301510
+       },
+       {
+        "name": "Blightscale Clutch",
+        "id": 1289962
+       },
+       {
+        "name": "Acidic Explosion",
+        "id": 1313531
+       },
+       {
+        "name": "Serpent's Bite",
+        "id": 1295905
+       },
+       {
+        "name": "Volatile Purge",
+        "id": 1306086
+       },
+       {
+        "name": "Vicious Echoes",
+        "id": 1310764
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Malignant Shell",
+        "id": 1295360
+       },
+       {
+        "name": "Caustic Waves",
+        "id": 1292403
+       },
+       {
+        "name": "Call of the Serpent",
+        "id": 1304012
+       },
+       {
+        "name": "Mephitic Thrash",
+        "id": 1296301
+       },
+       {
+        "name": "Spectral Coils",
+        "id": 1287265
+       },
+       {
+        "name": "Rage of the Shackled",
+        "id": 1286860
+       },
+       {
+        "name": "Rattler Slam",
+        "id": 1299206
+       },
+       {
+        "name": "Mother's Wrath",
+        "id": 1298367
+       },
+       {
+        "name": "Unchecked Rage",
+        "id": 1286945
+       },
+       {
+        "name": "Necrotic Vapors",
+        "id": 1286834
+       },
+       {
+        "name": "Malice",
+        "id": 1290779
+       },
+       {
+        "name": "Grasping Fangs",
+        "id": 1301117
+       },
+       {
+        "name": "Virulent Spit",
+        "id": 1302982
+       },
+       {
+        "name": "Doomscale Cauldron",
+        "id": 1313355
+       },
+       {
+        "name": "Desperate Trash",
+        "id": 1305709
+       },
+       {
+        "name": "Anguished Cry",
+        "id": 1305650
+       },
+       {
+        "name": "Circling Prey",
+        "id": 1301510
+       },
+       {
+        "name": "Blightscale Clutch",
+        "id": 1289962
+       },
+       {
+        "name": "Acidic Explosion",
+        "id": 1313531
+       },
+       {
+        "name": "Serpent's Bite",
+        "id": 1295905
+       },
+       {
+        "name": "Volatile Purge",
+        "id": 1306086
+       },
+       {
+        "name": "Vicious Echoes",
+        "id": 1310764
+       }
+      ],
+      "normal": [
+       {
+        "name": "Malignant Shell",
+        "id": 1295360
+       },
+       {
+        "name": "Caustic Waves",
+        "id": 1292403
+       },
+       {
+        "name": "Call of the Serpent",
+        "id": 1304012
+       },
+       {
+        "name": "Mephitic Thrash",
+        "id": 1296301
+       },
+       {
+        "name": "Spectral Coils",
+        "id": 1287265
+       },
+       {
+        "name": "Rage of the Shackled",
+        "id": 1286860
+       },
+       {
+        "name": "Rattler Slam",
+        "id": 1299206
+       },
+       {
+        "name": "Mother's Wrath",
+        "id": 1298367
+       },
+       {
+        "name": "Unchecked Rage",
+        "id": 1286945
+       },
+       {
+        "name": "Necrotic Vapors",
+        "id": 1286834
+       },
+       {
+        "name": "Malice",
+        "id": 1290779
+       },
+       {
+        "name": "Grasping Fangs",
+        "id": 1301117
+       },
+       {
+        "name": "Virulent Spit",
+        "id": 1302982
+       },
+       {
+        "name": "Doomscale Cauldron",
+        "id": 1313355
+       },
+       {
+        "name": "Desperate Trash",
+        "id": 1305709
+       },
+       {
+        "name": "Anguished Cry",
+        "id": 1305650
+       },
+       {
+        "name": "Circling Prey",
+        "id": 1301510
+       },
+       {
+        "name": "Blightscale Clutch",
+        "id": 1289962
+       },
+       {
+        "name": "Acidic Explosion",
+        "id": 1313531
+       },
+       {
+        "name": "Serpent's Bite",
+        "id": 1295905
+       },
+       {
+        "name": "Volatile Purge",
+        "id": 1306086
+       },
+       {
+        "name": "Vicious Echoes",
+        "id": 1310764
+       }
+      ]
      }
-    ]
-   }
-  },
-  {
-   "slug": "vashnik-the-malignant",
-   "name": "Vashnik the Malignant",
-   "abilities": {
-    "mythic": [
-     {
-      "name": "Imbibe",
-      "id": 1283164
-     },
-     {
-      "name": "Malignant Tumor",
-      "id": 1304459
-     },
-     {
-      "name": "Splitting Clot",
-      "id": 1286631
-     },
-     {
-      "name": "Siphoning Infection",
-      "id": 1299941
-     },
-     {
-      "name": "Miasmic Coating",
-      "id": 1312366
-     },
-     {
-      "name": "Stygian Infection",
-      "id": 1294994
-     },
-     {
-      "name": "Burning Presence",
-      "id": 1305902
-     },
-     {
-      "name": "Exploding Infection",
-      "id": 1295173
-     },
-     {
-      "name": "Plague Froth",
-      "id": 1281907
-     },
-     {
-      "name": "Malignant Catalyst",
-      "id": 1282525
-     },
-     {
-      "name": "Toxic Vapor",
-      "id": 1284561
-     },
-     {
-      "name": "Dripping Fangs",
-      "id": 1280935
-     }
-    ],
-    "heroic": [
-     {
-      "name": "Imbibe",
-      "id": 1283164
-     },
-     {
-      "name": "Splitting Clot",
-      "id": 1286631
-     },
-     {
-      "name": "Siphoning Infection",
-      "id": 1299941
-     },
-     {
-      "name": "Miasmic Coating",
-      "id": 1312366
-     },
-     {
-      "name": "Stygian Infection",
-      "id": 1294994
-     },
-     {
-      "name": "Burning Presence",
-      "id": 1305902
-     },
-     {
-      "name": "Exploding Infection",
-      "id": 1295173
-     },
-     {
-      "name": "Plague Froth",
-      "id": 1281907
-     },
-     {
-      "name": "Malignant Catalyst",
-      "id": 1282525
-     },
-     {
-      "name": "Toxic Vapor",
-      "id": 1284561
-     },
-     {
-      "name": "Dripping Fangs",
-      "id": 1280935
-     }
-    ],
-    "normal": [
-     {
-      "name": "Imbibe",
-      "id": 1283164
-     },
-     {
-      "name": "Splitting Clot",
-      "id": 1286631
-     },
-     {
-      "name": "Siphoning Infection",
-      "id": 1299941
-     },
-     {
-      "name": "Miasmic Coating",
-      "id": 1312366
-     },
-     {
-      "name": "Stygian Infection",
-      "id": 1294994
-     },
-     {
-      "name": "Burning Presence",
-      "id": 1305902
-     },
-     {
-      "name": "Exploding Infection",
-      "id": 1295173
-     },
-     {
-      "name": "Plague Froth",
-      "id": 1281907
-     },
-     {
-      "name": "Toxic Vapor",
-      "id": 1284561
-     },
-     {
-      "name": "Dripping Fangs",
-      "id": 1280935
-     }
-    ]
-   }
-  },
-  {
-   "slug": "the-lost-explorers",
-   "name": "The Lost Explorers",
-   "abilities": {
-    "mythic": [
-     {
-      "name": "United Defense",
-      "id": 1297646
-     },
-     {
-      "name": "Dark Whispers",
-      "id": 1295451
-     },
-     {
-      "name": "Explosive Surprise",
-      "id": 1297625
-     },
-     {
-      "name": "Mighty Thud",
-      "id": 1296092
-     },
-     {
-      "name": "Frostfire Volley",
-      "id": 1295893
-     },
-     {
-      "name": "Throw Junk",
-      "id": 1291933
-     },
-     {
-      "name": "Disgusting Fish",
-      "id": 1292490
-     },
-     {
-      "name": "Blink Nova",
-      "id": 1292793
-     },
-     {
-      "name": "Evil Eyes",
-      "id": 1292388
-     },
-     {
-      "name": "Shell Spin",
-      "id": 1296061
-     },
-     {
-      "name": "Icebound Flames",
-      "id": 1286921
-     },
-     {
-      "name": "Steady Strikes",
-      "id": 1291930
-     },
-     {
-      "name": "Shredding Shards",
-      "id": 1295854
-     }
-    ],
-    "heroic": [
-     {
-      "name": "United Defense",
-      "id": 1297646
-     },
-     {
-      "name": "Dark Whispers",
-      "id": 1295451
-     },
-     {
-      "name": "Explosive Surprise",
-      "id": 1297625
-     },
-     {
-      "name": "Mighty Thud",
-      "id": 1296092
-     },
-     {
-      "name": "Frostfire Volley",
-      "id": 1295893
-     },
-     {
-      "name": "Throw Junk",
-      "id": 1291933
-     },
-     {
-      "name": "Disgusting Fish",
-      "id": 1292490
-     },
-     {
-      "name": "Blink Nova",
-      "id": 1292793
-     },
-     {
-      "name": "Evil Eyes",
-      "id": 1292388
-     },
-     {
-      "name": "Shell Spin",
-      "id": 1296061
-     },
-     {
-      "name": "Icebound Flames",
-      "id": 1286921
-     },
-     {
-      "name": "Steady Strikes",
-      "id": 1291930
-     },
-     {
-      "name": "Shredding Shards",
-      "id": 1295854
-     }
-    ],
-    "normal": [
-     {
-      "name": "Dark Whispers",
-      "id": 1295451
-     },
-     {
-      "name": "Explosive Surprise",
-      "id": 1297625
-     },
-     {
-      "name": "Mighty Thud",
-      "id": 1296092
-     },
-     {
-      "name": "Frostfire Volley",
-      "id": 1295893
-     },
-     {
-      "name": "Throw Junk",
-      "id": 1291933
-     },
-     {
-      "name": "Disgusting Fish",
-      "id": 1292490
-     },
-     {
-      "name": "Blink Nova",
-      "id": 1292793
-     },
-     {
-      "name": "Evil Eyes",
-      "id": 1292388
-     },
-     {
-      "name": "Shell Spin",
-      "id": 1296061
-     },
-     {
-      "name": "Icebound Flames",
-      "id": 1286921
-     },
-     {
-      "name": "Steady Strikes",
-      "id": 1291930
-     },
-     {
-      "name": "Shredding Shards",
-      "id": 1295854
-     }
-    ]
-   }
-  },
-  {
-   "slug": "sszorak",
-   "name": "Sszorak",
-   "abilities": {
-    "mythic": [
-     {
-      "name": "Venomous Surge",
-      "id": 1305959
-     },
-     {
-      "name": "Howling Maelstrom",
-      "id": 1285732
-     },
-     {
-      "name": "Apex Predator",
-      "id": 1277025
-     },
-     {
-      "name": "Ravage",
-      "id": 1277002
-     },
-     {
-      "name": "Mutilate",
-      "id": 1277027
-     },
-     {
-      "name": "Tempest",
-      "id": 1287072
-     },
-     {
-      "name": "Caustic Claws",
-      "id": 1305998
-     },
-     {
-      "name": "Raging Crosswinds",
-      "id": 1285419
-     },
-     {
-      "name": "Serpent's Fury",
-      "id": 1297367
-     },
-     {
-      "name": "Virulence",
-      "id": 1297707
-     },
-     {
-      "name": "Corroding Venom",
-      "id": 1282869
-     },
-     {
-      "name": "Ula'tek's Presence",
-      "id": 1285961
-     }
-    ],
-    "heroic": [
-     {
-      "name": "Venomous Surge",
-      "id": 1305959
-     },
-     {
-      "name": "Howling Maelstrom",
-      "id": 1285732
-     },
-     {
-      "name": "Apex Predator",
-      "id": 1277025
-     },
-     {
-      "name": "Ravage",
-      "id": 1277002
-     },
-     {
-      "name": "Mutilate",
-      "id": 1277027
-     },
-     {
-      "name": "Tempest",
-      "id": 1287072
-     },
-     {
-      "name": "Caustic Claws",
-      "id": 1305998
-     },
-     {
-      "name": "Raging Crosswinds",
-      "id": 1285419
-     },
-     {
-      "name": "Corroding Venom",
-      "id": 1282869
-     },
-     {
-      "name": "Ula'tek's Presence",
-      "id": 1285961
-     }
-    ],
-    "normal": [
-     {
-      "name": "Venomous Surge",
-      "id": 1305959
-     },
-     {
-      "name": "Howling Maelstrom",
-      "id": 1285732
-     },
-     {
-      "name": "Apex Predator",
-      "id": 1277025
-     },
-     {
-      "name": "Ravage",
-      "id": 1277002
-     },
-     {
-      "name": "Mutilate",
-      "id": 1277027
-     },
-     {
-      "name": "Tempest",
-      "id": 1287072
-     },
-     {
-      "name": "Raging Crosswinds",
-      "id": 1285419
-     },
-     {
-      "name": "Corroding Venom",
-      "id": 1282869
-     },
-     {
-      "name": "Ula'tek's Presence",
-      "id": 1285961
-     }
-    ]
-   }
-  },
-  {
-   "slug": "the-twin-fangs",
-   "name": "The Twin Fangs",
-   "abilities": {
-    "mythic": [
-     {
-      "name": "Caustic Deluge",
-      "id": 1289192
-     },
-     {
-      "name": "Blood Torrent",
-      "id": 1303230
-     },
-     {
-      "name": "Rouse the Brood",
-      "id": 1308356
-     },
-     {
-      "name": "Venomous Emergence",
-      "id": 1291404
-     },
-     {
-      "name": "Ravenous Feast",
-      "id": 1290516
-     },
-     {
-      "name": "Tainted Blood",
-      "id": 1310099
-     },
-     {
-      "name": "Coiling Ichor",
-      "id": 1290809
-     },
-     {
-      "name": "Stone Breaker",
-      "id": 1288538
-     },
-     {
-      "name": "Stir the Depths",
-      "id": 1290956
-     },
-     {
-      "name": "Vile Flood",
-      "id": 1294293
-     },
-     {
-      "name": "Sanguine Storm",
-      "id": 1306872
-     },
-     {
-      "name": "Clotted Bolt",
-      "id": 1295115
-     },
-     {
-      "name": "Toxic Fumes",
-      "id": 1295049
-     },
-     {
-      "name": "Envenomed",
-      "id": 1310360
-     },
-     {
-      "name": "Uncoiled Wrath",
-      "id": 1308583
-     }
-    ],
-    "heroic": [
-     {
-      "name": "Caustic Deluge",
-      "id": 1289192
-     },
-     {
-      "name": "Venomous Emergence",
-      "id": 1291404
-     },
-     {
-      "name": "Ravenous Feast",
-      "id": 1290516
-     },
-     {
-      "name": "Coiling Ichor",
-      "id": 1290809
-     },
-     {
-      "name": "Stone Breaker",
-      "id": 1288538
-     },
-     {
-      "name": "Stir the Depths",
-      "id": 1290956
-     },
-     {
-      "name": "Vile Flood",
-      "id": 1294293
-     },
-     {
-      "name": "Sanguine Storm",
-      "id": 1306872
-     },
-     {
-      "name": "Clotted Bolt",
-      "id": 1295115
-     },
-     {
-      "name": "Toxic Fumes",
-      "id": 1295049
-     },
-     {
-      "name": "Envenomed",
-      "id": 1310360
-     },
-     {
-      "name": "Uncoiled Wrath",
-      "id": 1308583
-     }
-    ],
-    "normal": [
-     {
-      "name": "Caustic Deluge",
-      "id": 1289192
-     },
-     {
-      "name": "Venomous Emergence",
-      "id": 1291404
-     },
-     {
-      "name": "Ravenous Feast",
-      "id": 1290516
-     },
-     {
-      "name": "Coiling Ichor",
-      "id": 1290809
-     },
-     {
-      "name": "Stone Breaker",
-      "id": 1288538
-     },
-     {
-      "name": "Stir the Depths",
-      "id": 1290956
-     },
-     {
-      "name": "Vile Flood",
-      "id": 1294293
-     },
-     {
-      "name": "Sanguine Storm",
-      "id": 1306872
-     },
-     {
-      "name": "Clotted Bolt",
-      "id": 1295115
-     },
-     {
-      "name": "Toxic Fumes",
-      "id": 1295049
-     },
-     {
-      "name": "Envenomed",
-      "id": 1310360
-     },
-     {
-      "name": "Uncoiled Wrath",
-      "id": 1308583
-     }
-    ]
-   }
-  },
-  {
-   "slug": "the-coiled-altar",
-   "name": "The Coiled Altar",
-   "abilities": {
-    "mythic": [
-     {
-      "name": "Fangs of the Coiled Altar",
-      "id": 1282487
-     },
-     {
-      "name": "Coalesced Venom",
-      "id": 1282403
-     },
-     {
-      "name": "Sever",
-      "id": 1299680
-     },
-     {
-      "name": "Virulent Mutation",
-      "id": 1310544
-     },
-     {
-      "name": "Guillotine",
-      "id": 1283594
-     },
-     {
-      "name": "Axegrinder",
-      "id": 1283832
-     },
-     {
-      "name": "Venomfang",
-      "id": 1282287
-     },
-     {
-      "name": "Dreadmarch",
-      "id": 1285643
-     },
-     {
-      "name": "Manifestation of Dread",
-      "id": 1285911
-     },
-     {
-      "name": "Soul Sever",
-      "id": 1286620
-     },
-     {
-      "name": "Eternal Nightfall",
-      "id": 1286918
-     },
-     {
-      "name": "Spiritcackle",
-      "id": 1286441
-     },
-     {
-      "name": "Spirit Shield",
-      "id": 1309105
-     },
-     {
-      "name": "Gloombomb",
-      "id": 1310882
-     },
-     {
-      "name": "Dreadful Presence",
-      "id": 1288624
-     },
-     {
-      "name": "Soulbinding",
-      "id": null
-     },
-     {
-      "name": "Fragment of Malacrass",
-      "id": 1287722
-     },
-     {
-      "name": "Defilement of the Crucible",
-      "id": 1298381
-     },
-     {
-      "name": "Blighted Sever",
-      "id": 1307279
-     },
-     {
-      "name": "Dread Bolt",
-      "id": 1307184
-     },
-     {
-      "name": "Soulbound",
-      "id": 1309987
-     }
-    ],
-    "heroic": [
-     {
-      "name": "Fangs of the Coiled Altar",
-      "id": 1282487
-     },
-     {
-      "name": "Coalesced Venom",
-      "id": 1282403
-     },
-     {
-      "name": "Sever",
-      "id": 1299680
-     },
-     {
-      "name": "Guillotine",
-      "id": 1283594
-     },
-     {
-      "name": "Axegrinder",
-      "id": 1283832
-     },
-     {
-      "name": "Venomfang",
-      "id": 1282287
-     },
-     {
-      "name": "Dreadmarch",
-      "id": 1285643
-     },
-     {
-      "name": "Manifestation of Dread",
-      "id": 1285911
-     },
-     {
-      "name": "Soul Sever",
-      "id": 1286620
-     },
-     {
-      "name": "Eternal Nightfall",
-      "id": 1286918
-     },
-     {
-      "name": "Spiritcackle",
-      "id": 1286441
-     },
-     {
-      "name": "Gloombomb",
-      "id": 1310882
-     },
-     {
-      "name": "Dreadful Presence",
-      "id": 1288624
-     },
-     {
-      "name": "Soulbinding",
-      "id": null
-     },
-     {
-      "name": "Fragment of Malacrass",
-      "id": 1287722
-     },
-     {
-      "name": "Defilement of the Crucible",
-      "id": 1298381
-     },
-     {
-      "name": "Blighted Sever",
-      "id": 1307279
-     },
-     {
-      "name": "Dread Bolt",
-      "id": 1307184
-     },
-     {
-      "name": "Soulbound",
-      "id": 1309987
-     }
-    ],
-    "normal": [
-     {
-      "name": "Fangs of the Coiled Altar",
-      "id": 1282487
-     },
-     {
-      "name": "Coalesced Venom",
-      "id": 1282403
-     },
-     {
-      "name": "Sever",
-      "id": 1299680
-     },
-     {
-      "name": "Guillotine",
-      "id": 1283594
-     },
-     {
-      "name": "Axegrinder",
-      "id": 1283832
-     },
-     {
-      "name": "Venomfang",
-      "id": 1282287
-     },
-     {
-      "name": "Dreadmarch",
-      "id": 1285643
-     },
-     {
-      "name": "Manifestation of Dread",
-      "id": 1285911
-     },
-     {
-      "name": "Soul Sever",
-      "id": 1286620
-     },
-     {
-      "name": "Eternal Nightfall",
-      "id": 1286918
-     },
-     {
-      "name": "Gloombomb",
-      "id": 1310882
-     },
-     {
-      "name": "Dreadful Presence",
-      "id": 1288624
-     },
-     {
-      "name": "Soulbinding",
-      "id": null
-     },
-     {
-      "name": "Fragment of Malacrass",
-      "id": 1287722
-     },
-     {
-      "name": "Defilement of the Crucible",
-      "id": 1298381
-     },
-     {
-      "name": "Blighted Sever",
-      "id": 1307279
-     },
-     {
-      "name": "Dread Bolt",
-      "id": 1307184
-     },
-     {
-      "name": "Soulbound",
-      "id": 1309987
-     }
-    ]
-   }
-  },
-  {
-   "slug": "ulatek",
-   "name": "Ula'tek",
-   "abilities": {
-    "mythic": [
-     {
-      "name": "Malignant Shell",
-      "id": 1295360
-     },
-     {
-      "name": "Caustic Waves",
-      "id": 1292403
-     },
-     {
-      "name": "Call of the Serpent",
-      "id": 1304012
-     },
-     {
-      "name": "Mephitic Thrash",
-      "id": 1296301
-     },
-     {
-      "name": "Spectral Coils",
-      "id": 1287265
-     },
-     {
-      "name": "Rage of the Shackled",
-      "id": 1286860
-     },
-     {
-      "name": "Rattler Slam",
-      "id": 1299206
-     },
-     {
-      "name": "Mother's Wrath",
-      "id": 1298367
-     },
-     {
-      "name": "Unchecked Rage",
-      "id": 1286945
-     },
-     {
-      "name": "Necrotic Vapors",
-      "id": 1286834
-     },
-     {
-      "name": "Malice",
-      "id": 1290779
-     },
-     {
-      "name": "Grasping Fangs",
-      "id": 1301117
-     },
-     {
-      "name": "Virulent Spit",
-      "id": 1302982
-     },
-     {
-      "name": "Doomscale Cauldron",
-      "id": 1313355
-     },
-     {
-      "name": "Desperate Trash",
-      "id": 1305709
-     },
-     {
-      "name": "Anguished Cry",
-      "id": 1305650
-     },
-     {
-      "name": "Circling Prey",
-      "id": 1301510
-     },
-     {
-      "name": "Blightscale Clutch",
-      "id": 1289962
-     },
-     {
-      "name": "Acidic Explosion",
-      "id": 1313531
-     },
-     {
-      "name": "Serpent's Bite",
-      "id": 1295905
-     },
-     {
-      "name": "Volatile Purge",
-      "id": 1306086
-     },
-     {
-      "name": "Vicious Echoes",
-      "id": 1310764
-     }
-    ],
-    "heroic": [
-     {
-      "name": "Malignant Shell",
-      "id": 1295360
-     },
-     {
-      "name": "Caustic Waves",
-      "id": 1292403
-     },
-     {
-      "name": "Call of the Serpent",
-      "id": 1304012
-     },
-     {
-      "name": "Mephitic Thrash",
-      "id": 1296301
-     },
-     {
-      "name": "Spectral Coils",
-      "id": 1287265
-     },
-     {
-      "name": "Rage of the Shackled",
-      "id": 1286860
-     },
-     {
-      "name": "Rattler Slam",
-      "id": 1299206
-     },
-     {
-      "name": "Mother's Wrath",
-      "id": 1298367
-     },
-     {
-      "name": "Unchecked Rage",
-      "id": 1286945
-     },
-     {
-      "name": "Necrotic Vapors",
-      "id": 1286834
-     },
-     {
-      "name": "Malice",
-      "id": 1290779
-     },
-     {
-      "name": "Grasping Fangs",
-      "id": 1301117
-     },
-     {
-      "name": "Virulent Spit",
-      "id": 1302982
-     },
-     {
-      "name": "Doomscale Cauldron",
-      "id": 1313355
-     },
-     {
-      "name": "Desperate Trash",
-      "id": 1305709
-     },
-     {
-      "name": "Anguished Cry",
-      "id": 1305650
-     },
-     {
-      "name": "Circling Prey",
-      "id": 1301510
-     },
-     {
-      "name": "Blightscale Clutch",
-      "id": 1289962
-     },
-     {
-      "name": "Acidic Explosion",
-      "id": 1313531
-     },
-     {
-      "name": "Serpent's Bite",
-      "id": 1295905
-     },
-     {
-      "name": "Volatile Purge",
-      "id": 1306086
-     },
-     {
-      "name": "Vicious Echoes",
-      "id": 1310764
-     }
-    ],
-    "normal": [
-     {
-      "name": "Malignant Shell",
-      "id": 1295360
-     },
-     {
-      "name": "Caustic Waves",
-      "id": 1292403
-     },
-     {
-      "name": "Call of the Serpent",
-      "id": 1304012
-     },
-     {
-      "name": "Mephitic Thrash",
-      "id": 1296301
-     },
-     {
-      "name": "Spectral Coils",
-      "id": 1287265
-     },
-     {
-      "name": "Rage of the Shackled",
-      "id": 1286860
-     },
-     {
-      "name": "Rattler Slam",
-      "id": 1299206
-     },
-     {
-      "name": "Mother's Wrath",
-      "id": 1298367
-     },
-     {
-      "name": "Unchecked Rage",
-      "id": 1286945
-     },
-     {
-      "name": "Necrotic Vapors",
-      "id": 1286834
-     },
-     {
-      "name": "Malice",
-      "id": 1290779
-     },
-     {
-      "name": "Grasping Fangs",
-      "id": 1301117
-     },
-     {
-      "name": "Virulent Spit",
-      "id": 1302982
-     },
-     {
-      "name": "Doomscale Cauldron",
-      "id": 1313355
-     },
-     {
-      "name": "Desperate Trash",
-      "id": 1305709
-     },
-     {
-      "name": "Anguished Cry",
-      "id": 1305650
-     },
-     {
-      "name": "Circling Prey",
-      "id": 1301510
-     },
-     {
-      "name": "Blightscale Clutch",
-      "id": 1289962
-     },
-     {
-      "name": "Acidic Explosion",
-      "id": 1313531
-     },
-     {
-      "name": "Serpent's Bite",
-      "id": 1295905
-     },
-     {
-      "name": "Volatile Purge",
-      "id": 1306086
-     },
-     {
-      "name": "Vicious Echoes",
-      "id": 1310764
-     }
-    ]
-   }
+    }
+   ]
   }
  ]
 }

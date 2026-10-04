@@ -297,7 +297,9 @@ def test_guides():
     assert guides.link(None, "Uncoiled Rage", 4).endswith("/nekzali-the-soulcoiler/heroic")
     assert guides.link(1293212, None, 4).endswith("/mythic")      # только на эпохальной — ведём туда
     assert guides.link(None, "Ледяная волна", 5) is None and guides.link(42, "Fireball", 5) is None
-    assert len(guides._data()["bosses"]) == 9
+    assert sum(1 for r, _ in guides.bosses() if r["slug"] == "venomous-abyss") == 9
+    assert guides.link(None, "Uncoiled Rage", 4, "Nek'zali the Soulcoiler").endswith("/nekzali-the-soulcoiler/heroic")
+    assert guides.link(None, "Uncoiled Rage", 4, "Другой босс") is not None   # босс не найден — ищем везде
     print("OK гайды Mythic Trap: 9 боссов, ссылка по id или английскому названию, без совпадения — текст")
 
 

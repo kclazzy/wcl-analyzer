@@ -487,8 +487,8 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
                 by_name[n].append(sid)
         guide_links = {}
         for n in quoted:
-            url = next((u for u in (guide_link(sid, None, f.get("difficulty")) for sid in by_name.get(n, [])) if u), None) \
-                or guide_link(None, n, f.get("difficulty"))
+            url = next((u for u in (guide_link(sid, None, f.get("difficulty"), f.get("name")) for sid in by_name.get(n, [])) if u), None) \
+                or guide_link(None, n, f.get("difficulty"), f.get("name"))
             if url:
                 guide_links[n] = url
     except Exception:  # noqa: BLE001 — ссылки на гайды необязательны

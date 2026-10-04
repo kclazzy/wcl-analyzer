@@ -32,6 +32,9 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from wcl_analyzer import wowhead  # noqa: E402 — русские названия и описания с Wowhead
+RU_FILE = ROOT / "wcl_analyzer" / "data" / "guides_ru.json"
 FILE = ROOT / "wcl_analyzer" / "data" / "guides.json"
 SITE = "https://www.mythictrap.com"
 BASE = SITE + "/en/"
@@ -113,6 +116,8 @@ def _good_name(s: str) -> bool:
 PANEL = re.compile(r"""class=["']SpellPanel_panel__""")
 SHARE = re.compile(r"""value=["'](https?://(?:www\.)?mythictrap\.com/[^"'?]+\?ability=[^"'&]+)["']""")
 TITLE = re.compile(r"""class=["']SpellPanel_headerTitle__[^"']*["'][^>]*>(.*?)</div>""", re.S)
+KIND = re.compile(r"""class=["']SpellPanel_headerDescription__[^"']*["'][^>]*>(.*?)</div>""", re.S)
+TODO = re.compile(r"""class=["']SpellPanel_footerDescription__[^"']*["'][^>]*>(.*?)</div>""", re.S)
 SPELL_ID = re.compile(r"wowhead\.com/(?:[a-z]{2}/)?spell=(\d+)")
 VIDEO = re.compile(r"""<source[^>]*src=["'](https?://[^"']+\.(?:mp4|webm))["']""", re.I)
 
@@ -138,6 +143,10 @@ def parse_abilities(page: str) -> list[dict]:
             continue  # та же карточка повторяется в мобильной раскладке
         seen.add(key)
         a = {"name": name, "id": sid}
+        for key, rx in (("type", KIND), ("todo", TODO)):  # тип механики и совет «WHAT TO DO» (англ.)
+            m_ = rx.search(chunk)
+            if m_ and _text(m_.group(1)):
+                a[key] = _text(m_.group(1))[:200]
         if sh:
             a["share"] = html.unescape(sh.group(1))
         # ролик механики стоит прямо перед карточкой (VideoAbilityPanel: видео, затем карточка)
@@ -310,6 +319,40 @@ def video_sizes(raids: list[dict]) -> None:
         print("::notice title=videos::" + "\n".join(lines).replace("%", "%25").replace("\n", "%0A"))
 
 
+def collect_spells(raids: list[dict], old: dict) -> tuple[dict, int]:
+    """Русские название и описание с Wowhead для каждой способности из гайдов: {id: {name, desc}}.
+    Уже известные не запрашиваем повторно (кроме тех, где описания не было)."""
+    prev = old.get("spells") or {}
+    ids = sorted({str(x["id"]) for r in raids for b in r["bosses"] for v in b["abilities"].values()
+                  for x in v if x.get("id")})
+    out, fetched = {}, 0
+    for i in ids:
+        if prev.get(i, {}).get("desc"):
+            out[i] = prev[i]
+            continue
+        time.sleep(0.4)
+        info = wowhead.fetch(i, timeout=20)
+        fetched += 1
+        if info:
+            out[i] = info
+        elif i in prev:
+            out[i] = prev[i]
+    print(f"Wowhead: способностей {len(ids)}, запрошено {fetched}, с описанием {sum(1 for v in out.values() if v.get('desc'))}")
+    return out, fetched
+
+
+def untranslated(raids: list[dict]) -> list[str]:
+    """Тип механики и советы Mythic Trap, для которых ещё нет перевода в guides_ru.json."""
+    try:
+        ru = json.loads(RU_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        ru = {}
+    have = set(ru.get("type", {})) | set(ru.get("todo", {}))
+    need = {x[k] for r in raids for b in r["bosses"] for v in b["abilities"].values() for x in v
+            for k in ("type", "todo") if x.get(k)}
+    return sorted(need - have)
+
+
 def _counts(raids: list[dict]) -> list[str]:
     return [f"{r['name']} / {b['name']}: " + ", ".join(
         f"{d} {len(v)} (share {sum(1 for x in v if x.get('share'))})" for d, v in b["abilities"].items())
@@ -322,6 +365,7 @@ def main(argv=None) -> int:
     ap.add_argument("--raid", action="append", help="только этот рейд (slug), можно несколько")
     ap.add_argument("--dump", metavar="URL", help="показать разметку вокруг первой ссылки на Wowhead и выйти")
     ap.add_argument("--find", metavar="TEXT", help="с --dump: показать разметку вокруг этого текста")
+    ap.add_argument("--list-ru", action="store_true", help="вывести советы и типы механик без перевода и выйти")
     ap.add_argument("--video-sizes", action="store_true", help="посчитать, сколько весят все ролики")
     a = ap.parse_args(argv)
 
@@ -342,6 +386,10 @@ def main(argv=None) -> int:
         return 0
 
     old = load_old()
+    if a.list_ru:
+        need = untranslated(old.get("raids", []))
+        print(json.dumps(need, ensure_ascii=False, indent=0))
+        return 0
     try:
         raids, notes = collect(old, set(a.raid) if a.raid else None)
         if a.video_sizes:
@@ -362,7 +410,15 @@ def main(argv=None) -> int:
 
     merged = merge(raids, old)
     changes = summary(raids, old)
-    same = json.dumps(merged, sort_keys=True) == json.dumps(old.get("raids", []), sort_keys=True)
+    spells, _ = collect_spells(merged, old)
+    if len(spells) != len(old.get("spells") or {}):
+        changes.append(f"Русских описаний с Wowhead: {len(old.get('spells') or {})} → {len(spells)}")
+    need_ru = untranslated(merged)
+    if need_ru:
+        changes.append(f"Нет перевода советов Mythic Trap: {len(need_ru)} (в программе — по-английски): "
+                       + "; ".join(need_ru[:15]) + (" …" if len(need_ru) > 15 else ""))
+    same = (json.dumps(merged, sort_keys=True) == json.dumps(old.get("raids", []), sort_keys=True)
+            and json.dumps(spells, sort_keys=True) == json.dumps(old.get("spells") or {}, sort_keys=True))
     total = sum(len(v) for r in merged for b in r["bosses"] for v in b["abilities"].values())
     print(f"\nРейдов {len(merged)}, боссов {sum(len(r['bosses']) for r in merged)}, записей способностей {total}.")
     if same:
@@ -378,7 +434,7 @@ def main(argv=None) -> int:
     data = {
         "_about": old.get("_about") or "Гайды Mythic Trap по боссам. Файл обновляет tools/update_guides.py.",
         "version": 2, "site": "Mythic Trap", "base": BASE, "pages": PAGES,
-        "updated": dt.date.today().isoformat(), "raids": merged,
+        "updated": dt.date.today().isoformat(), "raids": merged, "spells": spells,
     }
     FILE.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"Записано: {FILE.relative_to(ROOT)}")

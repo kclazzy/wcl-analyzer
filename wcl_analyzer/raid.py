@@ -34,6 +34,33 @@ from . import game_data as _gd  # noqa: E402
 RAID_CD_IDS = _gd.LazyIds(_gd.cd_ids)
 RAID_CD_RE = _gd.LazyRe(_gd.cd_name_re)
 
+# Не рейдовые кулдауны, которые лекари жмут редко и которые иначе попали бы в «нажатые рейдовые кулдауны»:
+# защита на себя, перемещение и контроль, сейвы на одну цель. Названия — английские и русские (логи бывают
+# на обоих языках), id — основные заклинания.
+NOT_RAID_CD_IDS = {
+    108271, 79206, 192077, 192063, 58875, 108287, 51490, 198103,          # шаман
+    642, 498, 633, 6940, 1022, 1044, 190784, 204018,                      # паладин
+    33206, 47788, 19236, 586, 73325, 32375, 10060, 47585, 8122, 121536,   # жрец
+    102342, 22812, 29166, 106898, 77764, 108238, 102793, 1850, 102401,    # друид
+    116849, 115203, 122783, 122278, 116844, 109132, 115008, 116841, 119381, 101643, 119996,  # монах
+    357170, 363916, 374348, 358267, 370665, 374968,                       # пробудитель
+}
+NOT_RAID_CD_RE = re.compile(
+    r"^(Astral Shift|Spiritwalker's Grace|Wind Rush Totem|Gust of Wind|Spirit Walk|Totemic Projection|Thunderstorm|"
+    r"Earth Elemental|Divine Shield|Divine Protection|Lay on Hands|Blessing of (Sacrifice|Protection|Freedom|Spellwarding)|"
+    r"Divine Steed|Pain Suppression|Guardian Spirit|Desperate Prayer|Fade|Leap of Faith|Mass Dispel|Power Infusion|"
+    r"Dispersion|Psychic Scream|Angelic Feather|Ironbark|Barkskin|Innervate|Stampeding Roar|Renewal|Ursol's Vortex|"
+    r"Dash|Wild Charge|Life Cocoon|Fortifying Brew|Diffuse Magic|Dampen Harm|Ring of Peace|Roll|Chi Torpedo|"
+    r"Tiger's Lust|Leg Sweep|Transcendence.*|Time Dilation|Obsidian Scales|Renewing Blaze|Hover|Rescue|Time Spiral|"
+    r"Астральный сдвиг|Благосклонность духов|Тотем ветряного порыва|Порыв ветра|Поступь духа|Гроза|"
+    r"Божественный щит|Божественная защита|Возложение рук|Благословение (жертвенности|защиты|свободы|защиты от заклинаний)|"
+    r"Жертвенное благословение|Божественный скакун|Подавление боли|Оберегающий дух|Отчаянная молитва|Уход в тень|"
+    r"Духовное рвение|Массовое рассеивание|Придание сил|Слияние с Тьмой|Ментальный крик|Ангельское перо|Железная кора|"
+    r"Дубовая кожа|Озарение|Тревожный рев|Тревожный рёв|Обновление|Тайфун|Порыв|Исцеляющий кокон|Укрепляющий отвар|"
+    r"Распыление магии|Смягчение удара|Кольцо мира|Кувырок|Торпеда ци|Тигриное рвение|Круговой удар ногой|"
+    r"Трансцендентность.*|Растяжение времени|Обсидиановая чешуя|Возрождающееся пламя|Парение|Спасение|Временная спираль)$",
+    re.I)
+
 ROLE_RU = {"tank": "Танк", "healer": "Лекарь", "dps": "DPS"}
 ROLE_ORDER = {"tank": 0, "healer": 1, "dps": 2}
 CAT_TANK, CAT_RAID, CAT_SELECT = "По танкам", "По всему рейду", "Выборочно"
@@ -186,6 +213,29 @@ def fight_phases(f: dict, meta: list | None, dur: float) -> list[dict]:
                     "end": round(tr[i + 1][0] if i + 1 < len(tr) else dur, 1),
                     "name": name or (f"Интермиссия" if inter else f"Фаза {pid}"), "intermission": inter})
     return out
+
+
+def _trinket_check(raw: dict):
+    """(игрок, способность) → это применение надетого тринкета? Та же иконка или то же имя, что у предмета
+    в слотах 13–14 (как в разборе игрока, logs.mark_trinket_spells)."""
+    from .logs import gear_slots
+    abil = {int(a["gameID"]): a for a in ((raw.get("report") or {}).get("masterData") or {}).get("abilities") or []}
+    trink: dict = {}
+    for role in ("dps", "healers", "tanks"):
+        for p in (raw.get("details") or {}).get(role) or []:
+            ci = p.get("combatantInfo") or {}
+            ci = (ci[0] if ci else {}) if isinstance(ci, list) else ci
+            if not isinstance(ci, dict):
+                continue
+            ts = [g for g in gear_slots(ci.get("gear") or []) if g.get("slot") in (12, 13)]
+            trink[int(p.get("id", -1))] = ({g["icon"] for g in ts if g.get("icon")},
+                                          {g["name"].lower() for g in ts if g.get("name")})
+
+    def check(pid, ab) -> bool:
+        icons, names = trink.get(int(pid), (set(), set()))
+        a = abil.get(int(ab)) or {}
+        return bool((a.get("icon") and a["icon"] in icons) or (a.get("name") and a["name"].lower() in names))
+    return check
 
 
 def merge_cd_ticks(raid_cds: list[dict]) -> list[dict]:
@@ -792,12 +842,17 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
     raid_cds = []
     used_by_others = {ab for pid, cs in casts_by.items() if players.get(pid, {}).get("role") != "healer"
                       for _, ab in cs}
+    is_trinket = _trinket_check(raw)
     for pid, p in players.items():
         per_ab = defaultdict(list)
         for t, ab in casts_by[pid]:
             per_ab[ab].append(t)
         for ab, ts in per_ab.items():
             name = nm(ab)
+            # не рейдовые сейвы и не боевые кулдауны лекаря: тринкеты, защита на себя, перемещение,
+            # сейвы на одну цель (Кокон, Подавление боли…) — в «нажатые кулдауны» и в MRT не попадают
+            if ab not in RAID_CD_IDS and (ab in NOT_RAID_CD_IDS or NOT_RAID_CD_RE.search(name) or is_trinket(pid, ab)):
+                continue
             known = ab in RAID_CD_IDS or bool(RAID_CD_RE.search(name))
             if not known:
                 if p["role"] != "healer" or POTION_RE.search(name) or HEALTHSTONE_RE.search(name) \

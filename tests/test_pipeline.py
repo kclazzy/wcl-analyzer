@@ -326,6 +326,15 @@ def test_top_progress():
     ticks = [{"t": 43.0 + i, "name": "Tranquility", "pid": 7, "id": 740} for i in range(8)] + \
             [{"t": 140.0, "name": "Tranquility", "pid": 7, "id": 740}, {"t": 44.0, "name": "Divine Hymn", "pid": 8, "id": 64843}]
     assert [(c["name"], c["t"]) for c in merge_cd_ticks(ticks)] == [("Tranquility", 43.0), ("Divine Hymn", 44.0), ("Tranquility", 140.0)]
+    # в «нажатые рейдовые кулдауны» не попадают тринкеты и защита на себя / перемещение / сейвы на одну цель
+    from wcl_analyzer.raid import NOT_RAID_CD_RE, _trinket_check
+    assert all(NOT_RAID_CD_RE.search(n) for n in ("Astral Shift", "Spiritwalker's Grace", "Wind Rush Totem", "Lay on Hands", "Возложение рук"))
+    assert not any(NOT_RAID_CD_RE.search(n) for n in ("Tranquility", "Divine Hymn", "Revival", "Rewind", "Божественный гимн"))
+    raw = {"report": {"masterData": {"abilities": [{"gameID": 1, "name": "Soulcoiler Ritual Vessel", "icon": "inv_vessel"},
+                                                   {"gameID": 2, "name": "Tranquility", "icon": "spell_tranq"}]}},
+           "details": {"healers": [{"id": 7, "combatantInfo": {"gear": [{"slot": 12, "id": 99, "icon": "inv_vessel", "name": "Soulcoiler Ritual Vessel"}]}}]}}
+    chk = _trinket_check(raw)
+    assert chk(7, 1) and not chk(7, 2) and not chk(8, 1)
     # заметка: одна, строки по времени; в строке сначала рейдовые кулдауны, затем лекарей
     hv = [{"t": 90, "abilities": ["Волна"], "ability_id": 5, "cd_list": [
               {"cd": "Апофеоз", "player": "Б", "id": 200183, "t": 88, "cls": "Priest", "kind": "heal"},

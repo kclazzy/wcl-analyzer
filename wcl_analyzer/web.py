@@ -817,6 +817,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         if not self._allowed():
             return
+        SERVER["seen"] = True
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
             self._file(_page(), "text/html; charset=utf-8")
@@ -944,9 +945,9 @@ class Handler(BaseHTTPRequestHandler):
                 if body.get("kind") == "full":
                     return self._json(update.apply_full())
                 res = update.apply_code()
-                from .platform_support import app_mode
-                if app_mode() == "exe":
-                    update.restart_exe()
+                if res.get("ok"):
+                    request_restart()  # новый код подключается сразу, страница перезагрузится сама
+                    res = {**res, "restart": "Перезапускаю программу…", "soft_restart": True}
                 return self._json(res)
             if path == "/api/phone":
                 if SERVER["public"] or not self._is_local():
@@ -975,6 +976,8 @@ def _quote(s: str) -> str:
 def _free_port(preferred: int, host: str) -> int:
     for port in [preferred] + list(range(preferred + 1, preferred + 50)):
         with socket.socket() as s:
+            if os.name != "nt":  # как у самого сервера: порт после недавних соединений (TIME_WAIT) свободен
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 s.bind((host, port))
                 return port
@@ -983,7 +986,9 @@ def _free_port(preferred: int, host: str) -> int:
     return 0
 
 
-def serve(port: int = 8765, open_browser: bool = True, local_only: bool = False, public: bool = False) -> None:
+def serve(port: int = 8765, open_browser: bool = True, local_only: bool = False, public: bool = False,
+          same_port: bool = False) -> None:
+    """same_port — перезапуск после обновления: тот же порт, что был, иначе открытая страница его не найдёт."""
     public = public or os.environ.get("WCL_PUBLIC") == "1"
     from .platform_support import android_preload, app_mode
     if app_mode() == "android":
@@ -999,10 +1004,24 @@ def serve(port: int = 8765, open_browser: bool = True, local_only: bool = False,
         open_browser = False
     else:
         host = "127.0.0.1" if local_only else "0.0.0.0"
-        port = _free_port(port, host)
-    httpd = ThreadingHTTPServer((host, port), Handler)
+        if not same_port:
+            port = _free_port(port, host)
+    for attempt in range(30):  # после перезапуска порт может освободиться не сразу
+        try:
+            httpd = ThreadingHTTPServer((host, port), Handler)
+            break
+        except OSError:
+            if not same_port or attempt == 29:
+                raise
+            time.sleep(0.3)
     httpd.daemon_threads = True
-    SERVER.update(port=httpd.server_address[1], lan=not local_only and not public, public=public)
+    SERVER.update(port=httpd.server_address[1], lan=not local_only and not public, public=public,
+                  httpd=httpd, restart=False, seen=False)
+    # После перезапуска (обновление .exe целиком) браузер уже открыт — страница сама переподключится.
+    # Если за 20 с никто не зашёл (вкладку закрыли), открываем браузер как обычно.
+    reopen = bool(os.environ.pop("WCL_NO_BROWSER", None))
+    if reopen:
+        open_browser = False
     _CACHE["obj"] = None
     if public:
         print(f"WCL Analyzer работает как сервис на порту {SERVER['port']}. "
@@ -1015,7 +1034,39 @@ def serve(port: int = 8765, open_browser: bool = True, local_only: bool = False,
         print("Не закрывайте это окно, пока пользуетесь программой. Остановить — Ctrl+C.")
         if open_browser:
             threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+        elif reopen:
+            threading.Timer(20, lambda: None if SERVER.get("seen") else webbrowser.open(url)).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\nОстановлено.")
+    httpd.server_close()
+    if SERVER.get("restart"):
+        _reload_and_serve(port=SERVER["port"], local_only=local_only, public=public)
+
+
+def request_restart(delay: float = 0.7) -> None:
+    """Мягкий перезапуск после обновления кода: сервер останавливается, программа подключает новый код
+    и снова запускает сервер на том же адресе — уже открытая страница сама перезагрузится.
+    Процесс не завершается: так работает и на Windows, и в приложении Android."""
+    SERVER["restart"] = True
+    httpd = SERVER.get("httpd")
+    if httpd is not None:
+        threading.Timer(delay, httpd.shutdown).start()  # после того, как ответ на запрос ушёл
+
+
+def _reload_and_serve(port: int, local_only: bool, public: bool) -> None:
+    import sys
+    print("Перезапуск: подключаю обновлённый код…")
+    sys.meta_path[:] = [f for f in sys.meta_path if type(f).__name__ != "_Finder"]  # прежний скачанный код
+    for m in [m for m in list(sys.modules) if m == "wcl_analyzer" or m.startswith("wcl_analyzer.")]:
+        del sys.modules[m]
+    try:
+        import wcl_boot  # загрузчик оболочки (.exe / APK): подключает новый скачанный код
+        build = wcl_boot.activate()
+        if build:
+            print(f"Обновлённая версия кода: сборка {build}")
+    except ImportError:
+        pass
+    from wcl_analyzer.web import serve as new_serve  # noqa: PLC0415 — уже новый модуль
+    new_serve(port=port, open_browser=False, local_only=local_only, public=public, same_port=True)

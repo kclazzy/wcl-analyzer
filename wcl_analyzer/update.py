@@ -202,9 +202,7 @@ def _download_jsdelivr(info: dict, tmp: Path) -> None:
 
 
 def restart_hint() -> str:
-    from .platform_support import app_mode
-    return ("Программа перезапустится сама через пару секунд." if app_mode() == "exe"
-            else "Закройте приложение (уберите из недавних) и откройте снова.")
+    return "Программа перезапустится сама через пару секунд."
 
 
 def restart_exe(new_exe: Path | None = None) -> None:
@@ -213,7 +211,8 @@ def restart_exe(new_exe: Path | None = None) -> None:
     bat = exe.with_name("wcl_update.bat")
     move = (f'move /y "{new_exe}" "{exe}" >nul 2>&1 || (timeout /t 1 /nobreak >nul & goto again)\n'
             if new_exe else "")
-    bat.write_text("@echo off\r\ntimeout /t 2 /nobreak >nul\r\n:again\r\n" + move.replace("\n", "\r\n")
+    # WCL_NO_BROWSER: новая программа не открывает ещё одну вкладку — открытая страница переподключится сама
+    bat.write_text("@echo off\r\nset WCL_NO_BROWSER=1\r\ntimeout /t 2 /nobreak >nul\r\n:again\r\n" + move.replace("\n", "\r\n")
                    + f'start "" "{exe}"\r\ndel "%~f0"\r\n', encoding="cp866", errors="replace")
     subprocess.Popen(["cmd", "/c", str(bat)], creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
                      | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0), close_fds=True)
@@ -229,7 +228,8 @@ def apply_full() -> dict:
         new = Path(sys.executable).with_name("WCL Analyzer.new.exe")
         new.write_bytes(data)
         restart_exe(new)
-        return {"ok": True, "restart": "Новая версия скачана, программа перезапустится через пару секунд."}
+        return {"ok": True, "restart": "Новая версия скачана, программа перезапустится через пару секунд.",
+                "full_restart": True}
     if mode == "android":
         from .platform_support import android_open_url
         android_open_url(BASE + APK)

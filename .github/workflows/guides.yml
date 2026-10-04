@@ -13,6 +13,14 @@ on:
         description: "Только проверить, ничего не сохранять"
         type: boolean
         default: false
+      debug_url:
+        description: "Отладка: показать разметку страницы (адрес)"
+        type: string
+        default: ""
+      debug_find:
+        description: "Отладка: искать на странице этот текст"
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -29,15 +37,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
+      - name: Отладка разметки
+        if: ${{ inputs.debug_url != '' && inputs.debug_url != null }}
+        run: python tools/update_guides.py --dump "${{ inputs.debug_url }}" --find "${{ inputs.debug_find }}"
       - name: Собрать ссылки с Mythic Trap
+        if: ${{ !inputs.debug_url }}
         run: python tools/update_guides.py ${{ inputs.dry_run && '--dry-run' || '' }}
       - name: Проверить программу с новыми ссылками
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && !inputs.debug_url }}
         run: |
           pip install -r requirements.txt
           python tests/test_pipeline.py
       - name: Сохранить и запустить сборку
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && !inputs.debug_url }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

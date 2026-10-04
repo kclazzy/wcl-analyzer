@@ -244,13 +244,23 @@ def main(argv=None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="ничего не записывать")
     ap.add_argument("--raid", action="append", help="только этот рейд (slug), можно несколько")
     ap.add_argument("--dump", metavar="URL", help="показать разметку вокруг первой ссылки на Wowhead и выйти")
+    ap.add_argument("--find", metavar="TEXT", help="с --dump: показать разметку вокруг этого текста")
     a = ap.parse_args(argv)
 
     if a.dump:
         page = fetch(a.dump) or ""
+        parts = [f"Длина страницы {len(page)}"]
         i = page.find("wowhead.com")
-        print(page[max(0, i - 400):i + 800] if i >= 0 else page[:1500])
-        print("\nНайдено способностей:", parse_abilities(page)[:10])
+        parts.append("== вокруг первой ссылки на Wowhead ==\n" + (page[max(0, i - 600):i + 900] if i >= 0 else page[:1500]))
+        if a.find:
+            hits = [m.start() for m in re.finditer(re.escape(a.find), page)][:3]
+            parts.append(f"== «{a.find}»: найдено {len(hits)} ==")
+            parts += [page[max(0, h - 900):h + 400] for h in hits]
+        parts.append("== скрипты ==\n" + "\n".join(re.findall(r"<script[^>]*src=[\"']([^\"']+)", page)[:40]))
+        for p_ in parts:
+            print(p_)
+            if os.environ.get("GITHUB_ACTIONS"):
+                print("::notice title=dump::" + p_[:6000].replace("%", "%25").replace("\r", "").replace("\n", "%0A"))
         return 0
 
     old = load_old()

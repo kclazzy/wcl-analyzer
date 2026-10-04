@@ -226,9 +226,19 @@ def heaviest_mrt(heaviest: list[dict], phases: list[dict]) -> list[dict]:
     от начала фазы); в строке сначала рейдовые кулдауны, затем кулдауны лекарей.
     Для разбора топа — готовая расстановка лучших гильдий."""
     from .raid_top import mrt_line
+    # Окна соседних моментов перекрываются (8 с до момента + 5 + 3 после): одно нажатие — только в одну
+    # строку, к ближайшему моменту, иначе MRT напомнит про один и тот же кулдаун дважды
+    owner: dict = {}
+    for hi_, h in enumerate(heaviest or []):
+        for p in h.get("cd_list") or []:
+            k = (p["player"], p.get("id") or p["cd"], p["t"])
+            d = abs(h["t"] - p["t"])
+            if k not in owner or d < owner[k][0]:
+                owner[k] = (d, hi_)
     out = []
-    for h in heaviest or []:
-        picks = sorted(h.get("cd_list") or [], key=lambda p: (p.get("kind", "raid") != "raid", p["t"]))
+    for hi_, h in enumerate(heaviest or []):
+        mine = [p for p in h.get("cd_list") or [] if owner[(p["player"], p.get("id") or p["cd"], p["t"])][1] == hi_]
+        picks = sorted(mine, key=lambda p: (p.get("kind", "raid") != "raid", p["t"]))
         if not picks:
             continue
         t0 = min(p["t"] for p in picks)

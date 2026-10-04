@@ -335,6 +335,12 @@ def test_top_progress():
     note = [x["mrt"] for x in heaviest_mrt(hv, [])]
     assert len(note) == 2 and note[0].startswith("{time:0:28}") and note[1].startswith("{time:1:28}"), note
     assert note[1].index("{spell:108280}") < note[1].index("{spell:200183}"), note
+    # окна соседних моментов перекрываются — одно нажатие только в одной строке, у ближайшего момента
+    press = {"cd": "Гимн", "player": "Б", "id": 64843, "t": 100, "cls": "Priest", "kind": "raid"}
+    note = [x["mrt"] for x in heaviest_mrt([
+        {"t": 104, "abilities": ["Волна"], "ability_id": 5, "cd_list": [press]},
+        {"t": 92, "abilities": ["Удар"], "ability_id": 6, "cd_list": [press, {"cd": "Тотем", "player": "А", "id": 108280, "t": 91, "cls": "Shaman", "kind": "raid"}]}], [])]
+    assert sum(x.count("{spell:64843}") for x in note) == 1 and note[1].startswith("{time:1:40}"), note
     # заметка MRT по самым тяжёлым моментам: их нажатия, без повторов способности в строке
     assert R["extras"]["heaviest_mrt"] and all(x["mrt"].startswith("{time:") for x in R["extras"]["heaviest_mrt"])
     for h in R["extras"]["heaviest"]:
@@ -368,6 +374,20 @@ def test_top_progress():
     assert R2["variant"] == "progress_all" and R2["order"] == ["b0", "b1"] and list(R2["parts"]) == ["b0"], R2["order"]
     assert "лимит" in R2["errors"]["b1"] and R2["params"]["mode"] == "progress" and job.get("xlsx")
     assert R2["parts"]["b0"]["info"]["top_progress"]["guild"] == "Echo"
+    # героик и обычный: рейтинга прогресса нет — самый ранний по дате килл среди страниц рейтинга киллов
+    class Heroic:
+        calls = []
+
+        def fight_rankings(self, enc, diff, metric="speed", page=1, **k):
+            self.calls.append((metric, page))
+            if page > 1:
+                return []
+            return [{"report": {"code": "FAST0000001", "fightID": 3}, "guild": {"name": "Быстрые"}, "startTime": 1_700_000_900_000},
+                    {"report": {"code": "FIRST000001", "fightID": 7}, "guild": {"name": "Первые"}, "startTime": 1_700_000_000_000}]
+    hc = Heroic()
+    cands = web._progress_cands(hc, 3001, 4)
+    assert cands[0]["guild"] == "Первые" and cands[0]["basis"] == "first_kill" and cands[0]["rank"] == 1, cands
+    assert all(m == "speed" for m, _ in hc.calls), hc.calls       # рейтинг прогресса для героика не спрашиваем
     # без лога: рейд, сложность и босс выбраны в списке (рейды текущего дополнения из Warcraft Logs)
     from wcl_analyzer.api import WCLClient
     zones_raw = {"worldData": {"zones": [

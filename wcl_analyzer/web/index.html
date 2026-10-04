@@ -341,7 +341,7 @@ dialog label.check input{width:auto;margin:0}
         <div><label for="tpBoss">Босс</label><select id="tpBoss"></select></div>
         <div><button class="btn" id="tpRun" type="button">Разобрать топ прогресса</button></div>
       </div>
-      <p class="hint" id="tpInfo" style="margin:10px 0 0">Бой гильдии, которая первой в мире убила босса на этой сложности: урон, сейвы и кто какие кулдауны жал, смерти, состав, заметка MRT. Без сравнения и без вашего лога; нужен только ключ Warcraft Logs. «Все боссы» — вкладка на каждого босса. Не все эпохальные логи открыты: если лог гильдии закрыт, программа возьмёт следующее место (до 6-го) и напишет, чьи логи недоступны.</p>
+      <p class="hint" id="tpInfo" style="margin:10px 0 0">Бой гильдии, которая первой в мире убила босса на этой сложности: урон, сейвы и кто какие кулдауны жал, смерти, состав, заметка MRT. Без сравнения и без вашего лога; нужен только ключ Warcraft Logs. «Все боссы» — вкладка на каждого босса. На героической и обычной сложности рейтинга прогресса нет — берётся самый ранний по дате килл среди 300 лучших в рейтинге WCL. Не все эпохальные логи открыты: если лог гильдии закрыт, программа возьмёт следующее место (до 6-го) и напишет, чьи логи недоступны.</p>
     </details>
 
     <div class="picks" id="picks" hidden>
@@ -1574,7 +1574,12 @@ function renderRaid(R){
     ${I.demo?'<div class="demo-flag">Демо: синтетический рейд, не реальный лог</div>':""}
     <div class="hero">
       <div>
-        ${I.top_progress ? `<div class="tp-flag">Топ прогресса: ${I.top_progress.rank}-е место в мире — ${esc(I.top_progress.guild)}${I.top_progress.server ? ` (${esc(I.top_progress.server)}${I.top_progress.region ? "-" + esc(I.top_progress.region) : ""})` : ""}. Разбор их боя, без сравнения.</div>` : ""}
+        ${I.top_progress ? (TP => { const where = TP.server ? ` (${esc(TP.server)}${TP.region ? "-" + esc(TP.region) : ""})` : "";
+            const date = TP.start ? ", килл " + new Date(TP.start).toLocaleDateString("ru-RU", {day:"numeric", month:"long"}) : "";
+            const what = TP.basis === "first_kill" ? `${TP.rank === 1 ? "первый" : TP.rank + "-й по дате"} килл на этой сложности`
+                       : TP.basis === "fastest" ? `${TP.rank === 1 ? "самый быстрый" : TP.rank + "-й по скорости"} килл (дат в рейтинге нет)`
+                       : `${TP.rank}-е место в мире по прогрессу`;
+            return `<div class="tp-flag">Топ прогресса: ${what} — ${esc(TP.guild)}${where}${date}. Разбор их боя, без сравнения.</div>`; })(I.top_progress) : ""}
         ${I.top_progress && (I.top_progress.skipped||[]).length ? `<div class="tp-skip">Логи недоступны: ${I.top_progress.skipped.map(t => `${t.rank}-е место — ${esc(t.guild)} (${esc(t.reason)})`).join("; ")}. Показан бой ${I.top_progress.rank}-го места.</div>` : ""}
         <div class="who"><strong>${esc(I.boss)}, ${esc(I.difficulty)}: ${outcome} за ${I.duration}</strong>
           Пулл ${S.pull_n} из ${S.pulls}. Состав: ${I.tanks} танка, ${I.healers} лекаря, ${I.dps} DPS.</div>

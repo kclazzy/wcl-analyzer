@@ -653,18 +653,52 @@ def _run_saves(job: dict, params: dict, creds, log) -> None:
     log("Готово.")
 
 
+FIRST_KILL_PAGES = 3   # героик и обычный: самый ранний килл ищем среди 3 страниц рейтинга WCL (300 киллов)
+
+
+def _basis_text(diff) -> str:
+    return ("рейтинг WCL по прогрессу (первые киллы в мире)…" if int(diff or 0) == 5 else
+            f"самый ранний по дате среди {FIRST_KILL_PAGES * 100} киллов рейтинга WCL (рейтинга прогресса для этой сложности нет)…")
+
+
 def _progress_cands(client, enc: int, diff: int) -> list[dict]:
-    """Первые киллы босса в мире (рейтинг WCL по прогрессу): до 5 мест с открытым логом."""
+    """Чей бой показывать. Эпохальная — рейтинг WCL по прогрессу (первые киллы в мире). Для героической и
+    обычной сложности такого рейтинга нет — берём самый ранний килл по дате среди FIRST_KILL_PAGES страниц
+    рейтинга киллов (basis="first_kill"); дат в ответе нет — самый быстрый килл (basis="fastest")."""
     from .config import SITE_URL
-    cands = []
-    for i, rk in enumerate(client.fight_rankings(enc, diff, "progress")[:10]):
-        rep = rk.get("report") or {}
-        if rep.get("code"):
-            g, srv = rk.get("guild") or {}, rk.get("server") or {}
-            cands.append({"url": f"{SITE_URL}/reports/{rep['code']}", "fight": int(rep.get("fightID") or rep.get("fightId") or 0),
-                          "guild": g.get("name") or rk.get("name") or rep["code"], "rank": i + 1,
-                          "server": srv.get("name"), "region": srv.get("region"), "start": rk.get("startTime")})
-    return cands
+
+    def cand(rk, place, basis):
+        rep, g, srv = rk.get("report") or {}, rk.get("guild") or {}, rk.get("server") or {}
+        return {"url": f"{SITE_URL}/reports/{rep['code']}", "fight": int(rep.get("fightID") or rep.get("fightId") or 0),
+                "guild": g.get("name") or rk.get("name") or rep["code"], "rank": place, "basis": basis,
+                "server": srv.get("name"), "region": srv.get("region"), "start": _kill_time(rk)}
+
+    ranks = [] if int(diff or 0) != 5 else [r for r in client.fight_rankings(enc, diff, "progress") if (r.get("report") or {}).get("code")]
+    if ranks:
+        return [cand(rk, i + 1, "progress") for i, rk in enumerate(ranks[:10])]
+    pool = []
+    for page in range(1, FIRST_KILL_PAGES + 1):
+        try:
+            got = client.fight_rankings(enc, diff, "speed", page=page)
+        except Exception:  # noqa: BLE001 — следующая страница не обязательна
+            break
+        pool += [r for r in got if (r.get("report") or {}).get("code")]
+        if len(got) < 100:
+            break
+    if not pool:
+        return []
+    if all(_kill_time(r) for r in pool):
+        pool.sort(key=_kill_time)
+        return [cand(rk, i + 1, "first_kill") for i, rk in enumerate(pool[:10])]
+    return [cand(rk, i + 1, "fastest") for i, rk in enumerate(pool[:10])]
+
+
+def _kill_time(rk: dict) -> float | None:
+    t = rk.get("startTime") or (rk.get("report") or {}).get("startTime")
+    try:
+        return float(t) if t else None
+    except (TypeError, ValueError):
+        return None
 
 
 CLOSED_HINTS = ("закрыт", "не найден", "permission", "private", "not found", "does not exist", "403", "unauthorized",
@@ -695,7 +729,7 @@ def _progress_one(job, client, cands: list[dict], params: dict, log, lo: float, 
             tried.append({"rank": c["rank"], "guild": c["guild"], "reason": reason})
             log(f"    недоступен: {reason}")
             continue
-        R["info"]["top_progress"] = {**{k: c.get(k) for k in ("rank", "guild", "server", "region", "start")},
+        R["info"]["top_progress"] = {**{k: c.get(k) for k in ("rank", "guild", "server", "region", "start", "basis")},
                                      "skipped": tried}
         return {**R, "source_url": c["url"]}
     places = "; ".join(f"{t['rank']}-е место — {t['guild']}: {t['reason']}" for t in tried)
@@ -736,10 +770,10 @@ def _run_top_progress(job: dict, params: dict, creds, log) -> None:
         if len(bosses) > 1:
             return _run_top_progress_all(job, params, client, bosses, zone["name"], log)
         enc, _, name = bosses[0]
-        log(f"{name} ({DIFFICULTY_NAMES.get(diff, '')}): ищу первый килл в мире (рейтинг WCL по прогрессу)…")
+        log(f"{name} ({DIFFICULTY_NAMES.get(diff, '')}): ищу первый килл — " + _basis_text(diff))
         cands = _progress_cands(client, enc, diff)
         if not cands:
-            raise LookupError(f"{name}: на этой сложности пока нет киллов в рейтинге прогресса Warcraft Logs")
+            raise LookupError(f"{name}: на этой сложности пока нет киллов в рейтингах Warcraft Logs")
         job["progress"] = 0.1
         R = _progress_one(job, client, cands, params, log, 0.1, 0.95, difficulty=diff)
         _excel_bytes(job, f"Топ_прогресса_{R['info']['boss']}_{R['info']['top_progress']['guild']}", write_raid_workbook, R)
@@ -763,10 +797,10 @@ def _run_top_progress(job: dict, params: dict, creds, log) -> None:
     fid = params.get("fight") if params.get("fight") not in (None, "") else url_fight
     f = next((f for f in fights if str(f["id"]) == str(fid)), None) or fights[-1]
     enc, diff = int(f["encounterID"]), int(f.get("difficulty") or 0)
-    log(f"{f.get('name')} ({DIFFICULTY_NAMES.get(diff, '')}): ищу первые киллы в мире (рейтинг WCL по прогрессу)…")
+    log(f"{f.get('name')} ({DIFFICULTY_NAMES.get(diff, '')}): ищу первый килл — " + _basis_text(diff))
     cands = _progress_cands(client, enc, diff)
     if not cands:
-        raise LookupError("У этого босса на этой сложности пока нет рейтинга прогресса в Warcraft Logs")
+        raise LookupError("У этого босса на этой сложности пока нет киллов в рейтингах Warcraft Logs")
     job["progress"] = 0.1
     R = _progress_one(job, client, cands, params, log, 0.1, 0.95, difficulty=diff)
     _excel_bytes(job, f"Топ_прогресса_{R['info']['boss']}_{R['info']['top_progress']['guild']}", write_raid_workbook, R)
@@ -801,7 +835,7 @@ def _run_top_progress_all(job: dict, params: dict, client, bosses: list[tuple], 
         try:
             cands = _progress_cands(client, enc, diff)
             if not cands:
-                raise LookupError("пока нет рейтинга прогресса в Warcraft Logs")
+                raise LookupError("на этой сложности пока нет киллов в рейтингах Warcraft Logs")
             R = _progress_one(job, client, cands, params, lambda m: log("  " + m), lo, lo + 1 / len(bosses), difficulty=diff)
         except Exception as e:  # noqa: BLE001
             msg = _friendly(e)

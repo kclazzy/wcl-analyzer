@@ -220,6 +220,11 @@ def summary(new: list[dict], old: dict) -> list[str]:
     return lines
 
 
+def _counts(raids: list[dict]) -> list[str]:
+    return [f"{r['name']} / {b['name']}: " + ", ".join(f"{d} {len(v)}" for d, v in b["abilities"].items())
+            for r in raids for b in r["bosses"]]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--dry-run", action="store_true", help="ничего не записывать")
@@ -235,7 +240,12 @@ def main(argv=None) -> int:
         return 0
 
     old = load_old()
-    raids, notes = collect(old, set(a.raid) if a.raid else None)
+    try:
+        raids, notes = collect(old, set(a.raid) if a.raid else None)
+    except SystemExit as e:
+        print(e)
+        _step_summary(["### Ссылки на гайды: файл не обновлён", f"- {e}"])
+        return 2
     problems = check(raids, old)
     for n in notes:
         print("Примечание:", n)
@@ -243,7 +253,7 @@ def main(argv=None) -> int:
         print("\nФайл НЕ обновлён — результат выглядит неправдоподобно (возможно, сайт поменял вёрстку):")
         for p in problems:
             print("  -", p)
-        _step_summary(["### Ссылки на гайды: файл не обновлён", *[f"- {p}" for p in problems]])
+        _step_summary(["### Ссылки на гайды: файл не обновлён", *[f"- {p}" for p in problems]], _counts(raids))
         return 2
 
     merged = merge(raids, old)
@@ -253,10 +263,11 @@ def main(argv=None) -> int:
     print(f"\nРейдов {len(merged)}, боссов {sum(len(r['bosses']) for r in merged)}, записей способностей {total}.")
     if same:
         print("Изменений нет.")
-        _step_summary(["### Ссылки на гайды: изменений нет"])
+        _step_summary(["### Ссылки на гайды: изменений нет"], _counts(raids))
         return 0
     print("Изменения:\n  " + "\n  ".join(changes or ["порядок или названия"]))
-    _step_summary(["### Ссылки на гайды обновлены", *[f"- {c}" for c in changes]])
+    _step_summary(["### Ссылки на гайды: " + ("найдены изменения (проверка)" if a.dry_run else "обновлены"),
+                   *[f"- {c}" for c in changes]], _counts(raids))
     if a.dry_run:
         print("(--dry-run: файл не записан)")
         return 0
@@ -270,11 +281,17 @@ def main(argv=None) -> int:
     return 0
 
 
-def _step_summary(lines: list[str]) -> None:
+def _step_summary(lines: list[str], counts: list[str] | None = None) -> None:
+    """Итог запуска: таблица на странице запуска в Actions и короткое сообщение (annotation) над ней."""
     p = os.environ.get("GITHUB_STEP_SUMMARY")
     if p:
         with open(p, "a", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
+            f.write("\n".join(lines + [""] + [f"- {c}" for c in (counts or [])]) + "\n")
+    if os.environ.get("GITHUB_ACTIONS"):
+        msg = "\n".join(lines[1:] + (counts or []))[:30000] or "—"
+        kind = "error" if "не обновлён" in lines[0] else "notice"
+        title = lines[0].lstrip("# ")
+        print(f"::{kind} title={title}::" + msg.replace("%", "%25").replace("\r", "").replace("\n", "%0A"))
 
 
 if __name__ == "__main__":

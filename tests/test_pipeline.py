@@ -351,6 +351,36 @@ def test_top_progress():
     assert R2["variant"] == "progress_all" and R2["order"] == ["b0", "b1"] and list(R2["parts"]) == ["b0"], R2["order"]
     assert "лимит" in R2["errors"]["b1"] and R2["params"]["mode"] == "progress" and job.get("xlsx")
     assert R2["parts"]["b0"]["info"]["top_progress"]["guild"] == "Echo"
+    # без лога: рейд, сложность и босс выбраны в списке (рейды текущего дополнения из Warcraft Logs)
+    from wcl_analyzer.api import WCLClient
+    zones_raw = {"worldData": {"zones": [
+        {"id": 50, "name": "Старый рейд", "frozen": True, "expansion": {"id": 10}, "difficulties": [{"id": 5}], "encounters": [{"id": 1, "name": "A"}]},
+        {"id": 60, "name": "М+ сезон", "frozen": False, "expansion": {"id": 11}, "difficulties": [{"id": 10}], "encounters": [{"id": 2, "name": "D"}]},
+        {"id": 61, "name": "The Venomous Abyss", "frozen": False, "expansion": {"id": 11},
+         "difficulties": [{"id": 1}, {"id": 3}, {"id": 4}, {"id": 5}], "encounters": [{"id": 3001, "name": "Sszorak"}, {"id": 3002, "name": "Ula'tek"}]},
+        {"id": 59, "name": "Прошлый сезон", "frozen": True, "expansion": {"id": 11}, "difficulties": [{"id": 4}, {"id": 5}], "encounters": [{"id": 9, "name": "X"}]}]}}
+    fake = type("Q", (), {"query": lambda self, q, v=None, **k: zones_raw})()
+    zs = WCLClient.raid_zones(fake)
+    assert [z["name"] for z in zs] == ["The Venomous Abyss", "Прошлый сезон"], zs     # М+ и прошлое дополнение — нет
+    assert [d["id"] for d in zs[0]["difficulties"]] == [3, 4, 5] and len(zs[0]["encounters"]) == 2
+
+    class C3(C):
+        def raid_zones(self):
+            return zs
+    cl3 = C3()
+    web.CLIENT_FACTORY = lambda creds: cl3
+    try:
+        job = {"id": "tpz1", "log": [], "progress": 0.0, "state": "running"}
+        web._run_top_progress(job, {"mode": "progress", "zone": 61, "difficulty": "5", "encounter": "3001"}, None, job["log"].append)
+        one = job["result"]
+        job = {"id": "tpz2", "log": [], "progress": 0.0, "state": "running"}
+        web._run_top_progress(job, {"mode": "progress", "zone": 61, "difficulty": "5", "encounter": "all"}, None, job["log"].append)
+        allz = job["result"]
+    finally:
+        web.CLIENT_FACTORY = orig
+    assert one["info"]["top_progress"]["guild"] == "Echo" and one["mode"] == "raid"
+    assert allz["variant"] == "progress_all" and allz["order"] == ["b0", "b1"] and allz["info"]["boss"] == "The Venomous Abyss"
+    assert allz["titles"] == {"b0": "Sszorak", "b1": "Ula'tek"} and allz["params"]["zone"] == 61
     print("OK топ прогресса: первый килл по рейтингу прогресса, закрытый лог — следующая гильдия, без сравнения; "
           "все боссы — вкладка на босса; заметка MRT по тяжёлым моментам")
 

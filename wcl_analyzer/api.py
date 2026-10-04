@@ -361,6 +361,25 @@ class WCLClient:
         except Exception:  # noqa: BLE001
             return None
 
+    def raid_zones(self, max_age_s: float = 3 * 86400) -> list[dict]:
+        """Рейды текущего дополнения для «Топ прогресса» без лога: [{id, name, frozen, difficulties, encounters}].
+        Подземелья М+ (сложность 10) и прочее без рейдовых сложностей отбрасываются; новые — первыми."""
+        q = """query { worldData { zones { id name frozen expansion { id name }
+                 difficulties { id name } encounters { id name } } } }"""
+        zones = (self.query(q, {}, max_age_s=max_age_s).get("worldData") or {}).get("zones") or []
+        raids = [z for z in zones if z.get("encounters")
+                 and {d.get("id") for d in z.get("difficulties") or []} & {3, 4, 5}
+                 and 10 not in {d.get("id") for d in z.get("difficulties") or []}]
+        if not raids:
+            return []
+        last = max(int((z.get("expansion") or {}).get("id") or 0) for z in raids)
+        cur = [z for z in raids if int((z.get("expansion") or {}).get("id") or 0) == last]
+        cur.sort(key=lambda z: (bool(z.get("frozen")), -int(z["id"])))
+        return [{"id": z["id"], "name": z["name"], "frozen": bool(z.get("frozen")),
+                 "expansion": (z.get("expansion") or {}).get("name"),
+                 "difficulties": [d for d in z.get("difficulties") or [] if d.get("id") in (3, 4, 5)],
+                 "encounters": [{"id": e["id"], "name": e["name"]} for e in z.get("encounters") or []]} for z in cur]
+
     def fight_rankings(self, encounter_id: int, difficulty: int, metric: str = "speed",
                        page: int = 1, max_age_s: float = 3 * 86400) -> list[dict]:
         """Лучшие киллы босса (рейтинг гильдий): [{report: {code, fightID}, guild, duration, …}]."""

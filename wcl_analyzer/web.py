@@ -712,13 +712,43 @@ def _run_top_progress(job: dict, params: dict, creds, log) -> None:
         log("Готово.")
         return
     client = _client(creds, job, log, wait=bool(params.get("wait")))
+    if params.get("zone"):  # без лога: рейд, сложность и босс выбраны в списке
+        zone = next((z for z in client.raid_zones() if str(z["id"]) == str(params["zone"])), None)
+        if not zone:
+            raise LookupError("Рейд не найден в Warcraft Logs — обновите страницу и выберите снова")
+        diff = int(params.get("difficulty") or 5)
+        encs = zone["encounters"] if params.get("encounter") in (None, "", "all") else \
+            [e for e in zone["encounters"] if str(e["id"]) == str(params["encounter"])]
+        if not encs:
+            raise LookupError("Босс не найден в этом рейде")
+        bosses = [(int(e["id"]), diff, e["name"]) for e in encs]
+        if len(bosses) > 1:
+            return _run_top_progress_all(job, params, client, bosses, zone["name"], log)
+        enc, _, name = bosses[0]
+        log(f"{name} ({DIFFICULTY_NAMES.get(diff, '')}): ищу первый килл в мире (рейтинг WCL по прогрессу)…")
+        cands = _progress_cands(client, enc, diff)
+        if not cands:
+            raise LookupError(f"{name}: на этой сложности пока нет киллов в рейтинге прогресса Warcraft Logs")
+        job["progress"] = 0.1
+        R = _progress_one(job, client, cands, params, log, 0.1, 0.95)
+        _excel_bytes(job, f"Топ_прогресса_{R['info']['boss']}_{R['info']['top_progress']['guild']}", write_raid_workbook, R)
+        job["result"] = {**R, "excel": f"/api/report/{job['id']}"}
+        log("Готово.")
+        return
     code, url_fight, _ = parse_report_url(params["url"])
     report = client.report(code)
     fights = [f for f in report.get("fights") or [] if int(f.get("encounterID") or 0)]
     if not fights:
         raise LookupError("В отчёте нет боёв с боссами — не понятно, чей топ прогресса искать")
     if params.get("fight") == "all":
-        return _run_top_progress_all(job, params, client, fights, log)
+        seen, bosses = set(), []
+        for f in sorted(fights, key=lambda x: float(x.get("startTime") or 0)):
+            k = (int(f["encounterID"]), int(f.get("difficulty") or 0))
+            if k not in seen:
+                seen.add(k)
+                bosses.append((k[0], k[1], f.get("name", "")))
+        title = (report.get("zone") or {}).get("name") or report.get("title") or "Все боссы"
+        return _run_top_progress_all(job, params, client, bosses, title, log)
     fid = params.get("fight") if params.get("fight") not in (None, "") else url_fight
     f = next((f for f in fights if str(f["id"]) == str(fid)), None) or fights[-1]
     enc, diff = int(f["encounterID"]), int(f.get("difficulty") or 0)
@@ -733,23 +763,17 @@ def _run_top_progress(job: dict, params: dict, creds, log) -> None:
     log("Готово.")
 
 
-def _run_top_progress_all(job: dict, params: dict, client, fights: list[dict], log) -> None:
+def _run_top_progress_all(job: dict, params: dict, client, bosses: list[tuple], report_title: str, log) -> None:
     """Топ прогресса на каждого босса отчёта (по сложностям из отчёта): вкладка на босса, готовые боссы
     видны сразу, пока считаются следующие. Кончился лимит WCL — остальные боссы с «Продолжить»
     (уже разобранное лимит повторно не тратит). Excel — один, листы подписаны именем босса."""
     from .config import DIFFICULTY_NAMES
     from .excel_raid import write_raid_workbook
-    seen, bosses = set(), []
-    for f in sorted(fights, key=lambda x: float(x.get("startTime") or 0)):
-        k = (int(f["encounterID"]), int(f.get("difficulty") or 0))
-        if k not in seen:
-            seen.add(k)
-            bosses.append((k[0], k[1], f.get("name", "")))
     multi = len({b[1] for b in bosses}) > 1
     order = [f"b{i}" for i in range(len(bosses))]
     titles = {f"b{i}": name + (f" ({DIFFICULTY_NAMES.get(d, '')[:4]}.)" if multi else "") for i, (_, d, name) in enumerate(bosses)}
     parts, errors, writers = {}, {}, []
-    log(f"Боссов в отчёте: {len(bosses)}. На каждого — бой гильдии с первым киллом в мире.")
+    log(f"Боссов: {len(bosses)}. На каждого — бой гильдии с первым киллом в мире.")
 
     def combined(pending=None):
         return {"mode": "fight", "variant": "progress_all", "all_bosses": True,
@@ -757,8 +781,8 @@ def _run_top_progress_all(job: dict, params: dict, client, fights: list[dict], l
                 "order": order, "errors": dict(errors), "pending": pending, "titles": titles,
                 "kinds": {k: "raid" for k in order}, "queued": [k for k in order if k not in parts and k not in errors and k != pending],
                 "excel": f"/api/report/{job['id']}",
-                "params": {"mode": "progress", "url": params.get("url"), "fight": "all"}}
-    report_title = (client.report(_report_code(params["url"])).get("zone") or {}).get("name") or "Все боссы"
+                "params": {"mode": "progress", "url": params.get("url"), "fight": "all", "zone": params.get("zone"),
+                           "encounter": params.get("encounter"), "difficulty": params.get("difficulty")}}
     for i, (enc, diff, name) in enumerate(bosses):
         key, lo = order[i], i / len(bosses)
         job["partial"], job["partial_v"] = combined(pending=key), job.get("partial_v", 0) + 1
@@ -1160,6 +1184,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/key":
                 CHECK_KEY(str(body.get("client_id", "")).strip(), str(body.get("client_secret", "")).strip())
                 return self._json({"ok": True})
+            if path == "/api/zones":  # рейды текущего дополнения — для «Топ прогресса» без лога
+                cl = CLIENT_FACTORY(creds)
+                cl.max_wait_s = 0
+                return self._json({"zones": cl.raid_zones()})
             if path == "/api/inspect":
                 from .collect import inspect_report
                 cl = CLIENT_FACTORY(creds)
@@ -1167,6 +1195,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "units", "prev", "wait",
+                                                   "zone", "encounter", "difficulty",
                                                    "refresh", "max_age_days", "pick", "mythic")}
                 if params["mode"] not in (None, "fight", "progress", "raid", "raidrot", "saves", "allbosses"):
                     params["mode"] = None

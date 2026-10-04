@@ -70,8 +70,11 @@ def _j(key: str):
     return _J[key]
 
 
-def android_save_download(name: str, data: bytes, mime: str) -> str:
-    """Сохраняет файл в общую папку «Загрузки» телефона. Возвращает, где искать файл."""
+def android_save_download(name: str, data: bytes, mime: str, sub: str = "") -> str:
+    """Сохраняет файл в общую папку «Загрузки» телефона (подпапка sub, по умолчанию «WCL Analyzer»).
+    Возвращает, где искать файл."""
+    import re
+    sub = re.sub(r'[\\:*?"<>|]+', "_", sub or "").strip(" /") or "WCL Analyzer"
     Build = _j("Build")
     activity = _j("activity")
     if Build.SDK_INT >= 29:
@@ -80,7 +83,7 @@ def android_save_download(name: str, data: bytes, mime: str) -> str:
         values = ContentValues()
         values.put("_display_name", name)
         values.put("mime_type", mime)
-        values.put("relative_path", "Download/WCL Analyzer")
+        values.put("relative_path", f"Download/{sub}")
         resolver = activity.getContentResolver()
         uri = resolver.insert(MediaStore.EXTERNAL_CONTENT_URI, values)
         if uri is None:
@@ -90,7 +93,7 @@ def android_save_download(name: str, data: bytes, mime: str) -> str:
             stream.write(bytearray(data))
         finally:
             stream.close()
-        return f"Загрузки/WCL Analyzer/{name}"
+        return f"Загрузки/{sub}/{name}"
     # Android 7–9: личная папка приложения на общем хранилище — разрешения не нужны
     Environment = _j("Environment")
     folder = Path(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath())

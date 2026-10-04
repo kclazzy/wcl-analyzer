@@ -372,6 +372,23 @@ dialog label.check input{width:auto;margin:0}
     <div id="histList"></div>
   </section>
 
+  <section class="refs" id="savedir" aria-labelledby="saveTitle">
+    <div class="refs-head">
+      <div>
+        <h2 id="saveTitle">Куда сохранять файлы</h2>
+        <p class="sub" id="saveHint">Excel и копии данных сохраняются в выбранную папку. Если папка не выбрана — как обычно, в «Загрузки».</p>
+      </div>
+    </div>
+    <div class="refs-opts" style="border-top:0;margin-top:0;padding-top:0;align-items:center">
+      <span>Сейчас: <b id="saveNow">«Загрузки» (по умолчанию)</b></span>
+      <button class="btn alt" id="savePick" type="button">Выбрать папку…</button>
+      <label id="saveTextWrap" hidden style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span id="saveTextLabel">Папка</span>
+        <input id="saveText" type="text" style="min-width:260px;border:1px solid var(--line);border-radius:6px;padding:6px 8px" placeholder="C:\Users\Имя\Documents\WCL">
+        <button class="btn alt" id="saveTextOk" type="button">Сохранить</button></label>
+      <button class="mini" id="saveReset" type="button">Сбросить</button>
+    </div>
+  </section>
+
   <section class="refs" id="mydata" aria-labelledby="dataTitle">
     <div class="refs-head">
       <div>
@@ -520,6 +537,7 @@ async function refreshKey(){
   $("#keyForget").hidden = !KEY;
   const p = $("#keyPill"); p.classList.toggle("ok", has_key);
   p.querySelector("span").innerHTML = has_key ? 'Ключ API<span class="long"> подключён</span><span class="short"> ✓</span>' : "Подключить ключ API";
+  renderSaveDir().catch(()=>{});
   refreshLimit();
   return has_key;
 }
@@ -885,6 +903,14 @@ function render(R){
 }
 
 
+/* «Способность» в тексте → ссылка на гайд Mythic Trap, если он есть в программе (data/guides.json) */
+function guideText(text, links){
+  if (!links) return esc(text);
+  return String(text).split(/(«[^»]+»)/).map(part => {
+    const m = part.match(/^«([^»]+)»$/), url = m && links[m[1]];
+    return url ? `«<a href="${esc(url)}" target="_blank" rel="noopener" title="Гайд Mythic Trap по этой способности">${esc(m[1])}</a>»` : esc(part);
+  }).join("");
+}
 function btT(t){ if (t==null) return "—"; t=Math.max(0,t); const m=Math.floor(t/60), s=Math.floor(t-m*60); return m+":"+(s<10?"0":"")+s; }  // м:сс без долей
 const KIND_CLS = {"Тринкет":"k-trinket","Зелье":"k-potion","Расовая":"k-racial"};
 const kindTag = k => k ? `<span class="tag ${KIND_CLS[k]||"k-spell"}">${esc(k)}</span>` : "";
@@ -1332,7 +1358,7 @@ function renderRaid(R){
       ${(R.brief||[]).length ? `<ul class="lines">${R.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : '<p class="empty">Явных проблем не найдено.</p>'}
       ${(R.extras||{}).damage_timeline ? `<p class="hint" style="margin:12px 0 0">График урона по рейду, план сейвов на следующий пулл и сравнение с лучшими киллами — во вкладке «Полученный урон и сейвы».</p>` : ""}
       ${topIssues(R.issues).length ? `<h3 style="margin-top:16px">Кому что поправить</h3>` + topIssues(R.issues).map(i=>`<div class="issue"><div class="who"><b>${esc(i.player)}</b><span>${esc(i.role)}, ${esc(who(i.cls, i.spec))}</span></div>
-          <div>${esc(i.text)}</div><span class="sev s${i.severity}">${i.kind?esc(i.kind):""}</span></div>`).join("") : ""}
+          <div>${guideText(i.text, R.guide_links)}</div><span class="sev s${i.severity}">${i.kind?esc(i.kind):""}</span></div>`).join("") : ""}
     </div>
     <details class="more" id="more"><summary>Подробности: полученный урон и сейвы, игроки, механики, смерти, пуллы</summary>
     <div class="legend raidleg"><span><i class="role tank"></i>Танк</span><span><i class="role healer"></i>Лекарь</span><span><i class="role dps"></i>DPS</span></div>
@@ -1517,11 +1543,76 @@ document.addEventListener("click", ev => {
     api("/api/open", {url: href}).catch(e => showErr(e.message));
   }
 });
+/* ---------- папка сохранения ----------
+   Chrome/Edge на компьютере: папка выбирается системным окном (доступ даёт сам браузер, ссылка на папку
+   хранится в этом браузере). Android: подпапка в «Загрузках». Другие браузеры с программой на этом же
+   компьютере: путь к папке — файл пишет программа. Иначе — обычное скачивание в «Загрузки». */
+function kvdb(){
+  return new Promise((resolve, reject) => { try {
+    const req = indexedDB.open("wcl-analyzer-fs", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("kv");
+    req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+  } catch(e){ reject(e); } });
+}
+async function kv(mode, fn){
+  try { const db = await kvdb(); return await new Promise((resolve, reject) => {
+    const tx = db.transaction("kv", mode), st = tx.objectStore("kv"), req = fn(st);
+    tx.oncomplete = () => resolve(req && req.result); tx.onerror = () => reject(tx.error); });
+  } catch(e){ return undefined; }
+}
+const canPickDir = () => typeof window.showDirectoryPicker === "function" && STATUS.app !== "android";
+const textSaveMode = () => STATUS.app === "android" ? "android" : (!canPickDir() && STATUS.local && !STATUS.public ? "path" : null);
+async function renderSaveDir(){
+  const handle = canPickDir() ? await kv("readonly", st => st.get("saveDir")) : null;
+  const P = prefs(), mode = textSaveMode();
+  $("#savePick").hidden = !canPickDir();
+  $("#saveTextWrap").hidden = !mode;
+  if (mode === "android") { $("#saveTextLabel").textContent = "Папка в «Загрузках»"; $("#saveText").placeholder = "WCL Analyzer"; $("#saveText").value = P.save_sub || ""; }
+  if (mode === "path") { $("#saveTextLabel").textContent = "Путь к папке"; $("#saveText").value = P.save_path || ""; }
+  $("#saveNow").textContent = handle ? `папка «${handle.name}»`
+    : mode === "android" ? `Загрузки/${P.save_sub || "WCL Analyzer"}`
+    : mode === "path" && P.save_path ? P.save_path : "«Загрузки» (по умолчанию)";
+  if (!canPickDir() && !mode) $("#saveHint").textContent = "Этот браузер не умеет выбирать папку — файлы сохраняются в его папку загрузок (её можно поменять в настройках браузера).";
+  $("#saveReset").hidden = !(handle || P.save_sub || P.save_path);
+}
+$("#savePick").onclick = async () => {
+  try {
+    const h = await window.showDirectoryPicker({id: "wcl-save", mode: "readwrite"});
+    await kv("readwrite", st => st.put(h, "saveDir"));
+    showOk(`Файлы будут сохраняться в папку «${h.name}».`); renderSaveDir();
+  } catch(e){ if (e.name !== "AbortError") showErr("Не удалось выбрать папку: " + e.message); }
+};
+$("#saveTextOk").onclick = () => {
+  const v = $("#saveText").value.trim();
+  store.set("wclPrefs", {...prefs(), ...(textSaveMode() === "android" ? {save_sub: v.replace(/[\\:*?"<>|]+/g, "_")} : {save_path: v})});
+  showOk(v ? "Папка сохранена." : "Папка сброшена — файлы пойдут в «Загрузки»."); renderSaveDir();
+};
+$("#saveReset").onclick = async () => {
+  await kv("readwrite", st => st.delete("saveDir"));
+  const P = {...prefs()}; delete P.save_sub; delete P.save_path; store.set("wclPrefs", P);
+  showOk("Файлы снова сохраняются в «Загрузки»."); renderSaveDir();
+};
+async function saveToDir(handle, blob, name){
+  let perm = await handle.queryPermission({mode: "readwrite"});
+  if (perm !== "granted") perm = await handle.requestPermission({mode: "readwrite"});  // браузер спросит один раз за сеанс
+  if (perm !== "granted") throw new Error("браузер не дал доступ к папке");
+  const fh = await handle.getFileHandle(name, {create: true});
+  const w = await fh.createWritable(); await w.write(blob); await w.close();
+}
 async function saveBlob(blob, name){
-  if (STATUS.app === "android") {
+  if (canPickDir()) {
+    const h = await kv("readonly", st => st.get("saveDir"));
+    if (h) {
+      try { await saveToDir(h, blob, name); showOk(`Файл сохранён в папку «${h.name}»: ${name}`); window.scrollTo({top:0, behavior:"smooth"}); return; }
+      catch(e){ showErr(`Не удалось сохранить в папку «${h.name}» (${e.message}) — скачиваю как обычно.`); }
+    }
+  }
+  const mode = textSaveMode(), P = prefs();
+  if (mode === "android" || (mode === "path" && P.save_path)) {
     try {
       const data = await blobToB64(blob);
-      const r = await api("/api/save", {name, data, mime: blob.type || "application/octet-stream"});
+      const r = await api("/api/save", {name, data, mime: blob.type || "application/octet-stream",
+                                        dir: mode === "android" ? (P.save_sub || "") : P.save_path});
       showOk(`Файл сохранён: ${r.saved}`); window.scrollTo({top:0, behavior:"smooth"});
     } catch(e){ showErr("Не удалось сохранить файл: " + e.message); }
     return;
@@ -1577,6 +1668,7 @@ $("#autoRefresh").onchange = () => { store.set("wclPrefs", {...prefs(), auto_ref
 
 /* ---------- история разборов ---------- */
 async function renderHistory(){
+  renderSaveDir().catch(()=>{});
   const items = await hist.all();
   $("#history").hidden = !items.length;
   $("#histList").innerHTML = items.map(it => `<div class="ref">

@@ -290,6 +290,17 @@ def test_cache_reuse_between_modes():
     print("OK кэш между режимами: после «всех боссов» ротация и разбор игрока докачивают только события урона")
 
 
+def test_guides():
+    """Гайды Mythic Trap лежат в программе: способность → страница босса своей сложности; без совпадения — None."""
+    from wcl_analyzer import guides
+    assert guides.link(1284034, None, 5).endswith("/nekzali-the-soulcoiler/mythic")
+    assert guides.link(None, "Uncoiled Rage", 4).endswith("/nekzali-the-soulcoiler/heroic")
+    assert guides.link(1293212, None, 4).endswith("/mythic")      # только на эпохальной — ведём туда
+    assert guides.link(None, "Ледяная волна", 5) is None and guides.link(42, "Fireball", 5) is None
+    assert len(guides._data()["bosses"]) == 9
+    print("OK гайды Mythic Trap: 9 боссов, ссылка по id или английскому названию, без совпадения — текст")
+
+
 def test_saves_all_bosses():
     from wcl_analyzer.excel_raid import write_saves_workbook
     from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
@@ -314,6 +325,7 @@ def test_saves_all_bosses():
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
+    test_guides()
     test_cache_reuse_between_modes()
     test_player_all_bosses()
     test_plan_long_fight()

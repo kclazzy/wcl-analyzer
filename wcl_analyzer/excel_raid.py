@@ -57,7 +57,19 @@ def _brief(wb, R, demo):
     top = [i for i in R["issues"] if i["severity"] >= 4 and not (i["player"] in seen or seen.add(i["player"]))][:5]
     if top:
         s.section("Кому что поправить")
-        s.table(["", "Игрок", "Что"], [[k + 1, f"{i['player']} ({spec_ru(i.get('cls', ''), i['spec'])})", i["text"]] for k, i in enumerate(top)])
+        import re as _re
+        gl = R.get("guide_links") or {}
+
+        def guide(t):  # первая способность из текста, у которой есть гайд Mythic Trap
+            return next((gl[n] for n in _re.findall(r"«([^»]+)»", t) if n in gl), "")
+        f, _l = s.table(["", "Игрок", "Что", "Гайд по способности"],
+                        [[k + 1, f"{i['player']} ({spec_ru(i.get('cls', ''), i['spec'])})", i["text"], guide(i["text"])]
+                         for k, i in enumerate(top)])
+        for k, i in enumerate(top):  # кликабельная ссылка в ячейке
+            url = guide(i["text"])
+            if url:
+                c = s.ws.cell(f + k, 4)
+                c.hyperlink, c.value, c.style = url, "Mythic Trap", "Hyperlink"
     X = R.get("extras") or {}
     if X.get("heaviest"):
         s.section("Самые тяжёлые моменты", "Подробно и с графиком — на листе «Урон по рейду».")

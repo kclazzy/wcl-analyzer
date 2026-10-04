@@ -165,6 +165,11 @@ def _run_job(job: dict, params: dict, creds) -> None:
         JOB_SLOTS.release()
 
 
+def app_mode_is_desktop() -> bool:
+    from .platform_support import app_mode
+    return app_mode() in ("exe", "python")
+
+
 def _client(creds, job: dict, log, wait: bool = False):
     """Клиент WCL для задачи. Кончился часовой лимит API — разбор останавливается с понятной ошибкой
     (уже скачанное остаётся в кэше). wait=True — ждать сброса лимита (галочка «Разобрать всех боссов»)."""
@@ -899,6 +904,16 @@ class Handler(BaseHTTPRequestHandler):
                     if job and job["state"] != "running":
                         JOBS.pop(job["id"], None)
                 return self._json({"ok": True})
+            if path == "/api/save" and app_mode_is_desktop() and not SERVER["public"] and self._is_local():
+                # Программа на этом же компьютере: файл пишется в папку, выбранную в «Куда сохранять файлы»
+                import base64
+                name = re.sub(r'[\\/:*?"<>|]+', "_", str(body.get("name") or "file"))[:120]
+                folder = Path(str(body.get("dir") or "")).expanduser()
+                if not str(body.get("dir") or "").strip() or not folder.is_absolute():
+                    raise ValueError("Укажите полный путь к папке, например C:\\Users\\Имя\\Documents\\WCL")
+                folder.mkdir(parents=True, exist_ok=True)
+                (folder / name).write_bytes(base64.b64decode(body.get("data") or ""))
+                return self._json({"saved": str(folder / name)})
             if path in ("/api/save", "/api/open"):
                 # Только Android-приложение: встроенное окно не умеет скачивать файлы и открывать ссылки
                 from .platform_support import android_open_url, android_save_download, app_mode
@@ -913,7 +928,8 @@ class Handler(BaseHTTPRequestHandler):
                 import base64
                 name = re.sub(r'[\\/:*?"<>|]+', "_", str(body.get("name") or "file"))[:120]
                 where = android_save_download(name, base64.b64decode(body.get("data") or ""),
-                                              str(body.get("mime") or "application/octet-stream"))
+                                              str(body.get("mime") or "application/octet-stream"),
+                                              sub=str(body.get("dir") or ""))
                 return self._json({"saved": where})
             if path in ("/api/update/check", "/api/update/apply"):
                 # Обновление программы — только на самом устройстве с программой, не на публичном сервере

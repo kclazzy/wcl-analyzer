@@ -454,10 +454,9 @@ def _vs_top(wb, R, demo):
         s.ws.column_dimensions["C"].width = 70
         if V["plan"]:
             s.ws.conditional_formatting.add(f"C{f}:C{l}", CellIsRule(operator="equal", formula=['"нет свободного кулдауна"'], fill=RED))
-        from .raid_top import mrt_heal_note, mrt_note
+        from .raid_top import mrt_note
         boss = (R.get("info") or {}).get("boss", "")
-        for title, note in (("Заметка для MRT — рейдовые сейвы", mrt_note(V["plan"], boss)),
-                            ("Заметка для MRT — кулдауны лекарей", mrt_heal_note(V["plan"], boss))):
+        for title, note in (("Заметка для MRT — сейвы рейда и кулдауны лекарей", mrt_note(V["plan"], boss)),):
             if note:
                 s.section(title, "Скопируйте строки ниже целиком: в игре /mrt → Заметки → вставить → Отправить.")
                 for line in note.split("\n"):
@@ -516,7 +515,7 @@ def write_saves_workbook(R: dict, path: str | Path, wb=None) -> Path:
             [[b["boss"], b["difficulty"], ("килл " if b["kill"] else "вайп ") + b["duration"], len(b["plan"]),
               "есть" if b["mrt"] else "нет назначенных кулдаунов"] for b in R["bosses"]], [None, None, None, F_INT, None])
     for b in R["bosses"]:
-        for label, note in (("MRT", b.get("mrt")), ("MRT, кулдауны лекарей", b.get("mrt_heal"))):
+        for label, note in (("MRT", b.get("mrt")),):
             if not note:
                 continue
             s.section(f"{label}: {b['boss']} ({b['difficulty']})")
@@ -541,8 +540,7 @@ def write_saves_workbook(R: dict, path: str | Path, wb=None) -> Path:
         t.table(["Нажать в", "Пик", "Кулдауны и кто", "У топа здесь"],
                 [[r["time"] + (f" ({r['phase_name']} +{r['phase_time']})" if (r.get("phase") or 0) > 1 and r.get("phase_time") else ""),
                   r["mechanic"], _plan_text(r), r.get("top") or "—"] for r in b["plan"]])
-        for title, note in (("Заметка для MRT — рейдовые сейвы", b.get("mrt")),
-                            ("Заметка для MRT — кулдауны лекарей", b.get("mrt_heal"))):
+        for title, note in (("Заметка для MRT — сейвы рейда и кулдауны лекарей", b.get("mrt")),):
             if note:
                 t.section(title, "В игре: /mrt → Заметки → вставить → Отправить.")
                 for line in note.split("\n"):

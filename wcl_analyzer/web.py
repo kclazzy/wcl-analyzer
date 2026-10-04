@@ -300,14 +300,15 @@ def _run_fight(job: dict, params: dict, creds, log) -> None:
     writers: list = []
     first = ("saves" if allb else "raid")
     second = None if ref == "none" else ("pall" if allb else ("rot" if actor in (None, "", "all") or demo else "player"))
-    order = [first] + ([second] if second else [])
+    order = ([] if allb else [first]) + ([second] if second else [])
     titles: dict = dict(FIGHT_PARTS)
+    info_box: dict = {}   # все боссы: шапка результата — отчёт целиком (вкладки — боссы)
     kinds: dict = {}
     queued: list = []
 
     def combined(pending=None) -> dict:
         base = parts.get(first) or {}
-        return {"mode": "fight", "all_bosses": allb, "info": base.get("info") or {}, "parts": dict(parts),
+        return {"mode": "fight", "all_bosses": allb, "info": info_box or base.get("info") or {}, "parts": dict(parts),
                 "order": list(order), "errors": dict(errors), "pending": pending, "titles": dict(titles),
                 "kinds": dict(kinds), "queued": [k for k in queued if k not in parts and k not in errors and k != pending],
                 "focus": actor, "ref": ref, "excel": f"/api/report/{job['id']}", "source_url": params.get("url"),
@@ -346,7 +347,7 @@ def _run_fight(job: dict, params: dict, creds, log) -> None:
 
     if allb:
         _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titles, kinds, queued, second,
-                        publish, 0.0, 0.6 if second else 0.95)
+                        publish, info_box, 0.0, 0.6 if second else 0.95)
     else:
         run_part("raid", _run_raid, {**params, "mode": "raid"}, 0.0, 0.3 if second else 0.95)
     if second:
@@ -384,16 +385,16 @@ def _run_fight(job: dict, params: dict, creds, log) -> None:
 
 
 def _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titles, kinds, queued, second,
-                    publish, lo, hi) -> None:
+                    publish, info_box, lo, hi) -> None:
     """«Все боссы отчёта»: на каждого босса — полный разбор боя, как у одиночного лога (главное по бою,
     кому что поправить, урон, сейвы, смерти, механики, план с двумя заметками MRT), вкладка на босса.
-    Первая вкладка — сводка «Сейвы по боссам» (план и заметки всех боссов в одном месте). Готовые боссы
+    Готовые боссы
     видны сразу; кончился лимит WCL — остальные боссы с «Продолжить» (скачанное повторно лимит не тратит)."""
     from .config import DIFFICULTY_NAMES, SITE_URL
-    from .excel_raid import write_raid_workbook, write_saves_workbook
+    from .excel_raid import write_raid_workbook
     from .logs import parse_report_url
     from .raid import run_raid
-    from .raid_saves import boss_entry, pick_fights
+    from .raid_saves import pick_fights
 
     avoidable = set(_avoidable_list())
     if params.get("demo"):
@@ -414,19 +415,13 @@ def _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titl
         f = c["fight"]
         titles[k] = f.get("name", "") + (f" ({DIFFICULTY_NAMES.get(int(f.get('difficulty') or 0), '')[:4]}.)" if multi else "")
         kinds[k] = "raid"
-    order[1:1] = keys   # «Сейвы по боссам», вкладки боссов, затем ротация
+    order[0:0] = keys   # вкладки боссов, затем ротация
     queued[:] = keys + ([second] if second else [])
     zone = (report.get("zone") or {}).get("name", "")
-    bosses, skipped = [], []
-
-    def saves_part() -> dict:
-        return {"mode": "saves",
-                "info": {"code": code, "title": report.get("title", ""), "zone": zone, "url": f"{SITE_URL}/reports/{code}",
-                         "bosses": len(bosses), "boss": zone or report.get("title", ""),
-                         "difficulty": ", ".join(dict.fromkeys(b["difficulty"] for b in bosses)),
-                         "demo": code.startswith("DEMO")},
-                "bosses": list(bosses), "skipped": list(skipped), "excel": f"/api/report/{job['id']}", "source_url": url}
-
+    info_box.update({"code": code, "title": report.get("title", ""), "zone": zone, "url": f"{SITE_URL}/reports/{code}",
+                     "boss": zone or report.get("title", ""), "bosses": len(chosen),
+                     "difficulty": ", ".join(dict.fromkeys(DIFFICULTY_NAMES.get(int(c["fight"].get("difficulty") or 0), "")
+                                                           for c in chosen)), "demo": code.startswith("DEMO")})
     log(f"Боссов в отчёте: {len(chosen)}. На каждого — полный разбор боя (последний килл, без киллов — лучший пулл).")
     n = len(chosen)
     for i, (k, c) in enumerate(zip(keys, chosen)):
@@ -446,25 +441,17 @@ def _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titl
         except Exception as e:  # noqa: BLE001 — один босс не должен ронять остальные
             msg = _friendly(e)
             if "лимит" in msg.lower():
-                for k2, c2 in zip(keys[i:], chosen[i:]):
+                for k2 in keys[i:]:
                     errors[k2] = "Не хватило часового лимита WCL — нажмите «Продолжить» после сброса."
-                    skipped.append({"boss": c2["fight"].get("name", ""),
-                                    "difficulty": DIFFICULTY_NAMES.get(int(c2["fight"].get("difficulty") or 0), ""),
-                                    "reason": "не хватило лимита WCL — «Продолжить» после сброса"})
                 log("Закончился часовой лимит WCL — остальные боссы после сброса.")
                 break
             errors[k] = msg
-            skipped.append({"boss": f.get("name", ""), "difficulty": diff, "reason": msg})
             log(f"    пропущен: {msg}")
             continue
         parts[k] = {**R, "excel": f"/api/report/{job['id']}", "source_url": url}
-        writers.append((titles[k], write_raid_workbook, R, k))
-        bosses.append(boss_entry(R, c))
-        parts["saves"] = saves_part()
-    if not bosses:
+        writers.append((f"Все_боссы_{zone or code}", write_raid_workbook, R, k))
+    if not any(k in parts for k in keys):
         raise LookupError("Ни один бой не удалось разобрать: " + "; ".join(dict.fromkeys(errors.values())))
-    parts["saves"] = saves_part()
-    writers.insert(0, (f"Все_боссы_{zone or code}", write_saves_workbook, parts["saves"], "saves"))
 
 
 def _new_wb():

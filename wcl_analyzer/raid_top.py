@@ -497,18 +497,34 @@ def mrt_line(t: float, mechanic: str, picks: list[dict], phase: int | None = Non
     return f"{{time:{tm}}}{mech} - " + "  ".join(who)
 
 
+def merge_mrt_lines(items) -> list[str]:
+    """[(время, строка MRT)] → строки по времени; строки с одним таймером и одной механикой (сейвы рейда и
+    кулдауны лекарей на один пик) сливаются в одну: «{time:0:32}{spell:…} - Гридд {spell:…}  Элария {spell:…}»."""
+    out: dict = {}   # строка → {игрок: [иконки]}: один игрок с сейвом и кулдауном лекаря — имя один раз
+    for t, line in sorted((x for x in items if x[1]), key=lambda x: x[0]):
+        head, _, who = line.partition(" - ")
+        by = out.setdefault(head, {})
+        for part in filter(None, who.split("  ")):
+            name, _, marks = part.partition(" ")
+            lst = by.setdefault(name, [])
+            lst += [m for m in marks.split(" ") if m and m not in lst]
+    return [f"{h} - " + "  ".join(f"{n} " + " ".join(m) for n, m in by.items()) for h, by in out.items()]
+
+
 def mrt_note(plan: list[dict], title: str = "") -> str:
-    """Весь план сейвов одной заметкой для MRT (вставить в Заметки → Общая заметка). Только пики вашего боя
-    по их фактическому времени: пики, до которых бой не дошёл (время у них — от лучших киллов), не входят."""
-    lines = [r.get("mrt") for r in plan if r.get("mrt") and not r.get("after_end")]
+    """Весь план одной заметкой для MRT (вставить в Заметки → Общая заметка): рейдовые сейвы и кулдауны
+    лекарей по времени; на один пик в одно время — одной строкой. Только пики вашего боя по их фактическому
+    времени: пики, до которых бой не дошёл (время у них — от лучших киллов), не входят."""
+    rows = [r for r in plan if not r.get("after_end")]
+    lines = merge_mrt_lines([(r["t"], r.get("mrt")) for r in rows]
+                            + [(r.get("heal_t", r["t"]), r.get("mrt_heal")) for r in rows])
     if not lines:
         return ""
-    head = [f"Сейвы: {title}" if title else "Сейвы"]
-    return "\n".join(head + lines)
+    return "\n".join([f"Сейвы: {title}" if title else "Сейвы"] + lines)
 
 
 def mrt_heal_note(plan: list[dict], title: str = "") -> str:
-    """Кулдауны лекарей из плана — отдельной заметкой MRT, по времени своих нажатий."""
+    """Только кулдауны лекарей из плана (для разборов старых версий; общая заметка — mrt_note)."""
     rows = sorted((r for r in plan if r.get("mrt_heal") and not r.get("after_end")), key=lambda r: r.get("heal_t", r["t"]))
     if not rows:
         return ""

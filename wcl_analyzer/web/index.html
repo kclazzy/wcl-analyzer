@@ -363,7 +363,7 @@ dialog label.check input{width:auto;margin:0}
             <input id="pickMax" type="number" min="1" max="99" step="1" value="50" list="pickPresets" disabled></label>
           <datalist id="pickPresets"><option value="25"><option value="50"><option value="75"><option value="90"></datalist>
         </div></div>
-      <p class="hint" id="allHint" hidden style="grid-column:1/-1;margin:0;font-size:14px">Выбраны <b>все боссы отчёта</b> — по одному бою на босса (последний килл, без киллов — лучший пулл): на каждого босса — свой полный разбор боя, как у одного лога (главное по бою, кому что поправить, урон, сейвы, смерти, план и заметки MRT с кулдаунами лекарей), плюс сводка «Сейвы по боссам» и ротация по боссам против топ-1, чтобы хватило лимита WCL.</p>
+      <p class="hint" id="allHint" hidden style="grid-column:1/-1;margin:0;font-size:14px">Выбраны <b>все боссы отчёта</b> — по одному бою на босса (последний килл, без киллов — лучший пулл): на каждого босса — свой полный разбор боя, как у одного лога (главное по бою, кому что поправить, урон, сейвы, смерти, план и заметка MRT с сейвами и кулдаунами лекарей), затем ротация по боссам против топ-1, чтобы хватило лимита WCL.</p>
       <div class="runrow">
         <button class="btn you" id="runBtn" type="button" title="Одна кнопка — весь разбор: сначала урон, сейвы и смерти (готово через несколько секунд), затем ротация — всех DPS или выбранного игрока. Вкладки результата переключаются без новой загрузки, Excel — один на всё">Разобрать бой</button>
         <button class="btn" id="progBtn" type="button" title="Бой гильдии, которая первой в мире убила этого босса на этой сложности (рейтинг прогресса Warcraft Logs): урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения — просто посмотреть, как это сделали лучшие. С «Все боссы отчёта» — на каждого босса отчёта, вкладка на босса">Топ прогресса</button>
@@ -657,7 +657,7 @@ $("#findForm").onsubmit = ev => { ev.preventDefault(); inspect(); };
 $("#url").addEventListener("paste", () => setTimeout(() => inspect(), 50));
 $("#fight").onchange = () => { syncAllMode(); if ($("#fight").value !== "all") inspect($("#fight").value); };
 /* «Все боссы» в рамке «Бой»: разбор всего отчёта — по одному бою на босса (последний килл, без киллов —
-   лучший пулл): полный разбор боя на каждого босса (вкладка на босса), сводка сейвов и ротация по боссам против топ-1. */
+   лучший пулл): полный разбор боя на каждого босса (вкладка на босса) и ротация по боссам против топ-1. */
 const allFights = () => $("#fight").value === "all";
 let REF_BEFORE_ALL = null;
 function syncAllMode(){
@@ -1215,11 +1215,10 @@ function renderRaidPeaks(P, el){
         r.top_raid!==undefined ? scopeCell(r.top_raid, r.top_self||[], false) : esc((r.top_cds||[]).join(", ")||"—")]),
         {num:[3], cls:"wide", flag:i=>{const r=V.rows[i]; return r.my!=null && !r.my.length && (r.top_share||0)>=0.5;}}) + "</div>" : ""}
     ${box(TP ? `Самые тяжёлые моменты боя ${TP.guild}` : "Самые тяжёлые моменты вашего боя", "5 секунд с наибольшим уроном по рейду, по ходу боя. Кулдаун засчитан, если нажат за 8 с до момента или во время него."
-        + ((X.heaviest_mrt||[]).length ? " Под таблицей — две заметки MRT с этими нажатиями: рейдовые сейвы и, отдельно, кулдауны лекарей; у каждой строки — время первого нажатия." : ""),
+        + ((X.heaviest_mrt||[]).length ? " Под таблицей — заметка MRT с этими нажатиями: сейвы рейда и кулдауны лекарей, у каждой строки — время первого нажатия." : ""),
       table(["Когда","Урон за 5 с","Доля боя","Механики","Нажатые рейдовые кулдауны"], H.map(h=>[h.time, num(h.damage), pct(h.share,0), esc(h.abilities.join(", ")),
         h.cds.length?esc([...new Set(h.cds)].join(", ")):'<span class="worse">ничего</span>']), {num:[1,2], empty:"Нет данных об уроне.", flag:i=>!H[i].cds.length})
-      + (HM => mrtBlock(HM.filter(x => (x.kind || "raid") === "raid"), HT, {label: "Скопировать сейвы для MRT"})
-          + mrtBlock(HM.filter(x => x.kind === "heal").map(x => ({mrt_heal: x.mrt, heal_t: x.t})), HT, HEAL_MRT))(X.heaviest_mrt || []))}
+      + mrtBlock((X.heaviest_mrt || []).map(x => ({mrt: x.mrt, t: x.t})), HT, {label: "Скопировать для MRT", hint: "Одна заметка: сейвы рейда и кулдауны лекарей по времени."}))}
     ${(X.roster_cds||[]).length ? box("Рейдовые кулдауны состава", "У кого какой рейдовый кулдаун есть и сколько раз его можно нажать за бой при этой перезарядке. Красным — ни разу не нажат.",
       table(["Игрок","Кулдаун","Откат","Нажато","Можно за бой","Откуда известно"], X.roster_cds.map(c=>[`${esc(c.player)} <span style="color:var(--muted);font-size:13.5px">${esc(who(c.cls, c.spec))}</span>`,
         esc(c.name), mmss(c.cd).replace(/,0$/,""), num(c.used), c.max_uses==null?"—":num(c.max_uses), esc(c.source)]), {num:[2,3,4], flag:i=>!X.roster_cds[i].used})) : ""}`;
@@ -1239,10 +1238,28 @@ function scopeCell(raid, self, mine){
 function mrtNote(plan, title, field = "mrt", prefix = "Сейвы"){
   /* пики после конца вашего боя (время — у лучших киллов) в заметку не входят: таймеры — только по вашему бою */
   plan = plan.filter(r => !r.after_end);
-  const rows = field === "mrt" ? plan : [...plan].filter(r => r[field]).sort((a, b) => (a.heal_t ?? a.t ?? 0) - (b.heal_t ?? b.t ?? 0));
-  const lines = rows.map(r => r[field] || (field === "mrt" && (r.picks||[]).length
-    ? `{time:${(r.time||"0:00").replace(/,\d+$/,"")}}${String(r.mechanic||"").replace(/[«»]/g,"")} - ${r.picks.map(p=>p.player+" "+p.cd).join("  ")}` : "")).filter(Boolean);
+  const legacy = r => (r.picks||[]).length
+    ? `{time:${(r.time||"0:00").replace(/,\d+$/,"")}}${String(r.mechanic||"").replace(/[«»]/g,"")} - ${r.picks.map(p=>p.player+" "+p.cd).join("  ")}` : "";
+  const items = field === "mrt"   // одна заметка: сейвы рейда и кулдауны лекарей, каждые по своему времени
+    ? plan.flatMap(r => [[r.t ?? 0, r.mrt || legacy(r)], [r.heal_t ?? r.t ?? 0, r.mrt_heal]])
+    : plan.map(r => [r.heal_t ?? r.t ?? 0, r[field]]);
+  const lines = mergeMrt(items);
   return lines.length ? [title ? prefix + ": " + title : prefix, ...lines].join("\n") : "";
+}
+/* [[время, строка]] → по времени; один таймер и одна механика (сейв рейда и кулдаун лекаря на тот же пик) — одна строка */
+function mergeMrt(items){
+  const out = new Map();
+  items.filter(x => x[1]).sort((a, b) => a[0] - b[0]).forEach(([, line]) => {
+    const i = line.indexOf(" - "), head = i < 0 ? line : line.slice(0, i), who = i < 0 ? "" : line.slice(i + 3);
+    if (!out.has(head)) out.set(head, new Map());
+    const by = out.get(head);  // один игрок с сейвом и кулдауном лекаря — имя один раз
+    who.split("  ").filter(Boolean).forEach(part => {
+      const j = part.indexOf(" "), name = j < 0 ? part : part.slice(0, j), marks = j < 0 ? [] : part.slice(j + 1).split(" ");
+      if (!by.has(name)) by.set(name, []);
+      marks.forEach(m => { if (m && !by.get(name).includes(m)) by.get(name).push(m); });
+    });
+  });
+  return [...out].map(([h, by]) => h + " - " + [...by].map(([n, m]) => [n, ...m].join(" ")).join("  "));
 }
 /* Блок «скопировать для MRT». opts: field — поле строк (mrt | mrt_heal), prefix — заголовок заметки, label — надпись кнопки */
 function mrtBlock(plan, title, opts = {}){
@@ -1256,8 +1273,6 @@ function mrtBlock(plan, title, opts = {}){
       <textarea readonly rows="${Math.min(14, note.split("\n").length + 1)}" style="width:100%;margin-top:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;box-sizing:border-box">${esc(note)}</textarea></details></div>`;
 }
 /* Две заметки: рейдовые сейвы и кулдауны лекарей (у каждой свои строки и своё время) */
-const HEAL_MRT = {field: "mrt_heal", prefix: "Кулдауны лекарей", label: "Скопировать кулдауны лекарей для MRT",
-                  hint: "Отдельная заметка: Апофеоз, Древо Жизни, Природная мощь, Перерождение и др. — на самые тяжёлые пики."};
 async function copyText(text, ta){
   try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch (e) {}
   try {  // запасной путь (Android WebView, старые браузеры): выделить текст и скопировать
@@ -1280,7 +1295,7 @@ function planTable(plan, title, phases){
   const ph = (phases||[]).length > 1 ? `<p class="hint" style="margin:0 0 8px">Фазы этого боя: ${phases.map(p=>`<b>${esc(p.name)}</b>${p.intermission?' <span class="tag MEDIUM">переход</span>':""} с ${btT(p.t)}`).join(" · ")}.
     Время от начала фазы показано под «Нажать в» — по нему и ставятся таймеры MRT: если фаза придёт раньше или позже, сейвы сдвинутся вместе с ней.
     Кулдаун, который жмётся в разных фазах, планируется с запасом 10 с на смещение фазы.</p>` : "";
-  return ph + planRows(plan) + mrtBlock(plan, title, {label: "Скопировать сейвы для MRT"}) + mrtBlock(plan, title, HEAL_MRT);
+  return ph + planRows(plan) + mrtBlock(plan, title, {label: "Скопировать для MRT", hint: "Одна заметка: сейвы рейда и кулдауны лекарей по времени."});
 }
 function planRows(plan){
   return table(["Нажать в","Пик","Кулдауны и кто"], plan.map(r=>{

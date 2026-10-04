@@ -204,8 +204,12 @@ def test_plan_healer_cds():
     assert all(b - a >= 120 for a, b in zip(apo, apo[1:])), apo             # перезарядка соблюдена
     assert any(m == "«Волна» №2" for m, _, _ in heal)                         # самый тяжёлый пик — с кулдауном лекаря
     note = mrt_heal_note(plan, "Демо")
-    assert note.startswith("Кулдауны лекарей: Демо") and "{spell:200183}" in note and "{spell:200183}" not in mrt_note(plan, "Демо")
-    print("OK план: кулдауны лекарей — отдельным проходом и отдельной заметкой MRT")
+    assert note.startswith("Кулдауны лекарей: Демо") and "{spell:200183}" in note
+    one = mrt_note(plan, "Демо").split("\n")
+    assert one[0] == "Сейвы: Демо" and any("{spell:200183}" in l for l in one) and any("{spell:64843}" in l for l in one), one
+    heads = [l.split(" - ")[0] for l in one[1:]]
+    assert len(heads) == len(set(heads)), one     # сейв и кулдаун лекаря на один пик в одно время — одной строкой
+    print("OK план: кулдауны лекарей — отдельным проходом, в общей заметке MRT вместе с сейвами")
 
 
 def test_plan_longer_phase():
@@ -242,7 +246,7 @@ def test_plan_own_timings():
     """Сравнение с топом не двигает таймеры MRT: в заметку — только пики вашего боя по их времени.
     Пики топа после конца вашего боя — в плане с пометкой «по топу», в заметку не входят и не отнимают
     кулдауны у ваших пиков; пик топа, время которого (по вашим фазам) ваш бой прошёл тихо, — не в плане."""
-    from wcl_analyzer.raid_top import compare_with_top, mrt_heal_note, mrt_note
+    from wcl_analyzer.raid_top import compare_with_top, mrt_note
     HYMN = 64843
 
     def sp(t, ab, k, ph=1, pt=None, cov=()):
@@ -263,7 +267,7 @@ def test_plan_own_timings():
     wave, storm = plan["«М5» №1"], plan["«М8» №1"]
     assert not wave.get("after_end") and 42 <= wave["t"] <= 46 and wave["picks"][0]["cd"] == "Гимн", wave
     assert storm["after_end"] and not storm["picks"], storm  # гимн ушёл на ваш пик, а не на выдуманный топом
-    note = mrt_note(V["plan"], "Б") + mrt_heal_note(V["plan"], "Б")
+    note = mrt_note(V["plan"], "Б")
     assert "{spell:8}" not in note and "М8" not in note and "{spell:5}" in note, note
     print("OK план с топом: таймеры MRT — по вашему бою, пики «по топу» в заметку не входят")
 
@@ -325,13 +329,11 @@ def test_fight_mode():
     finally:
         web._run_player_all = o_all
     R4 = job4["result"]
-    assert calls == [("pall", "all")] and R4["order"] == ["saves", "b0", "pall"], (calls, R4["order"])
+    assert calls == [("pall", "all")] and R4["order"] == ["b0", "pall"], (calls, R4["order"])
     b0 = R4["parts"]["b0"]
-    assert R4["kinds"] == {"b0": "raid"} and R4["titles"]["b0"] == b0["info"]["boss"]
+    assert R4["kinds"] == {"b0": "raid"} and R4["titles"]["b0"] == b0["info"]["boss"] and R4["info"]["code"]
     assert b0["brief"] and b0["extras"]["plan"], "у босса — тот же полный разбор, что у одиночного лога"
-    sv = R4["parts"]["saves"]["bosses"][0]
-    assert sv["mrt"].startswith("Сейвы:") and "mrt_heal" in sv
-    assert seen["partial4"]["parts"].keys() == {"saves", "b0"} and seen["partial4"]["pending"] == "pall"
+    assert seen["partial4"]["parts"].keys() == {"b0"} and seen["partial4"]["pending"] == "pall"
     names = load_workbook(io.BytesIO(job4["xlsx"])).sheetnames
     assert any(n.startswith(b0["info"]["boss"][:14] + " — ") for n in names), names
     print("OK «Разобрать бой»: рейд сразу, ротация следом, лимит не теряет готовое, один Excel, все боссы")

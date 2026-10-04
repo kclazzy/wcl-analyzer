@@ -184,6 +184,12 @@ td .imp{font-size:13.5px}
 
 dialog{border:0;border-radius:var(--r-lg);padding:26px;max-width:520px;width:calc(100% - 32px);color:var(--ink)}
 dialog::backdrop{background:rgba(22,33,58,.45)}
+.vplay{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 2px 0 4px;padding:0;border:0;border-radius:50%;background:var(--top);color:#fff;font-size:11px;line-height:1;cursor:pointer;vertical-align:middle}
+.vplay:hover,.vplay:focus-visible{background:var(--ink)}
+#videoDlg{max-width:860px;padding:18px}
+#videoDlg video{display:block;width:100%;max-height:70vh;border-radius:var(--r-sm);background:#000}
+#videoDlg .vsrc{font-size:13px;color:var(--muted);margin-top:8px}
+#videoDlg .verr{display:none;padding:18px;border-radius:var(--r-sm);background:var(--warn-soft);color:var(--ink)}
 dialog h3{margin:0 0 8px;font-size:20px}
 dialog ol{padding-left:20px;color:var(--muted);font-size:14px}
 dialog label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px}
@@ -414,6 +420,17 @@ dialog label.check input{width:auto;margin:0}
     <button class="btn you" id="updApply" type="button" hidden>Обновить</button>
   </footer>
 </div>
+
+<dialog id="videoDlg" aria-labelledby="videoTitle">
+  <h3 id="videoTitle">Ролик механики</h3>
+  <video id="videoEl" controls loop muted playsinline preload="metadata"></video>
+  <div class="verr" id="videoErr">Ролик не открылся: сайт не разрешает показывать его здесь или нет интернета. Посмотрите его в гайде.</div>
+  <div class="vsrc">Ролик и гайд — <a href="https://www.mythictrap.com" target="_blank" rel="noopener">Mythic Trap</a>. Видео загружается с их сайта при просмотре, в программе хранится только адрес.</div>
+  <div class="row">
+    <a class="btn alt" id="videoGuide" href="#" target="_blank" rel="noopener">Открыть гайд</a>
+    <button class="btn" id="videoClose" type="button">Закрыть</button>
+  </div>
+</dialog>
 
 <dialog id="phoneDlg" aria-labelledby="phoneTitle">
   <h3 id="phoneTitle">Открыть на телефоне или другом устройстве</h3>
@@ -903,14 +920,38 @@ function render(R){
 }
 
 
-/* «Способность» в тексте → ссылка на гайд Mythic Trap, если он есть в программе (data/guides.json) */
-function guideText(text, links){
+/* «Способность» в тексте → ссылка на гайд Mythic Trap, если он есть в программе (data/guides.json),
+   и ▶ — ролик механики, если он есть на сайте (хранится только адрес, видео грузится при просмотре) */
+function guideText(text, links, videos){
   if (!links) return esc(text);
   return String(text).split(/(«[^»]+»)/).map(part => {
-    const m = part.match(/^«([^»]+)»$/), url = m && links[m[1]];
-    return url ? `«<a href="${esc(url)}" target="_blank" rel="noopener" title="Гайд Mythic Trap по этой способности">${esc(m[1])}</a>»` : esc(part);
+    const m = part.match(/^«([^»]+)»$/), url = m && links[m[1]], v = m && videos && videos[m[1]];
+    if (!url) return esc(part);
+    const play = v ? `<button type="button" class="vplay" data-v="${esc(v)}" data-g="${esc(url)}" data-n="${esc(m[1])}" title="Смотреть ролик механики" aria-label="Смотреть ролик: ${esc(m[1])}">▶</button>` : "";
+    return `«<a href="${esc(url)}" target="_blank" rel="noopener" title="Гайд Mythic Trap по этой способности">${esc(m[1])}</a>»${play}`;
   }).join("");
 }
+function openVideo(btn){
+  const dlg = document.getElementById("videoDlg"), v = document.getElementById("videoEl"), err = document.getElementById("videoErr");
+  document.getElementById("videoTitle").textContent = "Ролик: " + btn.dataset.n;
+  document.getElementById("videoGuide").href = btn.dataset.g;
+  err.style.display = "none"; v.style.display = "";
+  v.onerror = () => { v.style.display = "none"; err.style.display = "block"; };
+  v.src = btn.dataset.v;
+  dlg.showModal();
+  const p = v.play(); if (p && p.catch) p.catch(() => {});
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest(".vplay");
+  if (b) { e.preventDefault(); openVideo(b); }
+});
+function closeVideo(){ const v = document.getElementById("videoEl"); v.onerror = null; v.pause(); v.removeAttribute("src"); v.load(); }
+document.addEventListener("DOMContentLoaded", () => {
+  const dlg = document.getElementById("videoDlg");
+  document.getElementById("videoClose").onclick = () => dlg.close();
+  dlg.addEventListener("close", closeVideo);
+  dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });  // клик по фону — закрыть
+});
 function btT(t){ if (t==null) return "—"; t=Math.max(0,t); const m=Math.floor(t/60), s=Math.floor(t-m*60); return m+":"+(s<10?"0":"")+s; }  // м:сс без долей
 const KIND_CLS = {"Тринкет":"k-trinket","Зелье":"k-potion","Расовая":"k-racial"};
 const kindTag = k => k ? `<span class="tag ${KIND_CLS[k]||"k-spell"}">${esc(k)}</span>` : "";
@@ -1358,7 +1399,7 @@ function renderRaid(R){
       ${(R.brief||[]).length ? `<ul class="lines">${R.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : '<p class="empty">Явных проблем не найдено.</p>'}
       ${(R.extras||{}).damage_timeline ? `<p class="hint" style="margin:12px 0 0">График урона по рейду, план сейвов на следующий пулл и сравнение с лучшими киллами — во вкладке «Полученный урон и сейвы».</p>` : ""}
       ${topIssues(R.issues).length ? `<h3 style="margin-top:16px">Кому что поправить</h3>` + topIssues(R.issues).map(i=>`<div class="issue"><div class="who"><b>${esc(i.player)}</b><span>${esc(i.role)}, ${esc(who(i.cls, i.spec))}</span></div>
-          <div>${guideText(i.text, R.guide_links)}</div><span class="sev s${i.severity}">${i.kind?esc(i.kind):""}</span></div>`).join("") : ""}
+          <div>${guideText(i.text, R.guide_links, R.guide_videos)}</div><span class="sev s${i.severity}">${i.kind?esc(i.kind):""}</span></div>`).join("") : ""}
     </div>
     <details class="more" id="more"><summary>Подробности: полученный урон и сейвы, игроки, механики, смерти, пуллы</summary>
     <div class="legend raidleg"><span><i class="role tank"></i>Танк</span><span><i class="role healer"></i>Лекарь</span><span><i class="role dps"></i>DPS</span></div>

@@ -40,19 +40,32 @@ def _url(raid: dict, boss: dict, page: str) -> str:
     return d["base"] + raid["slug"] + "/" + boss["slug"] + d["pages"].get(page, "")
 
 
-def _find(rb: list, spell_id, nn: str, want: str) -> str | None:
+def _find(rb: list, spell_id, nn: str, want: str) -> dict | None:
     for raid, b in rb:
+        hit = None
         for diff in (want, "mythic", "heroic", "normal"):  # сначала страница своей сложности
             for a in b.get("abilities", {}).get(diff, []):
                 if (spell_id and a.get("id") == int(spell_id)) or (nn and nn in {_norm(x) for x in [a["name"], *a.get("aka", [])]}):
-                    return a.get("share") or _url(raid, b, diff)
+                    hit = hit or {"url": a.get("share") or _url(raid, b, diff), "video": a.get("video")}
+                    hit["video"] = hit["video"] or a.get("video")  # ролик бывает только на одной из сложностей
+                    break
+        if hit:
+            return hit
     return None
 
 
 def link(spell_id: int | None, name: str | None, difficulty: int | None = None,
          boss: str | None = None) -> str | None:
     """Ссылка «Share link» на саму способность в гайде (…/boss/heroic?ability=ключ), а если её нет —
-    на страницу босса нужной сложности; если способность не найдена — None.
+    на страницу босса нужной сложности; если способность не найдена — None."""
+    g = find(spell_id, name, difficulty, boss)
+    return g["url"] if g else None
+
+
+def find(spell_id: int | None, name: str | None, difficulty: int | None = None,
+         boss: str | None = None) -> dict | None:
+    """{url: ссылка на способность в гайде, video: адрес ролика механики или None}; не найдена — None.
+    В программе хранится только адрес ролика, само видео грузится с Mythic Trap при просмотре.
     boss — название босса боя: по названию способности ищем сначала у него (в разных рейдах бывают тёзки)."""
     want = DIFF_PAGE.get(int(difficulty or 0), "normal")
     nn = _norm(name or "")
@@ -76,7 +89,7 @@ def links_for(names: dict, difficulty: int | None, boss: str | None = None) -> d
     for sid, nm in names.items():
         if nm in out:
             continue
-        url = link(sid, nm, difficulty, boss)
-        if url:
-            out[nm] = url
+        g = find(sid, nm, difficulty, boss)
+        if g:
+            out[nm] = g["url"]
     return out

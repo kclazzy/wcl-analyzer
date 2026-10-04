@@ -58,18 +58,18 @@ def _brief(wb, R, demo):
     if top:
         s.section("Кому что поправить")
         import re as _re
-        gl = R.get("guide_links") or {}
+        gl, gv = R.get("guide_links") or {}, R.get("guide_videos") or {}
 
-        def guide(t):  # первая способность из текста, у которой есть гайд Mythic Trap
-            return next((gl[n] for n in _re.findall(r"«([^»]+)»", t) if n in gl), "")
-        f, _l = s.table(["", "Игрок", "Что", "Гайд по способности"],
-                        [[k + 1, f"{i['player']} ({spec_ru(i.get('cls', ''), i['spec'])})", i["text"], guide(i["text"])]
-                         for k, i in enumerate(top)])
-        for k, i in enumerate(top):  # кликабельная ссылка в ячейке
-            url = guide(i["text"])
-            if url:
-                c = s.ws.cell(f + k, 4)
-                c.hyperlink, c.value, c.style = url, "Mythic Trap", "Hyperlink"
+        def guide(t, d=gl):  # первая способность из текста, у которой есть гайд (или ролик) Mythic Trap
+            return next((d[n] for n in _re.findall(r"«([^»]+)»", t) if n in d), "")
+        f, _l = s.table(["", "Игрок", "Что", "Гайд по способности", "Ролик"],
+                        [[k + 1, f"{i['player']} ({spec_ru(i.get('cls', ''), i['spec'])})", i["text"], guide(i["text"]),
+                          guide(i["text"], gv)] for k, i in enumerate(top)])
+        for k, i in enumerate(top):  # кликабельные ссылки в ячейках
+            for col, url, label in ((4, guide(i["text"]), "Mythic Trap"), (5, guide(i["text"], gv), "▶ Смотреть")):
+                if url:
+                    c = s.ws.cell(f + k, col)
+                    c.hyperlink, c.value, c.style = url, label, "Hyperlink"
     X = R.get("extras") or {}
     if X.get("heaviest"):
         s.section("Самые тяжёлые моменты", "Подробно и с графиком — на листе «Урон по рейду».")

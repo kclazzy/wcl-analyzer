@@ -328,6 +328,8 @@ def test_guides():
     assert "/mythic" in guides.link(1293212, None, 4)      # только на эпохальной — ведём туда
     assert guides.link(None, "Ледяная волна", 5) is None and guides.link(42, "Fireball", 5) is None
     assert sum(1 for r, _ in guides.bosses() if r["slug"] == "venomous-abyss") == 9
+    g = guides.find(None, "Venomous Surge", 4, "Sszorak")
+    assert g and g["url"] and (g["video"] is None or g["video"].endswith(".mp4")), g
     # разбор карточки способности на сайте: Share link, id и название
     import importlib.util
     spec = importlib.util.spec_from_file_location("ug", Path(__file__).resolve().parent.parent / "tools" / "update_guides.py")

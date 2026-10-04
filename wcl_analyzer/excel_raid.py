@@ -127,7 +127,7 @@ def _damage(wb, R, demo):
     s.row += 1
     s.table(["Когда", "Урон за 5 с", "Доля", "Механики", "Рейдовые кулдауны"],
             [[h["time"], h["damage"], h["share"], ", ".join(h["abilities"]),
-              ", ".join(h["cds"]) or "нет"] for h in X.get("heaviest", [])],
+              ", ".join(h["cds"]) or "нет"] for h in sorted(X.get("heaviest", []), key=lambda h: h["t"])],
             [None, F_INT, F_PCT, None, None], col=5)
     s.ws.cell(row=s.row, column=5, value="Рейдовые кулдауны").font = Font(name=FONT, bold=True, size=12, color="2E75B6")
     s.row += 1

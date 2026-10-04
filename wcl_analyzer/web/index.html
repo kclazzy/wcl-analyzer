@@ -1196,7 +1196,7 @@ function renderTalents(T, el){
    и что в те же моменты жмут лучшие гильдии */
 function renderRaidPeaks(P, el){
   if (!P) { el.innerHTML = box("Рейдовые кулдауны в пики урона", "", '<p class="empty">Нет данных: урон по рейду для этого боя не загрузился. </p>'); return; }
-  const X = P.extras || {}, V = X.vs_top, H = X.heaviest || [], TP = (P.info || {}).top_progress;
+  const X = P.extras || {}, V = X.vs_top, H = [...(X.heaviest || [])].sort((a, b) => a.t - b.t), TP = (P.info || {}).top_progress;  // по ходу боя
   el.innerHTML = `
     ${(P.brief||[]).length ? `<div class="box brief"><ul class="lines">${P.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
     ${box("Урон по рейду и рейдовые кулдауны", "Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники — рейдовые кулдауны вашего рейда (красная обводка — нажат вне пиков)" + (V ? ", полые бирюзовые — что жмут лучшие киллы." : "."),
@@ -1213,7 +1213,7 @@ function renderRaidPeaks(P, el){
         r.top_share==null ? "—" : pct(r.top_share,0),
         r.top_raid!==undefined ? scopeCell(r.top_raid, r.top_self||[], false) : esc((r.top_cds||[]).join(", ")||"—")]),
         {num:[3], cls:"wide", flag:i=>{const r=V.rows[i]; return r.my!=null && !r.my.length && (r.top_share||0)>=0.5;}}) + "</div>" : ""}
-    ${box(TP ? `Самые тяжёлые моменты боя ${TP.guild}` : "Самые тяжёлые моменты вашего боя", "5 секунд с наибольшим уроном по рейду. Кулдаун засчитан, если нажат за 8 с до момента или во время него."
+    ${box(TP ? `Самые тяжёлые моменты боя ${TP.guild}` : "Самые тяжёлые моменты вашего боя", "5 секунд с наибольшим уроном по рейду, по ходу боя. Кулдаун засчитан, если нажат за 8 с до момента или во время него."
         + ((X.heaviest_mrt||[]).length ? " «Скопировать для MRT» — заметка с этими нажатиями: строка на момент, по времени первого нажатия; в строке сначала рейдовые кулдауны, затем кулдауны лекарей." : ""),
       table(["Когда","Урон за 5 с","Доля боя","Механики","Нажатые рейдовые кулдауны"], H.map(h=>[h.time, num(h.damage), pct(h.share,0), esc(h.abilities.join(", ")),
         h.cds.length?esc([...new Set(h.cds)].join(", ")):'<span class="worse">ничего</span>']), {num:[1,2], empty:"Нет данных об уроне.", flag:i=>!H[i].cds.length})

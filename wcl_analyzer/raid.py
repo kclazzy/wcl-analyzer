@@ -21,6 +21,7 @@ from .metrics import HEALTHSTONE_RE, LUST_IDS, LUST_RE, POTION_RE, RACIAL_RE
 FLASK_RE = re.compile(r"flask|phial|фиал|настой|флакон|alchemical chaos", re.I)
 FOOD_RE = re.compile(r"well fed|сытост|сытн|hearty|пищ|food|feast|пир", re.I)
 RUNE_RE = re.compile(r"augment|руна усиления|кристаллиз", re.I)
+CD_MERGE_S = 15             # такты канала и повторные события одного кулдауна в пределах 15 с — одно нажатие
 SPIKE_GAP_S = 8              # пики урона ближе 8 с считаются одним
 HEAL_CD_LEAD = (8.0, 3.0)    # кулдаун лекаря засчитан, если нажат за 8 с до пика … 3 с после
 ADDS_LOW = 0.4               # доля кастов по аддам ниже 40% от медианы DPS
@@ -187,34 +188,62 @@ def fight_phases(f: dict, meta: list | None, dur: float) -> list[dict]:
     return out
 
 
+def merge_cd_ticks(raid_cds: list[dict]) -> list[dict]:
+    """Канальные кулдауны (Спокойствие, Божественный гимн…) пишутся в лог каждым тактом — это одно нажатие:
+    тот же кулдаун того же игрока в пределах CD_MERGE_S от первого нажатия не считаем новым."""
+    first: dict = {}
+    out = []
+    for c in sorted(raid_cds, key=lambda c: c["t"]):
+        k = (c["pid"], c["name"])
+        if k in first and c["t"] - first[k] < CD_MERGE_S:
+            continue
+        first[k] = c["t"]
+        out.append(c)
+    return out
+
+
 def _uniq_cds(cds: list[dict]) -> list[dict]:
     """Кулдауны в окне момента без повторов: один и тот же кулдаун одного игрока (два события, два нажатия
     подряд) — одна запись, по первому нажатию."""
     seen, out = set(), []
     for c in cds:
-        k = (c.get("pid"), c.get("id"), c.get("name"))
+        k = (c.get("pid"), c.get("name"))
         if k not in seen:
             seen.add(k)
             out.append(c)
     return out
 
 
+def _cd_kind(c: dict) -> str:
+    """raid — рейдовый кулдаун из списка (гимн, тотем, барьер, клич…); heal — кулдаун лекаря на себя или
+    найденный по логу (Апофеоз, Древо Жизни, Кокон, Растяжение времени…)."""
+    from .game_data import scope
+    return "raid" if c.get("source") == "список" and scope(c["id"]) == "raid" else "heal"
+
+
 def heaviest_mrt(heaviest: list[dict], phases: list[dict]) -> list[dict]:
-    """Заметка MRT по самым тяжёлым моментам: какие рейдовые кулдауны нажал этот рейд — по времени первого
-    нажатия, со 2-й фазы — от начала фазы. Для разбора топа — готовая расстановка лучших гильдий."""
+    """Заметка MRT по самым тяжёлым моментам: какие кулдауны нажал этот рейд — сверху рейдовые, ниже
+    кулдауны лекарей, в каждом блоке по времени первого нажатия (со 2-й фазы — от начала фазы).
+    Для разбора топа — готовая расстановка лучших гильдий."""
     from .raid_top import mrt_line
+    blocks = {"raid": [], "heal": []}
+    for h in heaviest or []:
+        for kind in blocks:
+            picks = [p for p in h.get("cd_list") or [] if p.get("kind", "raid") == kind]
+            if not picks:
+                continue
+            t0 = min(p["t"] for p in picks)
+            ph = phase_at(phases, t0)
+            n = ph["n"] if ph and (ph.get("n") or 0) > 1 else None
+            line = mrt_line(t0, "«" + (h["abilities"][0] if h.get("abilities") else "Пик") + "»", picks, n,
+                            round(t0 - ph["t"], 1) if n else None, mech_id=h.get("ability_id"))
+            if line:
+                blocks[kind].append({"t": t0, "time": _fmt_t(t0), "mrt": line, "kind": kind})
     out = []
-    for h in sorted(heaviest or [], key=lambda x: x["t"]):
-        picks = h.get("cd_list") or []
-        if not picks:
-            continue
-        t0 = min(p["t"] for p in picks)
-        ph = phase_at(phases, t0)
-        n = ph["n"] if ph and (ph.get("n") or 0) > 1 else None
-        line = mrt_line(t0, "«" + (h["abilities"][0] if h.get("abilities") else "Пик") + "»", picks, n,
-                        round(t0 - ph["t"], 1) if n else None, mech_id=h.get("ability_id"))
-        if line:
-            out.append({"t": t0, "time": _fmt_t(t0), "mrt": line})
+    for kind, title in (("raid", "--- Рейдовые кулдауны ---"), ("heal", "--- Кулдауны лекарей ---")):
+        if blocks[kind]:
+            out.append({"t": -1, "time": "", "mrt": title, "kind": kind, "header": True})
+            out += sorted(blocks[kind], key=lambda x: x["t"])
     return out
 
 
@@ -775,6 +804,7 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
             raid_cds += [{"t": t, "name": name, "player": p["name"], "role": p["role_ru"], "id": ab, "pid": pid,
                           "source": "список" if known else "по логу"} for t in ts]
     raid_cds.sort(key=lambda c: c["t"])
+    raid_cds = merge_cd_ticks(raid_cds)
     lo, hi = HEAL_CD_LEAD
     for sp in spikes:
         # Секунда самого сильного удара внутри пика — от неё считается время нажатия в плане
@@ -833,7 +863,7 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
                       "cds": [f"{c['name']} ({c['player']})" for c in cds],
                       # для заметки MRT: кто, что и когда нажал (класс — для цвета имени)
                       "cd_list": [{"cd": c["name"], "player": c["player"], "id": c["id"], "t": round(c["t"], 1),
-                                   "cls": (players.get(c["pid"]) or {}).get("cls", "")} for c in cds]})
+                                   "cls": (players.get(c["pid"]) or {}).get("cls", ""), "kind": _cd_kind(c)} for c in cds]})
     out["heaviest"] = sorted(heavy, key=lambda x: -x["damage"])
 
     # 3. Переключение на аддов

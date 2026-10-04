@@ -1,0 +1,15 @@
+## Interface: 120100, 120000
+## Title: WowUtils Group Export
+## Notes: Exports your current party or raid as WowUtils "Import Roster JSON".
+## Version: 1.0.1
+## Author: Seeneenee
+## SavedVariables: WowUtilsGroupExportDB
+## IconTexture: Interface\Icons\Sha_Spell_Shadow_ShadesOfDarkness
+
+Json.lua
+Text.lua
+Data.lua
+Inspect.lua
+Roster.lua
+UI.lua
+Core.lua

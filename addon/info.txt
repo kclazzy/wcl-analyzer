@@ -1,0 +1,21 @@
+a.zip: Zip archive data, at least v1.0 to extract, compression method=store
+f_8640546.zip: JSON text data
+.:
+file_ids.txt
+info.txt
+x_a
+
+./x_a:
+WowUtilsGroupExport
+
+./x_a/WowUtilsGroupExport:
+Core.lua
+Data.lua
+Inspect.lua
+Json.lua
+LICENSE
+README.md
+Roster.lua
+Text.lua
+UI.lua
+WowUtilsGroupExport.toc

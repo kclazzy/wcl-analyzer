@@ -110,8 +110,41 @@ def _good_name(s: str) -> bool:
     return 2 <= len(s) <= 60 and bool(re.search(r"[A-Za-z]", s)) and not s.lower().startswith(("http", "spell="))
 
 
+PANEL = re.compile(r"""class=["']SpellPanel_panel__""")
+SHARE = re.compile(r"""value=["'](https?://(?:www\.)?mythictrap\.com/[^"'?]+\?ability=[^"'&]+)["']""")
+TITLE = re.compile(r"""class=["']SpellPanel_headerTitle__[^"']*["'][^>]*>(.*?)</div>""", re.S)
+SPELL_ID = re.compile(r"wowhead\.com/(?:[a-z]{2}/)?spell=(\d+)")
+
+
 def parse_abilities(page: str) -> list[dict]:
-    """Способности со страницы босса: [{name, id}] без повторов, в порядке на странице.
+    """Способности со страницы босса: [{name, id, share}] без повторов, в порядке на странице.
+    Каждая способность на сайте — карточка (SpellPanel): скрытое поле с «Share link»
+    (…/boss/heroic?ability=ключ), ссылка на Wowhead с id и заголовок с названием.
+    Если карточек нет (сайт поменял вёрстку) — запасной разбор по ссылкам на Wowhead, без Share link."""
+    starts = [m.start() for m in PANEL.finditer(page)]
+    out, seen = [], set()
+    for i, st in enumerate(starts):
+        chunk = page[st:starts[i + 1] if i + 1 < len(starts) else st + 6000]
+        t = TITLE.search(chunk)
+        name = _text(t.group(1)) if t else ""
+        if not _good_name(name):
+            continue
+        sid = SPELL_ID.search(chunk)
+        sid = int(sid.group(1)) if sid else None
+        sh = SHARE.search(chunk)
+        key = sid if sid is not None else "n:" + name
+        if key in seen:
+            continue  # та же карточка повторяется в мобильной раскладке
+        seen.add(key)
+        a = {"name": name, "id": sid}
+        if sh:
+            a["share"] = html.unescape(sh.group(1))
+        out.append(a)
+    return out or parse_abilities_plain(page)
+
+
+def parse_abilities_plain(page: str) -> list[dict]:
+    """Запасной разбор: [{name, id}] без повторов, в порядке на странице.
     Название — текст ссылки на Wowhead, а если внутри только иконка — первый текст сразу после ссылки."""
     out, seen = [], set()
     for m in SPELL_A.finditer(page):
@@ -231,11 +264,17 @@ def summary(new: list[dict], old: dict) -> list[str]:
                     plus, minus = sorted(a - p), sorted(p - a)
                     lines.append(f"{b['name']} ({diff}): " + "; ".join(
                         x for x in (("+ " + ", ".join(plus)) if plus else "", ("− " + ", ".join(minus)) if minus else "") if x))
+    def shares(rs):
+        return sum(1 for r in rs for b in r["bosses"] for v in b["abilities"].values() for x in v if x.get("share"))
+    n_new, n_old = shares(new), shares([r for r in old.get("raids", []) if r["slug"] in {x["slug"] for x in new}])
+    if n_new != n_old:
+        lines.append(f"Ссылок «Share link» на способности: {n_old} → {n_new}")
     return lines
 
 
 def _counts(raids: list[dict]) -> list[str]:
-    return [f"{r['name']} / {b['name']}: " + ", ".join(f"{d} {len(v)}" for d, v in b["abilities"].items())
+    return [f"{r['name']} / {b['name']}: " + ", ".join(
+        f"{d} {len(v)} (share {sum(1 for x in v if x.get('share'))})" for d, v in b["abilities"].items())
             for r in raids for b in r["bosses"]]
 
 

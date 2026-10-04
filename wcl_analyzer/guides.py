@@ -45,13 +45,14 @@ def _find(rb: list, spell_id, nn: str, want: str) -> str | None:
         for diff in (want, "mythic", "heroic", "normal"):  # сначала страница своей сложности
             for a in b.get("abilities", {}).get(diff, []):
                 if (spell_id and a.get("id") == int(spell_id)) or (nn and nn in {_norm(x) for x in [a["name"], *a.get("aka", [])]}):
-                    return _url(raid, b, diff)
+                    return a.get("share") or _url(raid, b, diff)
     return None
 
 
 def link(spell_id: int | None, name: str | None, difficulty: int | None = None,
          boss: str | None = None) -> str | None:
-    """Ссылка на страницу гайда босса нужной сложности, где описана эта способность; иначе None.
+    """Ссылка «Share link» на саму способность в гайде (…/boss/heroic?ability=ключ), а если её нет —
+    на страницу босса нужной сложности; если способность не найдена — None.
     boss — название босса боя: по названию способности ищем сначала у него (в разных рейдах бывают тёзки)."""
     want = DIFF_PAGE.get(int(difficulty or 0), "normal")
     nn = _norm(name or "")

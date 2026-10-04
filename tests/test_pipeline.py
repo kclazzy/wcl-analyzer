@@ -293,12 +293,23 @@ def test_cache_reuse_between_modes():
 def test_guides():
     """Гайды Mythic Trap лежат в программе: способность → страница босса своей сложности; без совпадения — None."""
     from wcl_analyzer import guides
-    assert guides.link(1284034, None, 5).endswith("/nekzali-the-soulcoiler/mythic")
-    assert guides.link(None, "Uncoiled Rage", 4).endswith("/nekzali-the-soulcoiler/heroic")
-    assert guides.link(1293212, None, 4).endswith("/mythic")      # только на эпохальной — ведём туда
+    assert "/nekzali-the-soulcoiler/mythic" in guides.link(1284034, None, 5)
+    assert "/nekzali-the-soulcoiler/heroic" in guides.link(None, "Uncoiled Rage", 4)
+    assert "/mythic" in guides.link(1293212, None, 4)      # только на эпохальной — ведём туда
     assert guides.link(None, "Ледяная волна", 5) is None and guides.link(42, "Fireball", 5) is None
     assert sum(1 for r, _ in guides.bosses() if r["slug"] == "venomous-abyss") == 9
-    assert guides.link(None, "Uncoiled Rage", 4, "Nek'zali the Soulcoiler").endswith("/nekzali-the-soulcoiler/heroic")
+    # разбор карточки способности на сайте: Share link, id и название
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("ug", Path(__file__).resolve().parent.parent / "tools" / "update_guides.py")
+    ug = importlib.util.module_from_spec(spec); spec.loader.exec_module(ug)
+    card = ('<div class="SpellPanel_panel__6lfTs undefined" id="a"><input class="SpellPanel_shareHiddenInput__u" type="text" '
+            'readonly="" value="https://www.mythictrap.com/venomous-abyss/sszorak/heroic?ability=sszzrakUlaPre"/>'
+            '<a href="https://en.wowhead.com/spell=1285961" target="_blank"><img alt=""/></a>'
+            '<div class="SpellPanel_headerTitle__dsD6L">Ula&#x27;tek&#x27;s Presence</div></div>')
+    got = ug.parse_abilities(card + card.replace('id="a"', 'id="b"'))   # повтор (мобильная раскладка) — одна запись
+    assert got == [{"name": "Ula'tek's Presence", "id": 1285961,
+                    "share": "https://www.mythictrap.com/venomous-abyss/sszorak/heroic?ability=sszzrakUlaPre"}], got
+    assert "/nekzali-the-soulcoiler/heroic" in guides.link(None, "Uncoiled Rage", 4, "Nek'zali the Soulcoiler")
     assert guides.link(None, "Uncoiled Rage", 4, "Другой босс") is not None   # босс не найден — ищем везде
     print("OK гайды Mythic Trap: 9 боссов, ссылка по id или английскому названию, без совпадения — текст")
 

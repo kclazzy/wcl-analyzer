@@ -323,6 +323,8 @@ def collect_spells(raids: list[dict], old: dict) -> tuple[dict, int]:
     """Русские название и описание с Wowhead для каждой способности из гайдов: {id: {name, desc}}.
     Уже известные не запрашиваем повторно (кроме тех, где описания не было)."""
     prev = old.get("spells") or {}
+    if old.get("spells_ver") != wowhead.VERSION:  # обработка описаний поменялась — берём заново
+        prev = {k: {"name": v.get("name")} for k, v in prev.items()}
     ids = sorted({str(x["id"]) for r in raids for b in r["bosses"] for v in b["abilities"].values()
                   for x in v if x.get("id")})
     out, fetched = {}, 0
@@ -418,7 +420,8 @@ def main(argv=None) -> int:
         changes.append(f"Нет перевода советов Mythic Trap: {len(need_ru)} (в программе — по-английски): "
                        + "; ".join(need_ru[:15]) + (" …" if len(need_ru) > 15 else ""))
     same = (json.dumps(merged, sort_keys=True) == json.dumps(old.get("raids", []), sort_keys=True)
-            and json.dumps(spells, sort_keys=True) == json.dumps(old.get("spells") or {}, sort_keys=True))
+            and json.dumps(spells, sort_keys=True) == json.dumps(old.get("spells") or {}, sort_keys=True)
+            and old.get("spells_ver") == wowhead.VERSION)
     total = sum(len(v) for r in merged for b in r["bosses"] for v in b["abilities"].values())
     print(f"\nРейдов {len(merged)}, боссов {sum(len(r['bosses']) for r in merged)}, записей способностей {total}.")
     if same:
@@ -434,7 +437,7 @@ def main(argv=None) -> int:
     data = {
         "_about": old.get("_about") or "Гайды Mythic Trap по боссам. Файл обновляет tools/update_guides.py.",
         "version": 2, "site": "Mythic Trap", "base": BASE, "pages": PAGES,
-        "updated": dt.date.today().isoformat(), "raids": merged, "spells": spells,
+        "updated": dt.date.today().isoformat(), "raids": merged, "spells": spells, "spells_ver": wowhead.VERSION,
     }
     FILE.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"Записано: {FILE.relative_to(ROOT)}")

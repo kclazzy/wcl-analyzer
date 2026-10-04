@@ -58,18 +58,30 @@ def _brief(wb, R, demo):
     if top:
         s.section("Кому что поправить")
         import re as _re
-        gl, gv = R.get("guide_links") or {}, R.get("guide_videos") or {}
+        gi = R.get("guide_info") or {n: {"url": u, "src": "mt", "video": (R.get("guide_videos") or {}).get(n)}
+                                     for n, u in (R.get("guide_links") or {}).items()}
 
-        def guide(t, d=gl):  # первая способность из текста, у которой есть гайд (или ролик) Mythic Trap
-            return next((d[n] for n in _re.findall(r"«([^»]+)»", t) if n in d), "")
-        f, _l = s.table(["", "Игрок", "Что", "Гайд по способности", "Ролик"],
-                        [[k + 1, f"{i['player']} ({spec_ru(i.get('cls', ''), i['spec'])})", i["text"], guide(i["text"]),
-                          guide(i["text"], gv)] for k, i in enumerate(top)])
+        def g_of(t):  # первая способность из текста, о которой есть гайд или страница Wowhead
+            return next((gi[n] for n in _re.findall(r"«([^»]+)»", t) if n in gi), {})
+
+        def brief(g):
+            parts = [g.get("name_ru") or "", f"[{g['type']}]" if g.get("type") else "", g.get("desc") or "",
+                     f"Что делать: {g['todo']}" if g.get("todo") else ""]
+            return " ".join(p for p in parts if p)
+        f, _l = s.table(["", "Игрок", "Что", "Гайд по способности", "Ролик", "Кратко о способности"],
+                        [[k + 1, f"{i['player']} ({spec_ru(i.get('cls', ''), i['spec'])})", i["text"],
+                          g_of(i["text"]).get("url", ""), g_of(i["text"]).get("video", ""), brief(g_of(i["text"]))]
+                         for k, i in enumerate(top)])
         for k, i in enumerate(top):  # кликабельные ссылки в ячейках
-            for col, url, label in ((4, guide(i["text"]), "Mythic Trap"), (5, guide(i["text"], gv), "▶ Смотреть")):
+            g = g_of(i["text"])
+            label = "Wowhead" if g.get("src") == "wowhead" else "Mythic Trap"
+            for col, url, text in ((4, g.get("url"), label), (5, g.get("video"), "▶ Смотреть")):
                 if url:
                     c = s.ws.cell(f + k, col)
-                    c.hyperlink, c.value, c.style = url, label, "Hyperlink"
+                    c.hyperlink, c.value, c.style = url, text, "Hyperlink"
+            from openpyxl.styles import Alignment
+            s.ws.cell(f + k, 6).alignment = Alignment(wrap_text=True, vertical="top")
+        s.ws.column_dimensions["F"].width = max(s.ws.column_dimensions["F"].width or 0, 60)
     X = R.get("extras") or {}
     if X.get("heaviest"):
         s.section("Самые тяжёлые моменты", "Подробно и с графиком — на листе «Урон по рейду».")

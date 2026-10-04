@@ -330,6 +330,28 @@ def test_guides():
     assert sum(1 for r, _ in guides.bosses() if r["slug"] == "venomous-abyss") == 9
     g = guides.find(None, "Venomous Surge", 4, "Sszorak")
     assert g and g["url"] and (g["video"] is None or g["video"].endswith(".mp4")), g
+    # краткое описание: русское название и описание (Wowhead), тип и совет Mythic Trap — по-русски
+    g = guides.find(None, "Ядовитый поток", 4, "Ссзорак")   # лог с русской локалью — по русскому названию
+    assert g and g["name_en"] == "Venomous Surge" and g["desc"] and g["todo"] == "Правильно ставить кисты", g
+    from wcl_analyzer import wowhead
+    tip = {"name": "Ядовитый поток", "tooltip": '<table><tr><td><b>Ядовитый поток</b><br />Направляемое</td></tr></table>'
+           '<table><tr><td><div class="q">Наносит 100009 ед. урона раз в 1 сек. Создаёт эффект " Вязкая киста " '
+           '([514.5% of Spell Power]) .</div></td></tr></table>'}
+    assert wowhead.parse_tooltip(tip) == {"name": "Ядовитый поток",
+                                          "desc": "Наносит 100009 ед. урона раз в 1 сек. Создаёт эффект «Вязкая киста»."}
+    assert wowhead.shorten("Наносит 5 ед. урона всем игрокам рядом. " + "Слово " * 60, 80) == "Наносит 5 ед. урона всем игрокам рядом."
+    # способности нет на Mythic Trap — ссылка на русский Wowhead и описание оттуда
+    from wcl_analyzer.raid import guide_info_for
+    orig = wowhead.lookup
+    wowhead.lookup = lambda ids, **k: {int(i): {"name": "Ледяная волна", "desc": "Урон всем."} for i in ids}
+    try:
+        gi = guide_info_for({"Ледяная волна", "Venomous Surge"}, {900002: "Ледяная волна", 1305959: "Venomous Surge"},
+                            {"difficulty": 4, "name": "Sszorak"})
+    finally:
+        wowhead.lookup = orig
+    assert gi["Ледяная волна"] == {"url": "https://www.wowhead.com/ru/spell=900002", "src": "wowhead", "id": 900002,
+                                   "name_ru": "Ледяная волна", "desc": "Урон всем."}, gi
+    assert gi["Venomous Surge"]["src"] == "mt" and gi["Venomous Surge"]["video"].endswith(".mp4")
     # разбор карточки способности на сайте: Share link, id и название
     import importlib.util
     spec = importlib.util.spec_from_file_location("ug", Path(__file__).resolve().parent.parent / "tools" / "update_guides.py")

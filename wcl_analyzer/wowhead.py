@@ -23,7 +23,9 @@ TOOLTIP = "https://nether.wowhead.com/tooltip/spell/{id}?dataEnv=1&locale=7"
 PAGE = "https://www.wowhead.com/ru/spell={id}"
 UA = "WCL-Analyzer (+https://github.com/kclazzy/wcl-analyzer)"
 MAX_DESC = 280
+VERSION = 2   # способ обработки описаний; поменялся — сборщик гайдов перекачивает описания заново
 
+SAVE = {"enabled": True}   # публичный сервер ничего не пишет на диск (web.serve выключает)
 _MEM: dict = {}
 _LOCK = threading.Lock()
 
@@ -37,15 +39,30 @@ def _text(fragment: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", fragment))).strip()
 
 
+_ABBR = {"ед", "сек", "мин", "ч", "м", "т", "д", "др", "см", "прим", "макс", "мин", "пр"}
+
+
+def clean(text: str) -> str:
+    """Без служебных формул Wowhead («([514.5% of Spell Power])») и лишних пробелов перед знаками."""
+    text = re.sub(r"\s*\(?\[[^\]]*\]\)?", "", text or "")
+    text = re.sub(r"\s+([.,;:!?)])", r"\1", text)
+    text = re.sub(r"\(\s+", "(", text)
+    text = re.sub(r'"\s*([^"]+?)\s*"', r"«\1»", text)  # " Вязкая киста " → «Вязкая киста»
+    return re.sub(r"\s{2,}", " ", text).strip()
+
+
 def shorten(text: str, limit: int = MAX_DESC) -> str:
     """Не длиннее limit символов, по границе предложения (или слова)."""
     text = text.strip()
     if len(text) <= limit:
         return text
     cut = text[:limit]
-    end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    # конец предложения — точка после слова, которое не сокращение («ед.», «сек.», «мин.», «м.»)
+    ends = [m.end(1) for m in re.finditer(r"(\w+[.!?])\s+(?=[A-ZА-ЯЁ«])", cut)
+            if m.group(1)[:-1].lower() not in _ABBR]
+    end = ends[-1] if ends else -1
     if end >= limit // 3:
-        return cut[:end + 1]
+        return cut[:end]
     return cut[:cut.rfind(" ")].rstrip(",;:—- ") + "…"
 
 
@@ -55,7 +72,7 @@ def parse_tooltip(data: dict) -> dict | None:
         return None
     tables = re.findall(r"<table>(.*?)</table>", data.get("tooltip") or "", re.S)
     desc = _text(tables[-1]) if len(tables) >= 2 else ""
-    return {"name": html.unescape(data["name"]).strip(), "desc": shorten(desc)}
+    return {"name": html.unescape(data["name"]).strip(), "desc": shorten(clean(desc))}
 
 
 def fetch(spell_id, timeout: float = 8) -> dict | None:
@@ -79,14 +96,16 @@ def _cache_file():
 def _load_disk() -> dict:
     f = _cache_file()
     try:
-        return json.loads(f.read_text(encoding="utf-8")) if f and f.exists() else {}
+        d = json.loads(f.read_text(encoding="utf-8")) if f and f.exists() else {}
+        return d if d.pop("_ver", None) == VERSION else {}   # старая обработка описаний — забываем
     except (OSError, ValueError):
         return {}
 
 
-def lookup(spell_ids, save: bool = True, limit: int = 15) -> dict:
+def lookup(spell_ids, save: bool | None = None, limit: int = 15) -> dict:
     """{id: {name, desc}} для способностей, которых нет в гайдах. Уже известные — из памяти и файла,
     остальные (не больше limit) — параллельными запросами к Wowhead. save=False — ничего не пишем на диск."""
+    save = SAVE["enabled"] if save is None else save
     ids = [int(i) for i in dict.fromkeys(spell_ids) if i]
     with _LOCK:
         if save and not _MEM.get("_disk"):
@@ -108,7 +127,7 @@ def lookup(spell_ids, save: bool = True, limit: int = 15) -> dict:
                 if f:
                     try:
                         f.parent.mkdir(parents=True, exist_ok=True)
-                        f.write_text(json.dumps({k: v for k, v in _MEM.items() if k != "_disk"},
+                        f.write_text(json.dumps({"_ver": VERSION, **{k: v for k, v in _MEM.items() if k != "_disk"}},
                                                 ensure_ascii=False), encoding="utf-8")
                     except OSError:
                         pass

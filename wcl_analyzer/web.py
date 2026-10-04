@@ -999,6 +999,8 @@ def serve(port: int = 8765, open_browser: bool = True, local_only: bool = False,
     if public:  # публичный сервер ничего не пишет на диск — и игровые данные держит только в памяти
         from . import game_data
         game_data.SAVE["enabled"] = False
+        from . import wowhead
+        wowhead.SAVE["enabled"] = False
     if public:
         host, port = "0.0.0.0", int(os.environ.get("PORT", port))
         open_browser = False

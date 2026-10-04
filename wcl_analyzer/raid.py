@@ -195,6 +195,33 @@ def phase_at(phases: list[dict], t: float) -> dict | None:
     return cur
 
 
+def guide_info_for(quoted: set, names: dict, f: dict, online: bool = True) -> dict:
+    """{название из текста: {url, src: "mt"|"wowhead", video, name_ru, desc, type, todo}}.
+    Сначала гайд Mythic Trap (хранится в программе), иначе — страница способности на русском Wowhead
+    и её описание оттуда (online=False — без запросов, только ссылка)."""
+    from .guides import find as guide_find
+    by_name: dict = defaultdict(list)
+    for sid, n in names.items():
+        if n in quoted and sid:
+            by_name[n].append(sid)
+    out, missing = {}, {}
+    for n in quoted:
+        g = next((x for x in (guide_find(sid, None, f.get("difficulty"), f.get("name")) for sid in by_name.get(n, [])) if x), None) \
+            or guide_find(None, n, f.get("difficulty"), f.get("name"))
+        if g:
+            out[n] = {k: v for k, v in g.items() if v not in (None, "")}
+        elif by_name.get(n):
+            missing[n] = by_name[n][0]
+    if missing:
+        from . import wowhead
+        wh = wowhead.lookup(missing.values()) if online else {}
+        for n, sid in missing.items():
+            w = wh.get(int(sid)) or {}
+            out[n] = {k: v for k, v in {"url": wowhead.page_url(sid), "src": "wowhead", "id": sid,
+                                        "name_ru": w.get("name"), "desc": w.get("desc")}.items() if v}
+    return out
+
+
 def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
     """avoidable — id или названия механик, урон от которых считается ошибкой (spell_meta.json: _avoidable)."""
     avoidable = {str(x).lower() for x in (avoidable or set())}
@@ -477,24 +504,15 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
         for kind, sev, text in extras["issues"].get(x["id"], []):
             add(sev, kind, text)
     issues.sort(key=lambda i: (-i["severity"], i["player"]))
-    # Гайды Mythic Trap: способности из «Кому что поправить», у которых есть разбор, — кликабельные
+    # Гайды Mythic Trap: способности из «Кому что поправить», у которых есть разбор, — кликабельные,
+    # с роликом и кратким описанием. Нет на Mythic Trap — ссылка и описание с Wowhead (на русском).
     try:
-        from .guides import find as guide_find
-        quoted = {m for i in issues for m in re.findall(r"«([^»]+)»", i["text"])}
-        by_name: dict = defaultdict(list)
-        for sid, n in names.items():
-            if n in quoted:
-                by_name[n].append(sid)
-        guide_links, guide_videos = {}, {}
-        for n in quoted:
-            g = next((x for x in (guide_find(sid, None, f.get("difficulty"), f.get("name")) for sid in by_name.get(n, [])) if x), None) \
-                or guide_find(None, n, f.get("difficulty"), f.get("name"))
-            if g:
-                guide_links[n] = g["url"]
-                if g.get("video"):
-                    guide_videos[n] = g["video"]
+        guide_info = guide_info_for({m for i in issues for m in re.findall(r"«([^»]+)»", i["text"])},
+                                    names, f, online=not code.startswith("DEMO"))
     except Exception:  # noqa: BLE001 — ссылки на гайды необязательны
-        guide_links, guide_videos = {}, {}
+        guide_info = {}
+    guide_links = {n: g["url"] for n, g in guide_info.items()}
+    guide_videos = {n: g["video"] for n, g in guide_info.items() if g.get("video")}
     # Боевое зелье — в блок «Расходники на пулле», а не в «Что проверить»
     no_potion = sorted(x["name"] for x in rows if x["potions"] == 0)
     if extras.get("consumables") is None:
@@ -549,7 +567,7 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
     return {"mode": "raid", "info": info, "summary": summary, "players": rows, "abilities": abilities,
             "heatmap": heatmap, "raidwide": raidwide, "deaths": deaths, "pulls": pulls,
             "timeline": sorted(timeline, key=lambda e: (e["lane"], e["t"])), "lanes": lanes,
-            "issues": issues, "guide_links": guide_links, "guide_videos": guide_videos, "extras": {**{k: v for k, v in extras.items() if k != "issues"}, "pull_trend": pull_trend},
+            "issues": issues, "guide_links": guide_links, "guide_videos": guide_videos, "guide_info": guide_info, "extras": {**{k: v for k, v in extras.items() if k != "issues"}, "pull_trend": pull_trend},
             "brief": _raid_brief(info, summary, issues, extras, deaths, kill),
             "thresholds": {"active": ACTIVE_LOW, "select": SELECT_RATIO, "raidwide": RAIDWIDE_RATIO,
                            "parse": PARSE_LOW, "wipe_tail": WIPE_TAIL_S}}

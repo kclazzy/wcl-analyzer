@@ -187,6 +187,14 @@ dialog::backdrop{background:rgba(22,33,58,.45)}
 .vplay{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 2px 0 4px;padding:0;border:0;border-radius:50%;background:var(--top);color:#fff;font-size:11px;line-height:1;cursor:pointer;vertical-align:middle}
 .vplay:hover,.vplay:focus-visible{background:var(--ink)}
 #videoDlg{max-width:860px;padding:18px}
+.vinfo{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 2px 0 4px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:var(--ink);font:600 13px/1 Georgia,serif;cursor:pointer;vertical-align:middle}
+.vinfo[aria-expanded="true"],.vinfo:hover,.vinfo:focus-visible{background:var(--ink);color:#fff;border-color:var(--ink)}
+.gdesc{margin:8px 0 2px;padding:10px 12px;border-left:3px solid var(--top);border-radius:0 var(--r-sm) var(--r-sm) 0;background:var(--soft);font-size:15px;line-height:1.5}
+.gdesc .gh{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline}
+.gdesc .gh .en{color:var(--muted);font-size:13.5px}
+.gdesc .gt{font-size:12.5px;padding:1px 8px;border-radius:99px;background:var(--top-soft);color:var(--ink)}
+.gdesc p{margin:6px 0 0}
+.gdesc .gsrc{display:block;margin-top:6px;font-size:12.5px;color:var(--muted)}
 #videoDlg video{display:block;width:100%;max-height:70vh;border-radius:var(--r-sm);background:#000}
 #videoDlg .vsrc{font-size:13px;color:var(--muted);margin-top:8px}
 #videoDlg .verr{display:none;padding:18px;border-radius:var(--r-sm);background:var(--warn-soft);color:var(--ink)}
@@ -920,17 +928,46 @@ function render(R){
 }
 
 
-/* «Способность» в тексте → ссылка на гайд Mythic Trap, если он есть в программе (data/guides.json),
-   и ▶ — ролик механики, если он есть на сайте (хранится только адрес, видео грузится при просмотре) */
-function guideText(text, links, videos){
-  if (!links) return esc(text);
+/* «Способность» в тексте → ссылка на гайд Mythic Trap (или Wowhead, если гайда нет), ▶ — ролик механики
+   (хранится только адрес, видео грузится при просмотре), ⓘ — краткое описание и что делать */
+function guideText(text, links, videos, info){
+  if (!links && !info) return esc(text);
   return String(text).split(/(«[^»]+»)/).map(part => {
-    const m = part.match(/^«([^»]+)»$/), url = m && links[m[1]], v = m && videos && videos[m[1]];
-    if (!url) return esc(part);
-    const play = v ? `<button type="button" class="vplay" data-v="${esc(v)}" data-g="${esc(url)}" data-n="${esc(m[1])}" title="Смотреть ролик механики" aria-label="Смотреть ролик: ${esc(m[1])}">▶</button>` : "";
-    return `«<a href="${esc(url)}" target="_blank" rel="noopener" title="Гайд Mythic Trap по этой способности">${esc(m[1])}</a>»${play}`;
+    const m = part.match(/^«([^»]+)»$/);
+    if (!m) return esc(part);
+    const g = (info && info[m[1]]) || (links && links[m[1]] ? {url: links[m[1]], video: videos && videos[m[1]], src: "mt"} : null);
+    if (!g || !g.url) return esc(part);
+    const wh = g.src === "wowhead";
+    const play = g.video ? `<button type="button" class="vplay" data-v="${esc(g.video)}" data-g="${esc(g.url)}" data-n="${esc(m[1])}" title="Смотреть ролик механики" aria-label="Смотреть ролик: ${esc(m[1])}">▶</button>` : "";
+    const more = (g.desc || g.todo || g.type) ? `<button type="button" class="vinfo" data-k="${esc(m[1])}" aria-expanded="false" title="Кратко о способности" aria-label="Кратко о способности: ${esc(m[1])}">i</button>` : "";
+    return `«<a href="${esc(g.url)}" target="_blank" rel="noopener" title="${wh ? "Способность на Wowhead (гайда Mythic Trap нет)" : "Гайд Mythic Trap по этой способности"}">${esc(m[1])}</a>»${play}${more}`;
   }).join("");
 }
+/* Скрытые блоки описаний для ⓘ — по одному на способность из текста */
+function guideDesc(text, info){
+  if (!info) return "";
+  const seen = new Set();
+  return (String(text).match(/«[^»]+»/g) || []).map(q => q.slice(1, -1)).filter(n => !seen.has(n) && seen.add(n)).map(n => {
+    const g = info[n];
+    if (!g || !(g.desc || g.todo || g.type)) return "";
+    const ru = g.name_ru && g.name_ru !== n ? g.name_ru : "", en = g.name_en && g.name_en !== n && g.name_en !== ru ? g.name_en : "";
+    const src = [g.desc ? "описание — Wowhead" : "", (g.todo || g.type) ? "совет — Mythic Trap" : ""].filter(Boolean).join(", ");
+    return `<div class="gdesc" data-k="${esc(n)}" hidden>
+      <div class="gh"><b>${esc(ru || n)}</b>${ru ? `<span class="en">${esc(n)}</span>` : en ? `<span class="en">${esc(en)}</span>` : ""}${g.type ? `<span class="gt">${esc(g.type)}</span>` : ""}</div>
+      ${g.desc ? `<p>${esc(g.desc)}</p>` : ""}
+      ${g.todo ? `<p><b>Что делать:</b> ${esc(g.todo)}</p>` : ""}
+      <span class="gsrc">${esc(src[0].toUpperCase() + src.slice(1))}</span></div>`;
+  }).join("");
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest(".vinfo");
+  if (!b) return;
+  e.preventDefault();
+  const box = b.closest(".gwrap"), d = box && [...box.querySelectorAll(".gdesc")].find(x => x.dataset.k === b.dataset.k);
+  if (!d) return;
+  d.hidden = !d.hidden;
+  b.setAttribute("aria-expanded", String(!d.hidden));
+});
 function openVideo(btn){
   const dlg = document.getElementById("videoDlg"), v = document.getElementById("videoEl"), err = document.getElementById("videoErr");
   document.getElementById("videoTitle").textContent = "Ролик: " + btn.dataset.n;
@@ -1399,7 +1436,7 @@ function renderRaid(R){
       ${(R.brief||[]).length ? `<ul class="lines">${R.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : '<p class="empty">Явных проблем не найдено.</p>'}
       ${(R.extras||{}).damage_timeline ? `<p class="hint" style="margin:12px 0 0">График урона по рейду, план сейвов на следующий пулл и сравнение с лучшими киллами — во вкладке «Полученный урон и сейвы».</p>` : ""}
       ${topIssues(R.issues).length ? `<h3 style="margin-top:16px">Кому что поправить</h3>` + topIssues(R.issues).map(i=>`<div class="issue"><div class="who"><b>${esc(i.player)}</b><span>${esc(i.role)}, ${esc(who(i.cls, i.spec))}</span></div>
-          <div>${guideText(i.text, R.guide_links, R.guide_videos)}</div><span class="sev s${i.severity}">${i.kind?esc(i.kind):""}</span></div>`).join("") : ""}
+          <div class="gwrap">${guideText(i.text, R.guide_links, R.guide_videos, R.guide_info)}${guideDesc(i.text, R.guide_info)}</div><span class="sev s${i.severity}">${i.kind?esc(i.kind):""}</span></div>`).join("") : ""}
     </div>
     <details class="more" id="more"><summary>Подробности: полученный урон и сейвы, игроки, механики, смерти, пуллы</summary>
     <div class="legend raidleg"><span><i class="role tank"></i>Танк</span><span><i class="role healer"></i>Лекарь</span><span><i class="role dps"></i>DPS</span></div>

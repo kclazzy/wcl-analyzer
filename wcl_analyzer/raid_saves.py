@@ -34,7 +34,7 @@ def pick_fights(report: dict) -> list[dict]:
 def run_raid_saves(client, url: str, log=print, progress=lambda x: None, talent_data=None,
                    save_talents: bool = True, avoidable: set | None = None) -> dict:
     from .raid import run_raid
-    from .raid_top import mrt_note
+    from .raid_top import mrt_heal_note, mrt_note
 
     code, _, _ = parse_report_url(url)
     report = client.report(code)
@@ -77,7 +77,7 @@ def run_raid_saves(client, url: str, log=print, progress=lambda x: None, talent_
             "boss": I["boss"], "difficulty": I["difficulty"], "fight_id": I["fight_id"], "kill": I["kill"],
             "boss_pct": I.get("boss_pct"), "duration": I["duration"], "url": I["url"], "phases": I.get("phases") or [],
             "pulls": c["pulls"], "kills": c["kills"], "size": I.get("size"), "healers": I.get("healers"),
-            "plan": plan, "mrt": mrt_note(plan, I["boss"]),
+            "plan": plan, "mrt": mrt_note(plan, I["boss"]), "mrt_heal": mrt_heal_note(plan, I["boss"]),
             "saves_brief": X.get("saves_brief") or [],
             "top_kills": V.get("kills") or [], "top_cover": V.get("top_cover"), "my_cover": V.get("my_cover"),
             "roster": len({c["player"] for c in X.get("roster_cds") or []}),

@@ -425,10 +425,10 @@ def _plan_text(r: dict) -> str:
     picks = r.get("picks")
     if picks is None:  # разборы старых версий
         return (r["cd"] + " — " + (r["player"] or "") + (" (как у топа)" if r["like_top"] else "")) if r["cd"] else "нет свободного кулдауна"
-    if not picks:
-        return "нет свободного кулдауна"
     text = "; ".join(f"{p['cd']} — {p['player']}{' (как у топа)' if p['like_top'] else ''}, откат {p['cooldown']}, "
-                     f"снова готов в {p['ready']}" for p in picks)
+                     f"снова готов в {p['ready']}" for p in picks) or "нет свободного кулдауна"
+    if r.get("heal_picks"):  # кулдауны лекарей на этот пик — своё время нажатия
+        text += ". Лекари: " + "; ".join(f"{p['cd']} — {p['player']} в {p['at']}" for p in r["heal_picks"])
     if r.get("spare"):
         text += ". Запасные: " + "; ".join(f"{x['cd']} — {x['player']}" for x in r["spare"])
     return text
@@ -452,14 +452,16 @@ def _vs_top(wb, R, demo):
         s.ws.column_dimensions["C"].width = 70
         if V["plan"]:
             s.ws.conditional_formatting.add(f"C{f}:C{l}", CellIsRule(operator="equal", formula=['"нет свободного кулдауна"'], fill=RED))
-        from .raid_top import mrt_note
-        note = mrt_note(V["plan"], (R.get("info") or {}).get("boss", ""))
-        if note:
-            s.section("Заметка для MRT", "Скопируйте строки ниже целиком: в игре /mrt → Заметки → вставить → Отправить.")
-            for line in note.split("\n"):
-                s.cell(s.row, 1, line)
+        from .raid_top import mrt_heal_note, mrt_note
+        boss = (R.get("info") or {}).get("boss", "")
+        for title, note in (("Заметка для MRT — рейдовые сейвы", mrt_note(V["plan"], boss)),
+                            ("Заметка для MRT — кулдауны лекарей", mrt_heal_note(V["plan"], boss))):
+            if note:
+                s.section(title, "Скопируйте строки ниже целиком: в игре /mrt → Заметки → вставить → Отправить.")
+                for line in note.split("\n"):
+                    s.cell(s.row, 1, line)
+                    s.row += 1
                 s.row += 1
-            s.row += 1
         s.section("Пики урона: ваш бой и лучшие киллы",
                   f"Закрыто кулдауном: у топа {V['top_cover']:.0%}, у вас {V['my_cover']:.0%}." if V["top_cover"] is not None
                   and V["my_cover"] is not None else None)
@@ -512,12 +514,13 @@ def write_saves_workbook(R: dict, path: str | Path, wb=None) -> Path:
             [[b["boss"], b["difficulty"], ("килл " if b["kill"] else "вайп ") + b["duration"], len(b["plan"]),
               "есть" if b["mrt"] else "нет назначенных кулдаунов"] for b in R["bosses"]], [None, None, None, F_INT, None])
     for b in R["bosses"]:
-        if not b["mrt"]:
-            continue
-        s.section(f"MRT: {b['boss']} ({b['difficulty']})")
-        for line in b["mrt"].split("\n"):
-            s.cell(s.row, 1, line)
-            s.row += 1
+        for label, note in (("MRT", b.get("mrt")), ("MRT, кулдауны лекарей", b.get("mrt_heal"))):
+            if not note:
+                continue
+            s.section(f"{label}: {b['boss']} ({b['difficulty']})")
+            for line in note.split("\n"):
+                s.cell(s.row, 1, line)
+                s.row += 1
     if R.get("skipped"):
         s.section("Пропущены")
         for x in R["skipped"]:
@@ -536,11 +539,13 @@ def write_saves_workbook(R: dict, path: str | Path, wb=None) -> Path:
         t.table(["Нажать в", "Пик", "Кулдауны и кто", "У топа здесь"],
                 [[r["time"] + (f" ({r['phase_name']} +{r['phase_time']})" if (r.get("phase") or 0) > 1 and r.get("phase_time") else ""),
                   r["mechanic"], _plan_text(r), r.get("top") or "—"] for r in b["plan"]])
-        if b["mrt"]:
-            t.section("Заметка для MRT", "В игре: /mrt → Заметки → вставить → Отправить.")
-            for line in b["mrt"].split("\n"):
-                t.cell(t.row, 1, line)
-                t.row += 1
+        for title, note in (("Заметка для MRT — рейдовые сейвы", b.get("mrt")),
+                            ("Заметка для MRT — кулдауны лекарей", b.get("mrt_heal"))):
+            if note:
+                t.section(title, "В игре: /mrt → Заметки → вставить → Отправить.")
+                for line in note.split("\n"):
+                    t.cell(t.row, 1, line)
+                    t.row += 1
     if not own:
         return wb
     path = Path(path)

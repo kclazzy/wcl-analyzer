@@ -186,6 +186,28 @@ def test_plan_long_fight():
     print("OK план сейвов: сильные пики в конце длинного боя (у топа их нет) тоже закрыты")
 
 
+def test_plan_healer_cds():
+    """Кулдауны лекарей на себя (Апофеоз, Перерождение…) — не в сейвах, а отдельным проходом на самые тяжёлые
+    пики, отдельной заметкой MRT, с перезарядкой."""
+    from wcl_analyzer.raid_top import make_plan, mrt_heal_note, mrt_note
+    roster = [{"pid": 1, "player": "Элария", "name": "Божественный гимн", "id": 64843, "cd": 180, "cls": "Priest"},
+              {"pid": 1, "player": "Элария", "name": "Апофеоз", "id": 200183, "cd": 120, "cls": "Priest"},
+              {"pid": 2, "player": "Таргун", "name": "Перерождение", "id": 114052, "cd": 180, "cls": "Shaman"}]
+    X = {"roster_cds": roster, "spikes": [{"t": t, "peak_t": t + 2, "ability": "Волна", "ability_id": 5, "k": i + 1, "damage": d}
+                                         for i, (t, d) in enumerate(((30, 100), (90, 300), (200, 250)))]}
+    plan = make_plan(X, {}, [], {})
+    raid_cds = {p["cd"] for r in plan for p in r["picks"]}
+    heal = [(r["mechanic"], p["cd"], p["t"]) for r in plan for p in r.get("heal_picks", [])]
+    assert raid_cds == {"Божественный гимн"}, raid_cds                      # в сейвах — только рейдовый кулдаун
+    assert {c for _, c, _ in heal} == {"Апофеоз", "Перерождение"}, heal
+    apo = sorted(t for _, c, t in heal if c == "Апофеоз")
+    assert all(b - a >= 120 for a, b in zip(apo, apo[1:])), apo             # перезарядка соблюдена
+    assert any(m == "«Волна» №2" for m, _, _ in heal)                         # самый тяжёлый пик — с кулдауном лекаря
+    note = mrt_heal_note(plan, "Демо")
+    assert note.startswith("Кулдауны лекарей: Демо") and "{spell:200183}" in note and "{spell:200183}" not in mrt_note(plan, "Демо")
+    print("OK план: кулдауны лекарей — отдельным проходом и отдельной заметкой MRT")
+
+
 def test_plan_longer_phase():
     """Ваша фаза длиннее, чем у топа: пики сопоставляются по фазе и номеру в фазе, а повторения сверх топа
     получают сейвы по образцу этой же способности у топа (какие кулдауны и сколько)."""
@@ -615,6 +637,7 @@ if __name__ == "__main__":
     test_fight_mode()
     test_top_progress()
     test_plan_longer_phase()
+    test_plan_healer_cds()
     test_saves_all_bosses()
     test_gear_and_trinkets()
     main()

@@ -1197,6 +1197,7 @@ function renderTalents(T, el){
 function renderRaidPeaks(P, el){
   if (!P) { el.innerHTML = box("Рейдовые кулдауны в пики урона", "", '<p class="empty">Нет данных: урон по рейду для этого боя не загрузился. </p>'); return; }
   const X = P.extras || {}, V = X.vs_top, H = [...(X.heaviest || [])].sort((a, b) => a.t - b.t), TP = (P.info || {}).top_progress;  // по ходу боя
+  const HT = (TP ? TP.guild + " — " : "") + ((P.info||{}).boss || "");
   el.innerHTML = `
     ${(P.brief||[]).length ? `<div class="box brief"><ul class="lines">${P.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
     ${box("Урон по рейду и рейдовые кулдауны", "Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники — рейдовые кулдауны вашего рейда (красная обводка — нажат вне пиков)" + (V ? ", полые бирюзовые — что жмут лучшие киллы." : "."),
@@ -1214,10 +1215,11 @@ function renderRaidPeaks(P, el){
         r.top_raid!==undefined ? scopeCell(r.top_raid, r.top_self||[], false) : esc((r.top_cds||[]).join(", ")||"—")]),
         {num:[3], cls:"wide", flag:i=>{const r=V.rows[i]; return r.my!=null && !r.my.length && (r.top_share||0)>=0.5;}}) + "</div>" : ""}
     ${box(TP ? `Самые тяжёлые моменты боя ${TP.guild}` : "Самые тяжёлые моменты вашего боя", "5 секунд с наибольшим уроном по рейду, по ходу боя. Кулдаун засчитан, если нажат за 8 с до момента или во время него."
-        + ((X.heaviest_mrt||[]).length ? " «Скопировать для MRT» — заметка с этими нажатиями, один список по времени: у рейдовых кулдаунов и у кулдаунов лекарей — свои строки со своим временем первого нажатия." : ""),
+        + ((X.heaviest_mrt||[]).length ? " Под таблицей — две заметки MRT с этими нажатиями: рейдовые сейвы и, отдельно, кулдауны лекарей; у каждой строки — время первого нажатия." : ""),
       table(["Когда","Урон за 5 с","Доля боя","Механики","Нажатые рейдовые кулдауны"], H.map(h=>[h.time, num(h.damage), pct(h.share,0), esc(h.abilities.join(", ")),
         h.cds.length?esc([...new Set(h.cds)].join(", ")):'<span class="worse">ничего</span>']), {num:[1,2], empty:"Нет данных об уроне.", flag:i=>!H[i].cds.length})
-      + mrtBlock(X.heaviest_mrt || [], (TP ? TP.guild + " — " : "") + ((P.info||{}).boss || "")))}
+      + (HM => mrtBlock(HM.filter(x => (x.kind || "raid") === "raid"), HT, {label: "Скопировать сейвы для MRT"})
+          + mrtBlock(HM.filter(x => x.kind === "heal").map(x => ({mrt_heal: x.mrt, heal_t: x.t})), HT, HEAL_MRT))(X.heaviest_mrt || []))}
     ${(X.roster_cds||[]).length ? box("Рейдовые кулдауны состава", "У кого какой рейдовый кулдаун есть и сколько раз его можно нажать за бой при этой перезарядке. Красным — ни разу не нажат.",
       table(["Игрок","Кулдаун","Откат","Нажато","Можно за бой","Откуда известно"], X.roster_cds.map(c=>[`${esc(c.player)} <span style="color:var(--muted);font-size:13.5px">${esc(who(c.cls, c.spec))}</span>`,
         esc(c.name), mmss(c.cd).replace(/,0$/,""), num(c.used), c.max_uses==null?"—":num(c.max_uses), esc(c.source)]), {num:[2,3,4], flag:i=>!X.roster_cds[i].used})) : ""}`;
@@ -1234,20 +1236,26 @@ function scopeCell(raid, self, mine){
 
 /* План сейвов: на пик — один или два кулдауна; у каждого — откат и когда он снова готов */
 /* Заметка для Method Raid Tools: строки готовит сервер (поле mrt у каждого пика) */
-function mrtNote(plan, title){
-  const lines = plan.map(r => r.mrt || ((r.picks||[]).length
+function mrtNote(plan, title, field = "mrt", prefix = "Сейвы"){
+  const rows = field === "mrt" ? plan : [...plan].filter(r => r[field]).sort((a, b) => (a.heal_t ?? a.t ?? 0) - (b.heal_t ?? b.t ?? 0));
+  const lines = rows.map(r => r[field] || (field === "mrt" && (r.picks||[]).length
     ? `{time:${(r.time||"0:00").replace(/,\d+$/,"")}}${String(r.mechanic||"").replace(/[«»]/g,"")} - ${r.picks.map(p=>p.player+" "+p.cd).join("  ")}` : "")).filter(Boolean);
-  return lines.length ? [title ? "Сейвы: "+title : "Сейвы", ...lines].join("\n") : "";
+  return lines.length ? [title ? prefix + ": " + title : prefix, ...lines].join("\n") : "";
 }
-function mrtBlock(plan, title){
-  const note = mrtNote(plan, title);
+/* Блок «скопировать для MRT». opts: field — поле строк (mrt | mrt_heal), prefix — заголовок заметки, label — надпись кнопки */
+function mrtBlock(plan, title, opts = {}){
+  const note = mrtNote(plan, title, opts.field || "mrt", opts.prefix || "Сейвы");
   if (!note) return "";
+  const label = opts.label || "Скопировать для MRT";
   return `<div class="mrt" style="margin-top:12px">
-    <button type="button" class="mini mrtbtn" data-mrt>Скопировать для MRT</button>
-    <span class="hint" style="margin-left:8px">В игре: /mrt → Заметки → вставить (Ctrl+V) → Отправить. Время — от пулла, а со 2-й фазы — от начала фазы (p2, p3…). Номера фаз сверьте с вашим босс-модом.</span>
+    <button type="button" class="mini mrtbtn" data-mrt data-label="${esc(label)}">${esc(label)}</button>
+    <span class="hint" style="margin-left:8px">${opts.hint ? esc(opts.hint) + " " : ""}В игре: /mrt → Заметки → вставить (Ctrl+V) → Отправить. Время — от пулла, а со 2-й фазы — от начала фазы (p2, p3…). Номера фаз сверьте с вашим босс-модом.</span>
     <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:13.5px">Текст заметки</summary>
       <textarea readonly rows="${Math.min(14, note.split("\n").length + 1)}" style="width:100%;margin-top:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;box-sizing:border-box">${esc(note)}</textarea></details></div>`;
 }
+/* Две заметки: рейдовые сейвы и кулдауны лекарей (у каждой свои строки и своё время) */
+const HEAL_MRT = {field: "mrt_heal", prefix: "Кулдауны лекарей", label: "Скопировать кулдауны лекарей для MRT",
+                  hint: "Отдельная заметка: Апофеоз, Древо Жизни, Природная мощь, Перерождение и др. — на самые тяжёлые пики."};
 async function copyText(text, ta){
   try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch (e) {}
   try {  // запасной путь (Android WebView, старые браузеры): выделить текст и скопировать
@@ -1262,7 +1270,7 @@ document.addEventListener("click", async ev => {
   const wrap = b.closest(".mrt"), ta = wrap.querySelector("textarea");
   const ok = await copyText(ta.value, null);
   if (!ok) { wrap.querySelector("details").open = true; ta.focus(); ta.select(); }
-  const old = "Скопировать для MRT"; b.textContent = ok ? "Скопировано ✓" : "Выделено — нажмите «Копировать»";
+  const old = b.dataset.label || "Скопировать для MRT"; b.textContent = ok ? "Скопировано ✓" : "Выделено — нажмите «Копировать»";
   setTimeout(() => b.textContent = old, 2500);
 });
 
@@ -1270,7 +1278,7 @@ function planTable(plan, title, phases){
   const ph = (phases||[]).length > 1 ? `<p class="hint" style="margin:0 0 8px">Фазы этого боя: ${phases.map(p=>`<b>${esc(p.name)}</b>${p.intermission?' <span class="tag MEDIUM">переход</span>':""} с ${btT(p.t)}`).join(" · ")}.
     Время от начала фазы показано под «Нажать в» — по нему и ставятся таймеры MRT: если фаза придёт раньше или позже, сейвы сдвинутся вместе с ней.
     Кулдаун, который жмётся в разных фазах, планируется с запасом 10 с на смещение фазы.</p>` : "";
-  return ph + planRows(plan) + mrtBlock(plan, title);
+  return ph + planRows(plan) + mrtBlock(plan, title, {label: "Скопировать сейвы для MRT"}) + mrtBlock(plan, title, HEAL_MRT);
 }
 function planRows(plan){
   return table(["Нажать в","Пик","Кулдауны и кто"], plan.map(r=>{
@@ -1285,6 +1293,8 @@ function planRows(plan){
           + (p.cooldown ? `<span style="color:var(--muted);font-size:13.5px"> · откат ${esc(p.cooldown)}, снова готов в ${esc(p.ready)}</span>` : "") + "</div>").join("")
         : '<span class="worse">нет свободного кулдауна</span>')
       + (!picks.some(p=>p.like_top) && r.top ? `<div style="font-size:13.5px;color:var(--muted)">у топа здесь: ${esc(r.top)}</div>` : "")
+      + ((r.heal_picks||[]).length ? r.heal_picks.map(p => `<div style="margin-top:3px"><span class="tag k-trinket">лекарь</span> <b>${esc(p.cd)}</b> — ${esc(p.player)}`
+          + `<span style="color:var(--muted);font-size:13.5px"> · нажать в ${esc(p.at)}, откат ${esc(p.cooldown)}</span></div>`).join("") : "")
       + ((r.spare||[]).length ? `<div style="font-size:13.5px;color:var(--muted);margin-top:3px">Запасные, откатаны к этому моменту: ${r.spare.map(x=>`${esc(x.cd)} — ${esc(x.player)}`).join("; ")}</div>` : "")];
   }));
 }

@@ -257,6 +257,7 @@ HEAVY_PEAK = 1.25    # пик тяжелее медианы пиков в 1,25 �
 DANGER_PEAK = 1.6    # в 1,6 раза — три
 MAX_PER_PEAK = 3
 MAX_SPARE = 3        # запасных вариантов на пик
+MAX_HEAL_PER_PEAK = 2  # кулдаунов лекарей на один пик (разные лекари)
 
 
 def _top_phase(r: dict) -> tuple[int | None, float | None]:
@@ -340,10 +341,15 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
         states.append({"ev": ev, "r": r, "pref": pref, "top_need": top_need, "need": need, "picks": [], "players": set(),
                        "how": how})
 
+    # Рейдовые сейвы и кулдауны лекарей на себя (Апофеоз, Древо Жизни…) планируются раздельно:
+    # сейвы — по пикам, как у топа; кулдауны лекарей — вторым проходом на самые тяжёлые пики, своей заметкой
+    raid_keys = [k for k in cds if game_data.scope(k[1]) != "self"]
+    heal_keys = [k for k in cds if game_data.scope(k[1]) == "self"]
+
     def add_one(st) -> bool:
         ev, pref, picks, players = st["ev"], st["pref"], st["picks"], st["players"]
         # Сначала кулдаун, который здесь жмёт топ; затем — реже назначенный и более сильный
-        order = sorted(cds, key=lambda k: (pref.index(k[1]) if k[1] in pref else 99, len(assigned[k]),
+        order = sorted(raid_keys, key=lambda k: (pref.index(k[1]) if k[1] in pref else 99, len(assigned[k]),
                                            -game_data.power(k[1]), cds[k]["cd"]))
         for k in order:
             # на один пик — разные игроки и разные способности: два одинаковых кулдауна
@@ -368,6 +374,21 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
     for st in by_weight:
         while len(st["picks"]) < st["need"] and add_one(st):
             pass
+    # Кулдауны лекарей: самые тяжёлые пики первыми, на пик — до MAX_HEAL_PER_PEAK разных лекарей,
+    # перезарядка и запас на смещение фазы — как у сейвов
+    for st in by_weight:
+        st["heal"] = []
+        for k in sorted(heal_keys, key=lambda k: (len(assigned[k]), -game_data.power(k[1]), cds[k]["cd"])):
+            if len(st["heal"]) >= MAX_HEAL_PER_PEAK:
+                break
+            if any(cds[k]["player"] == cds[h]["player"] or k[1] == h[1] for h, _ in st["heal"]):
+                continue
+            for lead in range(PRESS_WINDOW_S[1], PRESS_WINDOW_S[0] - 1, -1):
+                at = max(0.0, st["ev"]["t"] - lead)
+                if free(k, at):
+                    assigned[k].append(at)
+                    st["heal"].append((k, at))
+                    break
     plan = []
     for st in sorted(states, key=lambda st: st["ev"]["t"]):
         ev, r, pref, top_need, need = st["ev"], st["r"], st["pref"], st["top_need"], st["need"]
@@ -398,13 +419,26 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                          for k, at in picks]}
         row["mrt"] = mrt_line(t0, ev["mechanic"], row["picks"], n if (n or 0) > 1 else None, rel,
                               mech_id=(ev.get("key") or (None,))[0])
+        heal = sorted(st.get("heal") or [], key=lambda p: p[1])
+        row["heal_picks"] = [{"cd": cds[k]["name"], "player": cds[k]["player"], "cooldown": _fmt_t(cds[k]["cd"]),
+                              "ready": _fmt_t(at + cds[k]["cd"]), "at": _fmt_t(at), "t": at, "id": cds[k]["id"],
+                              "cls": cds[k].get("cls") or game_data.class_of(cds[k]["id"])} for k, at in heal]
+        if heal:  # своё время — первое нажатие лекаря, со 2-й фазы — от начала фазы
+            th = heal[0][1]
+            nh = ph_n(th)
+            ph_info = next((p for p in phases if p["n"] == nh), None)
+            sh = ph_info["t"] if ph_info else None
+            row["heal_time"] = _fmt_t(th)
+            row["mrt_heal"] = mrt_line(th, ev["mechanic"], row["heal_picks"], nh if (nh or 0) > 1 else None,
+                                       max(0.0, th - sh) if sh is not None else None, mech_id=(ev.get("key") or (None,))[0])
+            row["heal_t"] = th
         if picks:
             f = row["picks"][0]
             row.update({"cd": f["cd"], "player": f["player"], "like_top": any(x["like_top"] for x in row["picks"])})
         else:
             row.update({"cd": None, "player": None, "like_top": False})
         row["_t"] = ev["t"]
-        row["_keys"] = [k for k, _ in picks]
+        row["_keys"] = [k for k, _ in picks] + [k for k, _ in heal]
         plan.append(row)
     # Запасные варианты: кулдауны, которые к этому пику откатаны и не мешают остальному плану
     for row in plan:
@@ -463,6 +497,14 @@ def mrt_note(plan: list[dict], title: str = "") -> str:
         return ""
     head = [f"Сейвы: {title}" if title else "Сейвы"]
     return "\n".join(head + lines)
+
+
+def mrt_heal_note(plan: list[dict], title: str = "") -> str:
+    """Кулдауны лекарей из плана — отдельной заметкой MRT, по времени своих нажатий."""
+    rows = sorted((r for r in plan if r.get("mrt_heal")), key=lambda r: r.get("heal_t", r["t"]))
+    if not rows:
+        return ""
+    return "\n".join([f"Кулдауны лекарей: {title}" if title else "Кулдауны лекарей"] + [r["mrt_heal"] for r in rows])
 
 
 def brief_lines(vs: dict | None) -> list[str]:

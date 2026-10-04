@@ -1,7 +1,8 @@
 # Автосборка: Windows-программа (.exe) и Android-приложение (.apk).
-# Запускается при каждой загрузке файлов в репозиторий и вручную (Actions → Сборка → Run workflow).
-# Готовые файлы: вкладка Actions → последний запуск → Artifacts.
-# Если создать тег vX.Y.Z — файлы появятся в разделе Releases.
+# Запускается при каждой загрузке файлов в репозиторий и вручную (Actions → Сборка → Run workflow),
+# а также из «Ссылок на гайды» (gh workflow run). Каждая успешная сборка main публикует выпуск
+# v1.1.<номер запуска> (Releases → latest): WCL-Analyzer.exe, WCL-Analyzer.apk, архив кода и update.json.
+# Файлы отдельного запуска есть и во вкладке Actions → запуск → Artifacts.
 name: Сборка
 
 on:
@@ -23,6 +24,8 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python tests/test_pipeline.py
       - run: python tests/test_web.py
+      - run: python tests/test_update.py
+      - run: python tests/test_local_security.py
 
   windows:
     needs: tests
@@ -149,11 +152,15 @@ jobs:
           path: android/bin/*.apk
 
   # После каждой успешной сборки main — выпуск с прямыми ссылками (без входа в GitHub и без zip):
-  # программа сама проверяет его кнопкой «Проверить обновления»
+  # программа сама проверяет его кнопкой «Проверить обновления». Публикует и ручной запуск на main
+  # (в том числе еженедельный из «Ссылок на гайды»); два выпуска одновременно не публикуются.
   publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: [windows, android]
     runs-on: ubuntu-22.04
+    concurrency:
+      group: publish-main
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - name: Версия сборки
@@ -168,20 +175,27 @@ jobs:
           sed -i "s/^SHELL_ID = \"dev\"/SHELL_ID = \"$SHELL_ID\"/" wcl_boot.py
           echo "SHELL_ID=$SHELL_ID" >> "$GITHUB_ENV"
           cat wcl_analyzer/_build.py
-      - name: Архив кода и update.json
-        run: |
-          zip -qr wcl_analyzer-code.zip wcl_analyzer -x '*/__pycache__/*' '*.pyc'
-          SHA=$(sha256sum wcl_analyzer-code.zip | cut -d' ' -f1)
-          printf '{"build": %s, "shell": "%s", "sha256": "%s", "date": "%s"}\n' \
-            "${{ github.run_number }}" "$SHELL_ID" "$SHA" "$(date -u +%FT%TZ)" > update.json
-          cat update.json
-          echo "UPDATE_JSON=$(cat update.json)" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with: {path: out}
       - name: Файлы выпуска
         run: |
           cp "out/WCL-Analyzer-Windows/WCL Analyzer.exe" WCL-Analyzer.exe
           cp out/WCL-Analyzer-Android/*.apk WCL-Analyzer.apk
+      - name: Архив кода и update.json
+        run: |
+          zip -qr wcl_analyzer-code.zip wcl_analyzer -x '*/__pycache__/*' '*.pyc'
+          SHA=$(sha256sum wcl_analyzer-code.zip | cut -d' ' -f1)
+          # отпечаток файлов кода — для проверки обновления, скачанного по файлам через jsDelivr
+          CODE_SHA=$(python3 -B -c "from wcl_analyzer.update import code_tree_hash; print(code_tree_hash('wcl_analyzer'))")
+          # программа целиком: контрольная сумма и размер — программа проверяет их перед заменой
+          EXE_SHA=$(sha256sum WCL-Analyzer.exe | cut -d' ' -f1); EXE_SIZE=$(stat -c %s WCL-Analyzer.exe)
+          APK_SHA=$(sha256sum WCL-Analyzer.apk | cut -d' ' -f1); APK_SIZE=$(stat -c %s WCL-Analyzer.apk)
+          printf '{"format": 2, "build": %s, "shell": "%s", "sha256": "%s", "code_sha256": "%s", "exe_sha256": "%s", "exe_size": %s, "apk_sha256": "%s", "apk_size": %s, "date": "%s"}\n' \
+            "${{ github.run_number }}" "$SHELL_ID" "$SHA" "$CODE_SHA" "$EXE_SHA" "$EXE_SIZE" "$APK_SHA" "$APK_SIZE" \
+            "$(date -u +%FT%TZ)" > update.json
+          cat update.json
+          python3 -c "import json; json.load(open('update.json'))"
+          echo "UPDATE_JSON=$(cat update.json)" >> "$GITHUB_ENV"
           ls -la WCL-Analyzer.* wcl_analyzer-code.zip update.json
       - uses: softprops/action-gh-release@v2
         with:

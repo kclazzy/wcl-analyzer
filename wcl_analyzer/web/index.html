@@ -12,7 +12,6 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Разбор WCL">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="/static/chart.umd.min.js"></script>
 <script src="/static/qrcode.js"></script>
 <style>
@@ -183,6 +182,8 @@ td .imp{font-size:13.5px}
 .fbar i{display:block;height:100%;background:var(--you);transition:width .4s}
 .allnav{position:sticky;top:0;z-index:6;background:var(--paper);padding:4px 0 2px;margin-bottom:12px}
 .allnav .tabs{margin:0}.allnav .tabs button{font-size:14px}
+/* под закреплённой панелью боссов вкладки подробного разбора не закрепляются — иначе встают под неё */
+body:has(.allnav) .tabs:not(.allnav .tabs){position:static}
 .allnav-row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin-top:8px}
 .allnav-row .mini{font-size:14px;padding:5px 12px}
 .allnav-pl{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;color:var(--muted)}
@@ -289,7 +290,13 @@ dialog label.check input{width:auto;margin:0}
   .urlrow input,.picks select,.tpgrid select,.refs-opts select{font-size:16px}
   .refs-head{flex-direction:column}.ref{grid-template-columns:1fr auto}.ref .age{grid-column:1}
   .qr{flex-direction:column;align-items:center}
-  .kpis{grid-template-columns:1fr 1fr}.issue{grid-template-columns:1fr}
+  .kpis{grid-template-columns:1fr 1fr}.issue{grid-template-columns:1fr}.issue .sev{justify-self:start}
+  /* План сейвов на телефоне — карточками: время, пик, кто жмёт — друг под другом, без прокрутки вбок */
+  table.plan thead{display:none} table.plan,table.plan tbody,table.plan tr,table.plan td{display:block;width:auto}
+  table.plan tr{padding:10px 0;border-bottom:1px solid var(--line)} table.plan td{border:0;padding:2px 0}
+  table.plan td:first-child{font-weight:700}
+  /* широкие таблицы: первый столбец (игрок, время) остаётся на месте при прокрутке вбок */
+  .tw table:not(.plan) th:first-child,.tw table:not(.plan) td:first-child{position:sticky;left:0;z-index:1;background:var(--panel)}
   .picks{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.hero{grid-template-columns:1fr}
   .hero .side{align-items:flex-start}.db{grid-template-columns:1fr;gap:4px}.db .v{text-align:left}
   .urlrow{flex-direction:column}.start h2{font-size:24px}
@@ -390,11 +397,14 @@ dialog label.check input{width:auto;margin:0}
     <div class="error" id="err" role="alert" hidden></div>
     <div class="okmsg" id="okmsg" role="status" hidden></div>
     <div class="progress" id="prog" hidden>
-      <div class="bar"><b id="barFill"></b></div>
+      <div class="bar" id="barWrap" role="progressbar" aria-label="Готовность разбора" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><b id="barFill"></b></div>
       <div class="eta" id="eta" aria-live="polite"></div>
       <div class="log" id="log" aria-live="polite"></div>
     </div>
   </section>
+
+  <!-- результат — сразу под формой: на телефоне не нужно листать через историю и настройки -->
+  <section id="result" hidden></section>
 
   <section class="refs" id="refs" hidden aria-labelledby="refsTitle">
     <div class="refs-head">
@@ -455,13 +465,12 @@ dialog label.check input{width:auto;margin:0}
       <button class="btn alt" id="exportBtn" type="button">Сохранить в файл</button>
       <button class="btn alt" id="importBtn" type="button">Загрузить из файла</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
-      <label class="check"><input type="checkbox" id="exportKey" checked> Включить в файл ключ API</label>
+      <label class="check"><input type="checkbox" id="exportKey"> Включить в файл ключ API</label>
       <span class="hint" id="importAndroidHint" hidden style="margin:0">Чтобы перенести данные с ПК, вставьте ссылку переноса в окне «Подключить ключ API».</span>
       <button class="linkbtn" id="wipeBtn" type="button" style="margin-left:auto">Удалить все мои данные</button>
     </div>
   </section>
 
-  <section id="result" hidden></section>
   <footer class="appfoot" id="appFoot" hidden>
     <span>Версия: <b id="verBuild"></b></span>
     <button class="linkbtn" id="updBtn" type="button">Проверить обновления</button>
@@ -502,11 +511,11 @@ dialog label.check input{width:auto;margin:0}
     <details class="paste">
       <summary>Есть ссылка переноса с другого устройства?</summary>
       <p class="hint" style="margin:6px 0">На другом устройстве нажмите «На другом устройстве», скопируйте ссылку под QR-кодом (или отсканируйте код и скопируйте открывшийся адрес) и вставьте сюда.</p>
-      <div style="display:flex;gap:8px"><input id="pasteLink" placeholder="https://…#import=…" autocomplete="off"><button class="btn alt" id="pasteBtn" type="button">Перенести</button></div>
+      <div style="display:flex;gap:8px"><input id="pasteLink" aria-label="Ссылка переноса с другого устройства" placeholder="https://…#import=…" autocomplete="off"><button class="btn alt" id="pasteBtn" type="button">Перенести</button></div>
     </details>
     <label for="cid">Client ID</label><input id="cid" autocomplete="off" required>
     <label for="csec">Client Secret</label><input id="csec" type="password" autocomplete="off" required>
-    <div class="error" id="keyErr" hidden></div>
+    <div class="error" id="keyErr" role="alert" hidden></div>
     <div class="row">
       <button class="btn alt" id="keyForget" type="button" hidden>Удалить ключ</button>
       <button class="btn alt" value="cancel" formnovalidate type="submit">Отмена</button>
@@ -516,6 +525,9 @@ dialog label.check input{width:auto;margin:0}
 </dialog>
 
 <script>
+/* Шрифт — без задержки показа страницы: без интернета страница сразу открывается системным шрифтом */
+(() => { const l = document.createElement("link"); l.rel = "stylesheet";
+  l.href = "https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap"; document.head.append(l); })();
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const nf0 = new Intl.NumberFormat("ru-RU",{maximumFractionDigits:0});
@@ -563,33 +575,65 @@ function showOk(msg){ const e=$("#okmsg"); e.textContent=msg; e.hidden=!msg; if 
 /* История разборов с Excel-файлами — IndexedDB этого браузера */
 const HISTORY_MAX = 40;
 let memHistory = new Map();  // если браузер не даёт IndexedDB (приватный режим) — до закрытия вкладки
+/* Две таблицы: history — разбор целиком (результат и Excel), meta — короткая запись для списка.
+   Список истории читает только meta: не нужно поднимать в память все разборы с файлами. */
+let DB = null;
 function idb(){
+  if (DB) return Promise.resolve(DB);
   return new Promise((resolve, reject) => {
     try {
-      const req = indexedDB.open("wcl-analyzer", 1);
-      req.onupgradeneeded = () => req.result.createObjectStore("history", {keyPath:"id"});
-      req.onsuccess = () => resolve(req.result);
+      const req = indexedDB.open("wcl-analyzer", 2);
+      req.onupgradeneeded = ev => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains("history")) db.createObjectStore("history", {keyPath:"id"});
+        if (!db.objectStoreNames.contains("meta")) {
+          const meta = db.createObjectStore("meta", {keyPath:"id"});
+          if (ev.oldVersion >= 1) {   // разборы прежней версии: записи списка — из самих разборов
+            req.transaction.objectStore("history").openCursor().onsuccess = e => {
+              const c = e.target.result; if (!c) return; meta.put(metaOf(c.value)); c.continue();
+            };
+          }
+        }
+      };
+      /* в другой вкладке открыта прежняя версия программы — база занята: история этой вкладки — в памяти */
+      req.onblocked = () => { reject(new Error("blocked")); if (!idb.warned) { idb.warned = true;
+        showErr("Программа открыта ещё в одной вкладке — закройте лишние вкладки и обновите страницу, иначе история разборов не сохранится."); } };
+      req.onsuccess = () => { DB = req.result; DB.onversionchange = () => { DB.close(); DB = null; }; resolve(DB); };
       req.onerror = () => reject(req.error);
     } catch(e){ reject(e); }
   });
 }
-async function histTx(mode, fn){
+function metaOf(it){
+  const I = (it.result && it.result.info) || {};
+  return {id: it.id, created: it.created, title: it.title, mode: it.mode, hasBlob: !!it.blob,
+          info: {demo: !!I.demo, name: I.name, boss: I.boss, difficulty: I.difficulty, spec: I.spec}};
+}
+async function histTx(mode, fn, stores = ["history"]){
   try {
     const db = await idb();
     return await new Promise((resolve, reject) => {
-      const tx = db.transaction("history", mode), st = tx.objectStore("history");
-      const req = fn(st);
+      const tx = db.transaction(stores, mode), req = fn(...stores.map(n => tx.objectStore(n)));
       tx.oncomplete = () => resolve(req && req.result);
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
     });
-  } catch(e){ return undefined; }
+  } catch(e){
+    if (mode === "readwrite" && e && /quota/i.test(e.name + e.message))
+      throw new Error("В браузере кончилось место для истории разборов — удалите старые разборы из истории.");
+    return undefined;
+  }
 }
 const hist = {
+  /* полный список с файлами — только для «Сохранить в файл» */
   async all(){ const r = await histTx("readonly", st => st.getAll()); return (r ?? [...memHistory.values()]).sort((a,b)=>b.created-a.created); },
+  /* короткий список — для истории на странице */
+  async list(){ const r = await histTx("readonly", st => st.getAll(), ["meta"]);
+    return (r ?? [...memHistory.values()].map(metaOf)).sort((a,b)=>b.created-a.created); },
   async get(id){ const r = await histTx("readonly", st => st.get(id)); return r ?? memHistory.get(id); },
-  async put(item){ memHistory.set(item.id, item); await histTx("readwrite", st => st.put(item)); },
-  async del(id){ memHistory.delete(id); await histTx("readwrite", st => st.delete(id)); },
-  async clear(){ memHistory.clear(); await histTx("readwrite", st => st.clear()); },
+  async put(item){ memHistory.set(item.id, item);
+    try { await histTx("readwrite", (st, m) => { m.put(metaOf(item)); return st.put(item); }, ["history", "meta"]); }
+    catch(e){ showErr(e.message); } },
+  async del(id){ memHistory.delete(id); await histTx("readwrite", (st, m) => { m.delete(id); return st.delete(id); }, ["history", "meta"]).catch(()=>{}); },
+  async clear(){ memHistory.clear(); await histTx("readwrite", (st, m) => { m.clear(); return st.clear(); }, ["history", "meta"]).catch(()=>{}); },
 };
 
 /* ---------- ключ API ---------- */
@@ -604,6 +648,10 @@ async function refreshKey(){
   const p = $("#keyPill"); p.classList.toggle("ok", has_key);
   p.querySelector("span").innerHTML = has_key ? 'Ключ API<span class="long"> подключён</span><span class="short"> ✓</span>' : "Подключить ключ API";
   renderSaveDir().catch(()=>{});
+  /* ключ появился — списки рейдов (если блок открыт и список не загрузился) загружаем сразу */
+  if (has_key && !TP_ZONES && ($("#tpBox").open || $("#rpBox").open)) loadZones();
+  /* публичный сервис в обычном браузере телефона: выбирать нечего — раздел не показываем */
+  $("#savedir").hidden = STATUS.public && STATUS.app !== "android" && typeof window.showDirectoryPicker !== "function";
   refreshLimit();
   return has_key;
 }
@@ -661,6 +709,7 @@ async function inspect(fight){
   showErr(""); const b = $("#findBtn"); b.disabled = true; b.textContent = "Ищу…";
   try {
     inspected = await api("/api/inspect", {url, fight});
+    inspected.url = url;   // разбор — именно этого отчёта, даже если поле ссылки потом поменяли
     const fs = $("#fight");
     fs.innerHTML = inspected.fights.map(f => `<option value="${f.id}" ${f.id==inspected.fight?"selected":""}>${esc(f.name)}, ${esc(f.difficulty)} — ${f.kill?"килл":"вайп"}, ${mmss(f.duration)}</option>`).join("")
       + `<option value="all">Все боссы отчёта (${new Set(inspected.fights.map(f => f.name + "|" + f.difficulty)).size})</option>`;
@@ -675,6 +724,10 @@ async function inspect(fight){
 $("#findForm").onsubmit = ev => { ev.preventDefault(); inspect(); };
 /* Вставили ссылку — сразу ищем бой, без нажатия кнопки */
 $("#url").addEventListener("paste", () => setTimeout(() => inspect(), 50));
+/* Ссылку поменяли — старый выбор боя и игрока к ней не относится: прячем, пока не нажмут «Найти бой» */
+$("#url").addEventListener("input", () => {
+  if (inspected && $("#url").value.trim() !== inspected.url) { $("#picks").hidden = true; inspected = null; }
+});
 $("#fight").onchange = () => { syncAllMode(); if ($("#fight").value !== "all") inspect($("#fight").value); };
 /* «Все боссы» в рамке «Бой»: разбор всего отчёта — по одному бою на босса (последний килл, без киллов —
    лучший пулл): полный разбор боя на каждого босса (вкладка на босса) и ротация по боссам против топ-1. */
@@ -693,14 +746,15 @@ function syncAllMode(){
 try { if (localStorage.getItem("wclMythicToo") === "0") $("#mythicToo").checked = false; } catch(e){}
 $("#mythicToo").addEventListener("change", () => { try { localStorage.setItem("wclMythicToo", $("#mythicToo").checked ? "1" : "0"); } catch(e){} });
 /* Одна кнопка — весь разбор. Игрок: «Все игроки» — ротация всех DPS, один игрок — его подробный разбор */
-$("#runBtn").onclick = () => run({mode:"fight", url:$("#url").value.trim(), fight:$("#fight").value, actor:$("#player").value,
+$("#runBtn").onclick = () => !inspected ? showErr("Сначала нажмите «Найти бой».") : run({mode:"fight", url:inspected.url, fight:$("#fight").value, actor:$("#player").value,
   ref:$("#ref").value, pick: allFights() ? null : (pickValue() || null), mythic: $("#mythicToo").checked, wait: $("#waitLimit").checked});
 $("#player").addEventListener("change", syncAllMode);
 $("#demoBtn").onclick = () => run({demo:true});
 $("#demoRaidBtn").onclick = () => run({mode:"fight", demo:true, ref:"top3"});
 /* «Топ прогресса»: бой гильдии, первой в мире убившей этого босса на этой сложности, — без сравнения */
 $("#progBtn").onclick = () => {
-  run({mode:"progress", url:$("#url").value.trim(), fight:$("#fight").value, wait: $("#waitLimit").checked});
+  if (!inspected) return showErr("Сначала нажмите «Найти бой».");
+  run({mode:"progress", url:inspected.url, fight:$("#fight").value, wait: $("#waitLimit").checked});
 };
 /* Отбор игроков по рейтингу с учётом экипировки (WCL bracketPercent): место среди игроков спека с тем же уровнем предметов */
 function pickValue(){
@@ -737,10 +791,11 @@ async function loadZones(){
         if (c && Date.now() - c.at < 3 * 86400e3 && c.zones.length) TP_ZONES = c.zones; } catch(e){}
   if (!TP_ZONES) {
     try { TP_ZONES = (await api("/api/zones", {})).zones || []; }
-    catch(e){ $("#tpZone").innerHTML = '<option value="">Нужен ключ Warcraft Logs</option>'; showErr(e.message); if (e.needKey) $("#keyDlg").showModal(); return; }
+    catch(e){ ["#tpZone", "#rpZone"].forEach(z => $(z).innerHTML = `<option value="">${e.needKey ? "Нужен ключ Warcraft Logs" : "Список не загрузился"}</option>`);
+              showErr(e.message); if (e.needKey) $("#keyDlg").showModal(); return; }
     try { localStorage.setItem("wclZones", JSON.stringify({at: Date.now(), zones: TP_ZONES})); } catch(e){}
   }
-  if (!TP_ZONES.length) { $("#tpZone").innerHTML = '<option value="">Рейды не найдены</option>'; return; }
+  if (!TP_ZONES.length) { ["#tpZone", "#rpZone"].forEach(z => $(z).innerHTML = '<option value="">Рейды не найдены</option>'); return; }
   ["tp", "rp"].forEach(k => {
     $(`#${k}Zone`).innerHTML = TP_ZONES.map(z => `<option value="${z.id}">${esc(z.name)}${z.frozen ? " (прошлый сезон)" : ""}</option>`).join("");
     zoneChanged(k);
@@ -782,7 +837,11 @@ $("#tpRun").onclick = () => {
 };
 
 /* ---------- анализ ---------- */
+let RUNNING = false, USER_NAV = false;
 async function run(params, path="/api/analyze"){
+  /* Один разбор за раз: второй запуск (демо, «Продолжить», «Сравнить с топом»…) делил бы с первым журнал и вкладки */
+  if (RUNNING) { showErr("Уже идёт разбор — дождитесь, пока он закончится."); return; }
+  RUNNING = true; USER_NAV = false; document.body.classList.add("running");
   showErr(""); showOk(""); if (path === "/api/analyze") $("#result").hidden = true;
   RUN_BTNS.forEach(b => $(b).disabled = true);
   $("#prog").hidden = false; $("#log").textContent = ""; $("#barFill").style.width = "2%"; $("#eta").textContent = "";
@@ -811,22 +870,31 @@ async function run(params, path="/api/analyze"){
     const {job} = await api(path, params);
     let since = 0, limitTick = 0, pv = 0;
     FIGHT_LIVE = null;
+    let fails = 0;
     while (true){
-      await new Promise(r => setTimeout(r, 700));
-      const r = await fetch("/api/job/"+job, {headers:{"X-Log-Since":since, "X-Partial-V":pv}}); const s = await r.json();
-      if (s.partial) { pv = s.partial_v; FIGHT_LIVE = job; renderFight({...s.partial, _live: job}); }  // первая часть готова — показываем
+      await new Promise(r => setTimeout(r, fails ? Math.min(10000, 1000 * 2 ** fails) : 700));
+      /* Сбой связи (телефон ушёл в фон, Wi-Fi мигнул) — не бросаем разбор: повторяем с паузой */
+      let r, s;
+      try { r = await fetch("/api/job/"+job, {headers:{"X-Log-Since":since, "X-Partial-V":pv}}); s = await r.json(); fails = 0; }
+      catch(e){
+        if (++fails <= 8) { $("#eta").textContent = "Нет связи с программой — пробую ещё раз…"; continue; }
+        throw new Error("Связь с программой пропала. Если она запущена — откройте разбор из истории, когда он закончится, или запустите снова: скачанное лимит не тратит.");
+      }
+      if (s.partial) { pv = s.partial_v; FIGHT_LIVE = job;   // первая часть готова — показываем
+        if (!USER_NAV) renderFight({...s.partial, _live: job}); }
       if (FIGHT_LIVE === job) fightPending(s.progress);
       if (!r.ok) { showErr(s.error || "Ошибка"); break; }
       since = s.log_total;
       if (s.log.length){ $("#log").textContent += s.log.join("\n")+"\n"; $("#log").scrollTop = 1e9; }
-      $("#barFill").style.width = Math.round(s.progress*100)+"%";
+      $("#barFill").style.width = Math.round(s.progress*100)+"%"; $("#barWrap").setAttribute("aria-valuenow", Math.round(s.progress*100));
       updateEta(s);
       if (++limitTick % 28 === 0) refreshLimit();  // во время разбора — примерно раз в 20 с
       if (s.state === "done"){ refreshLimit(); await onDone(job, s.result); break; }
       if (s.state === "error"){ showErr(s.error); if (s.need_key) $("#keyDlg").showModal(); break; }
     }
   } catch(e){ showErr(e.message); }
-  finally { RUN_BTNS.forEach(b => $(b).disabled = false); $("#eta").textContent = ""; FIGHT_LIVE = null; }
+  finally { RUN_BTNS.forEach(b => $(b).disabled = false); $("#eta").textContent = ""; FIGHT_LIVE = null;
+            RUNNING = false; CONTINUE_ALL = null; document.body.classList.remove("running"); }
 }
 
 /* Результат готов: забираем всё в браузер, сервер сразу удаляет свою копию */
@@ -875,7 +943,8 @@ async function onDone(job, R){
     }
     await hist.put(item);
     await trimHistory();
-    openResult(item);
+    if (USER_NAV) showOk("Разбор готов — он первым в «Истории разборов».");   // пользователь смотрит другое — не перебиваем
+    else openResult(item);
     renderRefs(); renderHistory();
   }
   api("/api/job/done", {job}).catch(()=>{});
@@ -897,7 +966,8 @@ function histTitle(R){
   return R.mode === "raid" ? `Рейд: ${I.boss}, ${I.difficulty}, пулл ${R.summary.pull_n} (${I.kill?"килл":"вайп"})`
                            : `${I.name}, ${who(I.cls, I.spec)} — ${I.boss}, ${I.difficulty}`;
 }
-function openResult(item){
+function openResult(item, fromUser){
+  if (fromUser && RUNNING) USER_NAV = true;   // открыли старый разбор во время нового — живые обновления его не затрут
   RESULT_EL = null;
   if (item.result.mode === "fight") return renderFight({...item.result, _hid: item.id, _created: item.created});
   const R = {...item.result, excel: "#excel-" + item.id, _hid: item.id, _created: item.created};
@@ -926,7 +996,18 @@ function fightLabel(R, k){
 function renderFight(R){
   const host = $("#result"), id = R._hid || R._live, same = FIGHT_STATE.id === id, y = window.scrollY;
   if (!same) FIGHT_STATE.tab = null;
+  /* Пришла следующая часть того же разбора, а открытая вкладка уже была готова — её не перерисовываем
+     (не сбрасываем «Подробно», открытые блоки и вложенные вкладки), обновляем только подписи вкладок */
+  const keep = same && R._live && FIGHT_STATE.R && FIGHT_STATE.tab && FIGHT_STATE.R.parts[FIGHT_STATE.tab]
+               && R.parts[FIGHT_STATE.tab] && $("#fightPane");
   FIGHT_STATE.id = id; FIGHT_STATE.R = R;
+  if (keep) {
+    host.querySelectorAll("[data-ft]").forEach(b => {
+      const k = b.dataset.ft, st = R.parts[k] ? "" : (R.errors || {})[k] ? " — не досчитано" : R.pending === k ? " — считается…" : (R.queued || []).includes(k) ? " — в очереди" : "";
+      b.textContent = fightLabel(R, k) + st;
+    });
+    return;
+  }
   const order = R.order || [];
   if (!order.includes(FIGHT_STATE.tab)) FIGHT_STATE.tab = order[0];
   host.hidden = false;
@@ -964,10 +1045,19 @@ function showFightTab(userClick){
   pane.hidden = false;
   if (userClick) { const t = host.querySelector(".ftabs"); if (t.getBoundingClientRect().top < 0) t.scrollIntoView({block: "start"}); }
 }
+/* Вкладки с клавиатуры: стрелки влево/вправо, Home/End — во всех списках вкладок страницы */
+document.addEventListener("keydown", ev => {
+  const tab = ev.target.closest && ev.target.closest('[role="tablist"] [role="tab"], [role="tablist"] button');
+  if (!tab || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(ev.key)) return;
+  const all = [...tab.parentElement.querySelectorAll(':scope > button, :scope > [role="tab"]')];
+  let i = all.indexOf(tab);
+  i = ev.key === "Home" ? 0 : ev.key === "End" ? all.length - 1 : (i + (ev.key === "ArrowRight" ? 1 : -1) + all.length) % all.length;
+  ev.preventDefault(); all[i].focus(); all[i].click();
+});
 function fightPending(p){ FIGHT_STATE.p = p; const b = $("#fightBar"); if (b) b.style.width = Math.round(p * 100) + "%"; }
 
 async function trimHistory(){
-  const all = await hist.all();
+  const all = await hist.list();
   for (const it of all.slice(HISTORY_MAX)) await hist.del(it.id);
 }
 
@@ -1028,7 +1118,7 @@ function render(R){
         ${pair ? `<div class="diffsw" role="group" aria-label="С каким топом сравнивать">
           <button type="button" data-sw="main" aria-pressed="${R===pair.main}">Топ: ${esc(pair.main.info.ref_difficulty||pair.main.info.difficulty)}</button>
           <button type="button" data-sw="alt" aria-pressed="${R===pair.alt}">Топ: ${esc(pair.alt.info.ref_difficulty||"эпохальный")}</button></div>` : ""}
-        <div class="who"><strong>${esc(I.name)}, ${esc(who(I.cls, I.spec))}</strong>${esc(I.boss)}, ${esc(I.difficulty)}, ${I.kill?"килл":"вайп"} за ${I.duration}.
+        <div class="who"><strong>${esc(I.name)}, ${esc(who(I.cls, I.spec))}</strong>${esc(I.boss)}, ${esc(I.difficulty)}, ${I.kill?"килл":"вайп"} за ${esc(I.duration)}.
           Эталон: ${esc(I.ref_label)}, ${I.ref_n} ${plural(I.ref_n,"лог","лога","логов")}${I.ref_same_diff==null ? ""
             : I.ref_difficulty && I.ref_difficulty !== I.difficulty ? ` — ${esc(I.ref_difficulty)} топ (ваш бой — ${esc(I.difficulty)})`
             : I.ref_same_diff===I.ref_n ? ` — все той же сложности (${esc(I.difficulty)})` : ` — <span class="stale">той же сложности только ${I.ref_same_diff} из ${I.ref_n}</span>`}.</div>
@@ -1246,7 +1336,7 @@ function renderRaidPeaks(P, el){
   const PL = X.plan || (V && V.plan) || [], HM = (X.heaviest_mrt || []).map(x => ({mrt: x.mrt, t: x.t}));
   const nPlan = mrtCount(mrtNote(PL, (P.info||{}).boss)), nHeavy = mrtCount(mrtNote(HM, HT));
   const heavyWins = nHeavy > nPlan;
-  const where = (w, n) => `<p class="hint" style="margin-top:12px">Заметка MRT — под таблицей «${w}»: там она подробнее (${n} ${plural(n,"нажатие","нажатия","нажатий")}).</p>`;
+  const where = (w, n) => `<p class="hint" style="margin-top:12px">Заметка MRT — под таблицей «${esc(w)}»: там она подробнее (${n} ${plural(n,"нажатие","нажатия","нажатий")}).</p>`;
   el.innerHTML = `
     ${(P.brief||[]).length ? `<div class="box brief"><ul class="lines">${P.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
     ${box("Урон по рейду и рейдовые кулдауны", "Урон по рейду без танков за каждые 5 секунд. Красные точки — самые тяжёлые моменты, треугольники — рейдовые кулдауны вашего рейда (красная обводка — нажат вне пиков)" + (V ? ", полые бирюзовые — что жмут лучшие киллы." : "."),
@@ -1290,9 +1380,11 @@ function mrtNote(plan, title, field = "mrt", prefix = "Сейвы"){
   plan = plan.filter(r => !r.after_end);
   const legacy = r => (r.picks||[]).length
     ? `{time:${(r.time||"0:00").replace(/,\d+$/,"")}}${String(r.mechanic||"").replace(/[«»]/g,"")} - ${r.picks.map(p=>p.player+" "+p.cd).join("  ")}` : "";
+  /* у каждого нажатия своё время: строки из *_lines ([время, строка]); старые разборы — одна строка на пик */
+  const own = (r, f, t, fb) => r[f + "_lines"] ? r[f + "_lines"] : String(r[f] || fb || "").split("\n").filter(Boolean).map(l => [t, l]);
   const items = field === "mrt"   // одна заметка: сейвы рейда и кулдауны лекарей, каждые по своему времени
-    ? plan.flatMap(r => [[r.t ?? 0, r.mrt || legacy(r)], [r.heal_t ?? r.t ?? 0, r.mrt_heal]])
-    : plan.map(r => [r.heal_t ?? r.t ?? 0, r[field]]);
+    ? plan.flatMap(r => [...own(r, "mrt", r.t ?? 0, legacy(r)), ...own(r, "mrt_heal", r.heal_t ?? r.t ?? 0)])
+    : plan.flatMap(r => own(r, field, r.heal_t ?? r.t ?? 0));
   const lines = mergeMrt(items);
   return lines.length ? [title ? prefix + ": " + title : prefix, ...lines].join("\n") : "";
 }
@@ -1368,7 +1460,7 @@ function planRows(plan){
       + ((r.heal_picks||[]).length ? r.heal_picks.map(p => `<div style="margin-top:3px"><span class="tag k-trinket">лекарь</span> <b>${esc(p.cd)}</b> — ${esc(p.player)}`
           + `<span style="color:var(--muted);font-size:13.5px"> · нажать в ${esc(p.at)}, откат ${esc(p.cooldown)}</span></div>`).join("") : "")
       + ((r.spare||[]).length ? `<div style="font-size:13.5px;color:var(--muted);margin-top:3px">Запасные, откатаны к этому моменту: ${r.spare.map(x=>`${esc(x.cd)} — ${esc(x.player)}`).join("; ")}</div>` : "")];
-  }));
+  }), {cls: "plan"});
 }
 
 /* Разборы «Полученный урон и сейвы» из старых версий (отдельного режима больше нет) — открываются упрощённо */
@@ -1376,7 +1468,7 @@ function renderRaidCd(R){
   charts.splice(0).forEach(c => c.destroy());
   const el = resEl(), I = R.info || {};
   el.innerHTML = `<div class="box"><h3>Полученный урон и сейвы: ${esc(I.boss||"")}, ${esc(I.difficulty||"")}</h3>
-    <p class="sub">Разбор из прежней версии. Теперь это вкладка «Полученный урон и сейвы» в «Разбор рейда: урон, сейвы, смерти».</p></div><div id="rcdBody"></div>`;
+    <p class="sub">Разбор из прежней версии. Теперь это вкладка «Полученный урон и сейвы» во вкладке «Урон, сейвы, смерти» кнопки «Разобрать бой».</p></div><div id="rcdBody"></div>`;
   el.hidden = false;
   renderRaidPeaks(R, $("#rcdBody"));
 }
@@ -1497,13 +1589,13 @@ function renderPlayerAll(R, bossFid, noScroll){
     const fltBar = `<div class="fltbar" style="margin:0 0 12px"><div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end">
       <label style="display:flex;flex-direction:column;gap:2px;font-size:13.5px;color:var(--muted)">Показать игроков
         <select id="fltOp" style="padding:7px 8px"><option value="all" ${F.op==="all"?"selected":""}>всех</option>
-          <option value="le" ${F.op==="le"?"selected":""}>средний отыгрыш не выше</option>
-          <option value="ge" ${F.op==="ge"?"selected":""}>средний отыгрыш не ниже</option></select></label>
+          <option value="le" ${F.op==="le"?"selected":""}>средний рейтинг с учётом экипировки не выше</option>
+          <option value="ge" ${F.op==="ge"?"selected":""}>средний рейтинг с учётом экипировки не ниже</option></select></label>
       <label style="display:flex;flex-direction:column;gap:2px;font-size:13.5px;color:var(--muted)">Порог
         <input id="fltV" type="number" min="0" max="100" step="1" value="${F.v}" list="pickPresets" style="width:80px;padding:6px 8px" ${F.op==="all"?"disabled":""}></label>
       <span class="gsub" style="padding-bottom:6px">Показано: ${players.length} из ${allPlayers.length}</span></div></div>`;
-    body = box("Сводка: игроки × боссы", "В ячейке — разница DPS с топ-1 своего спека на этом боссе и рейтинг WCL с учётом экипировки (только киллы). «Средний отыгрыш» — среднее этого рейтинга по всем боссам; игроки — от лучшего. Нажмите на ячейку — откроется полный разбор.",
-      fltBar + table(["Игрок", "Средний отыгрыш (с учётом экип.)", ...BS.map(x=>x.boss)], players.map(pl => [
+    body = box("Сводка: игроки × боссы", "В ячейке — разница DPS с топ-1 своего спека на этом боссе и рейтинг WCL с учётом экипировки (только киллы). «Средний рейтинг» — среднее этого рейтинга по всем боссам; игроки — от лучшего. Нажмите на ячейку — откроется полный разбор.",
+      fltBar + table(["Игрок", "Средний рейтинг (с учётом экип.)", ...BS.map(x=>x.boss)], players.map(pl => [
         `<b>${esc(pl.player)}</b><div class="gsub">${esc(who(pl.cls, pl.spec))}</div>`,
         (a => a ? `${pctChip(a.avg)}<div class="gsub">${a.n} ${plural(a.n,"босс","босса","боссов")}</div>` : '<span class="gsub">нет рейтинга</span>')(avgIlvl(pl.actor)),
         ...BS.map(x => { const r = x.rows.find(r=>r.actor===pl.actor);
@@ -1512,7 +1604,7 @@ function renderPlayerAll(R, bossFid, noScroll){
         {num: BS.map((_,i)=>i+2), cls:"wide", empty: allPlayers.length ? "Под этот фильтр игроков нет." : "Пока ничего не разобрано."}));
   } else {
     const iv = B.filter(b=>b.ilvl_pct!=null).map(b=>b.ilvl_pct), avg = iv.length ? iv.reduce((a,c)=>a+c,0)/iv.length : null;
-    body = box("Сводка по боссам", `Разница — к DPS топ-1 на этом боссе. «С учётом экип.» — рейтинг WCL среди игроков спека с тем же уровнем предметов (только киллы)${avg!=null?`; средний отыгрыш по ${iv.length} ${plural(iv.length,"боссу","боссам","боссам")} — ${Math.floor(avg)}`:""}. Вкладки сверху или «Подробно» — полный разбор.`,
+    body = box("Сводка по боссам", `Разница — к DPS топ-1 на этом боссе. «С учётом экип.» — рейтинг WCL среди игроков спека с тем же уровнем предметов (только киллы)${avg!=null?`; средний рейтинг по ${iv.length} ${plural(iv.length,"боссу","боссам","боссам")} — ${Math.floor(avg)}`:""}. Вкладки сверху или «Подробно» — полный разбор.`,
       table(["Босс","Бой","DPS","Топ-1","Разница","С учётом экип.","Главное действие",""], B.map(b=>[
         `<b>${esc(b.boss)}</b><div class="gsub">${esc(b.difficulty)}</div>`, `${b.kill?"килл":"вайп"}, ${esc(b.duration)}`,
         num(b.dps), b.ref_dps==null?"—":num(b.ref_dps), gapCell(b), pctChip(b.ilvl_pct), act(b), det(b)]),
@@ -1522,7 +1614,7 @@ function renderPlayerAll(R, bossFid, noScroll){
     <div class="hero"><div>
         <div class="who"><strong>${R.everyone ? "Все игроки (DPS)" : esc(I.name || "Игрок") + (I.cls ? ", " + esc(who(I.cls, I.spec)) : "")} — все боссы</strong>${esc(I.title || "")}.
           На каждом боссе — последний килл (без киллов — лучший пулл), сравнение с топ-1 ради экономии запросов WCL.
-          Облегчённый разбор: без оценки прироста DPS от кулдаунов — полная оценка в обычном «Разобрать игрока».</div>
+          Облегчённый разбор: без оценки прироста DPS от кулдаунов — полная оценка — в «Разобрать бой» с выбранным игроком.</div>
         <div class="dps">${BS.length} <small>${plural(BS.length,"босс","босса","боссов")}${R.everyone?` · ${B.length} ${plural(B.length,"разбор","разбора","разборов")}`:""}${P.length?` · ещё ${P.length} ждут лимита`:""}</small></div>
       </div>
       <div class="side"><a class="btn you" href="${R.excel}" download>Скачать Excel</a>
@@ -1544,6 +1636,7 @@ function renderPlayerAll(R, bossFid, noScroll){
   }
   el.querySelectorAll("[data-b]").forEach(b => b.onclick = () => openAllDetail(R, B[+b.dataset.b]));
   if ($("#contAll")) $("#contAll").onclick = () => {
+    if (RUNNING) return showErr("Уже идёт разбор — дождитесь, пока он закончится.");
     CONTINUE_ALL = R._hid || null;
     const prev = B.map(b => ({boss: b.boss, difficulty: b.difficulty, kill: b.kill, dps: b.dps, ref_dps: b.ref_dps, actions: b.actions, player: b.player, ilvl_pct: b.ilvl_pct}));
     run({mode: "allbosses", url: R.params.url, actor: R.params.actor, units: P.map(p=>[p.fight_id, p.actor]), prev, wait: $("#waitLimit") && $("#waitLimit").checked});
@@ -1639,7 +1732,7 @@ function renderRaidRot(R){
       <div class="chart" style="height:${70+P.length*30}px"><canvas id="cRot"></canvas></div>
     </div>
     ${box("Каждый игрок", "Главное действие — первое из трёх в его выжимке. «Подробно» открывает полный разбор игрока: выжимку, графики и все отличия.",
-      table(["Игрок","Ур. предметов","Проц.","С учётом экип.","DPS","К топу","К эпох. топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
+      table(["Игрок","Ур. предметов","Процентиль","С учётом экип.","DPS","К топу","К эпох. топу","Надёжность","Главное действие","Эффект",""], P.map((p,i)=>[
         `<b>${esc(p.name)}</b><div style="font-size:13.5px;color:var(--muted)">${esc(who(p.cls, p.spec))}</div>`,
         ilvlCell(p), pctChip(p.rank), pctChip(p.ilvl), num(p.dps), `<span class="${p.gap<-0.1?"worse":p.gap>=0?"better":""}">${sgn(p.gap, v=>pct(v))}</span>`,
         p.mythic_gap==null ? "—" : `<span title="Эпохальный топ: ${num(p.mythic_dps)} DPS (медиана по рейтингу)">${sgn(p.mythic_gap, v=>pct(v))}</span>`,
@@ -1690,10 +1783,10 @@ function renderRaid(R){
                        : `${TP.rank}-е место в мире по прогрессу`;
             return `<div class="tp-flag">Топ прогресса: ${what} — ${esc(TP.guild)}${where}${date}. Разбор их боя, без сравнения.</div>`; })(I.top_progress) : ""}
         ${I.top_progress && (I.top_progress.skipped||[]).length ? `<div class="tp-skip">Логи недоступны: ${I.top_progress.skipped.map(t => `${t.rank}-е место — ${esc(t.guild)} (${esc(t.reason)})`).join("; ")}. Показан бой ${I.top_progress.rank}-го места.</div>` : ""}
-        <div class="who"><strong>${esc(I.boss)}, ${esc(I.difficulty)}: ${outcome} за ${I.duration}</strong>
+        <div class="who"><strong>${esc(I.boss)}, ${esc(I.difficulty)}: ${outcome} за ${esc(I.duration)}</strong>
           Пулл ${S.pull_n} из ${S.pulls}. Состав: ${I.tanks} танка, ${I.healers} лекаря, ${I.dps} DPS.</div>
         <div class="dps">${num(S.raid_dps)} <small>DPS рейда, ${num(S.raid_hps)} HPS</small></div>
-        <div class="gapline">${S.deaths_before_tail ? `${S.deaths_before_tail} ${plural(S.deaths_before_tail,"смерть","смерти","смертей")}; первая — ${esc(fd.player)} в ${fd.time} от «${esc(fd.ability)}»` : "Без смертей"}</div>
+        <div class="gapline">${S.deaths_before_tail ? `${S.deaths_before_tail} ${plural(S.deaths_before_tail,"смерть","смерти","смертей")}; первая — ${esc(fd.player)} в ${esc(fd.time)} от «${esc(fd.ability)}»` : "Без смертей"}</div>
       </div>
       <div class="side">
         <a class="btn you" href="${R.excel}" download>Скачать Excel</a>
@@ -1782,8 +1875,8 @@ function renderRaid(R){
   const th = R.thresholds;
   const canCompare = !I.demo;
   $("#p-r-pl").innerHTML = box("Все игроки", `Активное время — доля времени, пока игрок жив. Красным — ниже ${pct(th.active,0)}, смерти и урон от выборочных механик от ${ratio(th.select)} среднего.` +
-      (canCompare ? " Кнопка «Сравнить с топом» разбирает игрока против топа его спека (размер — в списке «Сравнить с»)." : ""),
-    table(["Игрок","Уровень предметов","DPS","HPS","Парс","Активное время","Смерти","Зелья / камни","Прерыв. / диспелы","Выборочные механики", ...(canCompare?[""]:[])],
+      (canCompare ? " Кнопка «Сравнить с топом» разбирает игрока против топа его спека (размер — в списке «Ротацию сравнить с»)." : ""),
+    table(["Игрок","Уровень предметов","DPS","HPS","Процентиль","Активное время","Смерти","Зелья / камни","Прерыв. / диспелы","Выборочные механики", ...(canCompare?[""]:[])],
       P.map(p=>[`<span style="white-space:nowrap"><i class="role ${p.role}"></i>${esc(p.name)}</span><div style="font-size:13.5px;color:var(--muted);white-space:nowrap">${esc(who(p.cls, p.spec))}</div>`, num(p.ilvl,1), num(p.dps), p.role==="healer"?num(p.hps):"—",
         p.parse==null?"—":num(p.parse)+"%",
         `<span class="${p.active!=null&&p.role!=="tank"&&p.active<th.active?"worse":""}">${pct(p.active,0)}</span>`,
@@ -1794,7 +1887,8 @@ function renderRaid(R){
       {num:[1,2,3,4,5,6,7,8,9]}));
   $("#p-r-pl").querySelectorAll("button[data-actor]").forEach(b => b.onclick = () => {
     window.scrollTo({top:0, behavior:"smooth"});
-    run({url:R.source_url, fight:I.fight_id, actor:b.dataset.actor, ref:$("#ref").value});
+    const ref = $("#ref").value;   // «Без ротации» и «все боссы» здесь не подходят — сравниваем с топ-3
+    run({url:R.source_url, fight:I.fight_id, actor:b.dataset.actor, ref: ref === "none" ? "top3" : ref});
   });
 
   // Механики
@@ -1855,11 +1949,12 @@ async function showProgress(R){
   if (!out || !R._created || R.mode !== "player") return;
   let prev = null;
   try {
-    const all = await hist.all();
-    prev = all.filter(it => it.mode==="player" && it.id!==R._hid && it.created < R._created && it.result && it.result.info
-        && it.result.info.name===R.info.name && it.result.info.boss===R.info.boss
-        && it.result.info.difficulty===R.info.difficulty && it.result.info.spec===R.info.spec)
+    const all = await hist.list();
+    const m = all.filter(it => it.mode==="player" && it.id!==R._hid && it.created < R._created && it.info
+        && it.info.name===R.info.name && it.info.boss===R.info.boss
+        && it.info.difficulty===R.info.difficulty && it.info.spec===R.info.spec)
       .sort((a,b)=>b.created-a.created)[0];
+    prev = m ? await hist.get(m.id) : null;
   } catch(e){ return; }
   if (!prev) return;
   const P = prev.result, pk = P.progress_keys || {}, ck = R.progress_keys || {};
@@ -2028,7 +2123,7 @@ function renderRefs(){
   $("#refs").hidden = !refs.length;
   $("#refreshStale").hidden = !refs.some(r=>r.stale);
   $("#refList").innerHTML = refs.map(r => `<div class="ref">
-    <div class="what"><b>${esc(r.boss)}: ${esc(who(r.cls, r.spec))}</b><span>${esc(r.label)}, ${r.n_logs} логов</span></div>
+    <div class="what"><b>${esc(r.boss)}: ${esc(who(r.cls, r.spec))}</b><span>${esc(r.label)}, ${num(r.n_logs)} ${plural(+r.n_logs || 0, "лог", "лога", "логов")}</span></div>
     <span class="age ${r.stale?"stale":""}" title="${fmtDate(r.collected_at)}">${r.stale?"устарел, ":""}${ageText(r.age_days)}</span>
     <span style="display:flex;gap:6px"><button class="mini" type="button" data-key="${esc(r.key)}">Обновить</button>
     <button class="mini" type="button" data-del="${esc(r.key)}" aria-label="Удалить эталон">✕</button></span></div>`).join("");
@@ -2044,14 +2139,14 @@ $("#autoRefresh").onchange = () => { store.set("wclPrefs", {...prefs(), auto_ref
 /* ---------- история разборов ---------- */
 async function renderHistory(){
   renderSaveDir().catch(()=>{});
-  const items = await hist.all();
+  const items = await hist.list();
   $("#history").hidden = !items.length;
   $("#histList").innerHTML = items.map(it => `<div class="ref">
-    <div class="what"><b>${esc(it.title)}</b><span>${new Date(it.created).toLocaleString("ru-RU",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}${it.result.info.demo?" · демо":""}</span></div>
-    <button class="mini" type="button" data-open="${it.id}">Открыть</button>
-    <span style="display:flex;gap:6px">${it.blob?`<button class="mini" type="button" data-xl="${it.id}">Excel</button>`:""}
-    <button class="mini" type="button" data-hdel="${it.id}" aria-label="Удалить из истории">✕</button></span></div>`).join("");
-  $("#histList").querySelectorAll("[data-open]").forEach(b => b.onclick = async () => openResult(await hist.get(b.dataset.open)));
+    <div class="what"><b>${esc(it.title)}</b><span>${new Date(it.created).toLocaleString("ru-RU",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}${(it.info||{}).demo?" · демо":""}</span></div>
+    <button class="mini" type="button" data-open="${esc(it.id)}">Открыть</button>
+    <span style="display:flex;gap:6px">${it.hasBlob?`<button class="mini" type="button" data-xl="${esc(it.id)}">Excel</button>`:""}
+    <button class="mini" type="button" data-hdel="${esc(it.id)}" aria-label="Удалить из истории">✕</button></span></div>`).join("");
+  $("#histList").querySelectorAll("[data-open]").forEach(b => b.onclick = async () => openResult(await hist.get(b.dataset.open), true));
   $("#histList").querySelectorAll("[data-xl]").forEach(b => b.onclick = async () => { const it = await hist.get(b.dataset.xl); saveBlob(it.blob, it.filename); });
   $("#histList").querySelectorAll("[data-hdel]").forEach(b => b.onclick = async () => { await hist.del(b.dataset.hdel); renderHistory(); });
 }
@@ -2072,12 +2167,20 @@ $("#importFile").onchange = async () => {
   try {
     const d = JSON.parse(await f.text());
     if (d.app !== "wcl-analyzer") throw new Error("Это не файл данных программы.");
-    if (d.key && d.key.id && d.key.s) { KEY = d.key; store.set("wclKey", KEY); }
+    if (d.key && typeof d.key.id === "string" && typeof d.key.s === "string"
+        && (!KEY || (KEY.id === d.key.id && KEY.s === d.key.s) || confirm("Заменить ваш ключ Warcraft Logs ключом из файла?"))) {
+      KEY = {id: d.key.id, s: d.key.s}; store.set("wclKey", KEY);
+    }
     (d.refs || []).slice().reverse().forEach(r => { const have = getRefs().find(x => x.key === refKey(r)); if (!have || have.collected_at < r.collected_at) upsertRef(r); });
     if (d.prefs) store.set("wclPrefs", {...prefs(), ...d.prefs});
-    for (const it of d.history || []) await hist.put({...it, blob: it.blob ? b64ToBlob(it.blob, XLSX_TYPE) : null});
+    /* только записи нужного вида: id, время, результат разбора */
+    const okItem = it => it && typeof it.id === "string" && /^[\w-]{1,80}$/.test(it.id) && Number.isFinite(+it.created)
+      && it.result && typeof it.result === "object" && it.result.info && typeof it.result.mode === "string";
+    const good = (Array.isArray(d.history) ? d.history : []).filter(okItem);
+    for (const it of good)
+      await hist.put({...it, title: String(it.title || ""), blob: typeof it.blob === "string" ? b64ToBlob(it.blob, XLSX_TYPE) : null});
     await trimHistory(); await refreshKey(); renderRefs(); renderHistory();
-    showOk(`Загружено: ${(d.history||[]).length} разборов, ${(d.refs||[]).length} эталонов${d.key?", ключ API":""}.`);
+    showOk(`Загружено: ${good.length} ${plural(good.length,"разбор","разбора","разборов")}, ${(d.refs||[]).length} эталонов${d.key && KEY && KEY.id === d.key.id ? ", ключ API" : ""}.`);
   } catch(e){ showErr("Не удалось загрузить файл: " + e.message); }
   $("#importFile").value = "";
 };
@@ -2154,17 +2257,28 @@ function importFromLink(text){
     const bin = atob(m[1].replace(/-/g,"+").replace(/_/g,"/"));
     const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
     const parts = [];
-    if (d.id && d.s) { KEY = {id:d.id, s:d.s}; store.set("wclKey", KEY); parts.push("ключ API"); }
-    if (d.r && d.r.length) {
-      d.r.slice().reverse().forEach(a => {
-        const r = {encounter_id:a[0], cls:a[1], spec:a[2], difficulty:a[3], top_n:a[4], duration:a[5]||null, boss:a[6],
-                   label:`топ-${a[4]}`, n_logs:a[7], collected_at:a[8]};
+    /* Данные из ссылки — чужие: только строки и числа нужного вида; ключ не меняем молча */
+    const str = (v, n = 80) => typeof v === "string" ? v.slice(0, n) : "", int = v => Number.isFinite(+v) ? Math.round(+v) : 0;
+    const kid = str(d.id, 80), ks = str(d.s, 120);
+    if (kid && ks && /^[\w-]+$/.test(kid) && /^[\w-]+$/.test(ks)) {
+      const same = KEY && KEY.id === kid && KEY.s === ks;
+      if (same || !KEY || confirm(`Заменить ваш ключ Warcraft Logs ключом из ссылки (Client ID ${kid.slice(0, 8)}…)? Нажмите «Отмена», если ссылку прислал кто-то другой.`)) {
+        KEY = {id: kid, s: ks}; store.set("wclKey", KEY); parts.push("ключ API");
+      }
+    }
+    if (Array.isArray(d.r) && d.r.length) {
+      d.r.slice(0, 30).reverse().forEach(a => {
+        if (!Array.isArray(a)) return;
+        const r = {encounter_id:int(a[0]), cls:str(a[1], 40), spec:str(a[2], 40), difficulty:int(a[3]), top_n:Math.max(1, Math.min(50, int(a[4]))),
+                   duration:+a[5] > 0 ? +a[5] : null, boss:str(a[6]), label:`топ-${Math.max(1, Math.min(50, int(a[4])))}`,
+                   n_logs:Math.max(0, int(a[7])), collected_at:int(a[8])};
+        if (!r.encounter_id || !r.cls) return;
         const have = getRefs().find(x => x.key === refKey(r));
         if (!have || have.collected_at < r.collected_at) upsertRef(r);
       });
       parts.push("эталоны");
     }
-    if (d.p) store.set("wclPrefs", {...prefs(), max_age_days:d.p[0], auto_refresh:!!d.p[1]});
+    if (Array.isArray(d.p)) store.set("wclPrefs", {...prefs(), max_age_days:Math.max(1, Math.min(30, int(d.p[0]) || 3)), auto_refresh:!!d.p[1]});
     if (parts.length) showOk(`Перенесено с другого устройства: ${parts.join(" и ")}.`);
     return true;
   } catch(e){ showErr("Не удалось прочитать ссылку переноса — отсканируйте QR-код ещё раз."); return false; }
@@ -2218,7 +2332,11 @@ async function checkUpdates(silent){
   } catch(e){ if (!silent) msg.textContent = "Не удалось проверить: " + e.message; return; }
   $("#updPill").hidden = !UPD.available;
   $("#updApply").hidden = !UPD.available;
-  if (!UPD.available) { msg.textContent = silent ? "" : "У вас последняя версия."; return; }
+  if (!UPD.available) {
+    msg.textContent = UPD.failed_build ? `Версия ${UPD.failed_build} у вас не запустилась — программа вернулась к прежней и дождётся следующей версии.`
+      : silent ? "" : "У вас последняя версия.";
+    return;
+  }
   msg.textContent = UPD.kind === "code"
     ? `Доступна сборка ${UPD.latest}: обновится без переустановки, займёт несколько секунд.`
     : `Доступна сборка ${UPD.latest}: нужна новая версия программы целиком` + (UPD.mode === "android" ? " (APK скачается в браузере, установите поверх)." : ".");
@@ -2229,7 +2347,9 @@ $("#updApply").onclick = async () => {
   const b = $("#updApply"), msg = $("#updMsg"); b.disabled = true; msg.textContent = "Скачиваю обновление…";
   try {
     const r = await api("/api/update/apply", {kind: UPD && UPD.kind}, 600);
-    msg.textContent = r.ok ? `Готово. ${r.restart || ""}` : "Откройте страницу выпусков и скачайте новую версию: " + (r.url || "");
+    msg.textContent = r.ok ? `Готово. ${r.restart || ""}` : r.up_to_date ? (r.error || "У вас последняя версия.")
+      : r.error ? "Не удалось обновить: " + r.error
+      : "Откройте страницу выпусков и скачайте новую версию: " + (r.url || "https://github.com/kclazzy/wcl-analyzer/releases/latest");
     $("#updPill").hidden = true; b.hidden = true;
     if (r.ok && (r.soft_restart || r.full_restart)) waitRestart(VER ? VER.build : "");
   } catch(e){ msg.textContent = "Не удалось обновить: " + e.message; b.disabled = false; }

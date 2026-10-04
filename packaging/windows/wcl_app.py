@@ -12,11 +12,22 @@ _build = wcl_boot.activate()
 if _build:
     print(f"Обновлённая версия кода: сборка {_build}")
 
-from wcl_analyzer.__main__ import main  # noqa: E402
+
+def _run(argv):
+    from wcl_analyzer.__main__ import main  # после отката — уже встроенная версия
+    main(argv)
+
 
 if __name__ == "__main__":
     try:
-        main(sys.argv[1:])
+        try:
+            _run(sys.argv[1:])
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception as e:  # скачанный код упал — один раз пробуем встроенную версию
+            if not wcl_boot.fall_back(e):
+                raise
+            _run(sys.argv[1:])
     except SystemExit:
         raise
     except Exception as e:  # окно не должно закрываться молча

@@ -24,6 +24,10 @@ class WCLError(RuntimeError):
     pass
 
 
+class RateLimitError(WCLError):
+    """Кончился часовой лимит запросов Warcraft Logs (в тексте всегда есть слово «лимит»)."""
+
+
 CACHE_MAX_AGE_DAYS = 21    # ответы старше — удаляются при запуске (понадобятся — скачаются заново)
 CACHE_MAX_MB = 500         # и не больше 500 МБ: сверх — удаляются самые старые
 _Z = b"z1"                 # метка сжатого ответа (старые записи — обычный текст JSON)
@@ -247,25 +251,19 @@ class WCLClient:
                 with self._count_lock:
                     self.cache_hits += 1
                 return hit
-        with self._sem:
-            return self._send(query, variables, key, use_cache)
-
-    def _send(self, query: str, variables: dict, key: str, use_cache: bool) -> dict:
-        for attempt in range(6):
-            r = self.session.post(
-                API_URL,
-                json={"query": query, "variables": variables},
-                headers={"Authorization": f"Bearer {self.token()}"},
-                timeout=60,
-            )
-            with self._count_lock:
-                self.requests_made += 1
+        limited = errors_5xx = 0
+        for _attempt in range(16):
+            with self._sem:   # слот — только на сам запрос: ожидание сброса лимита идёт вне его
+                r = self._post(query, variables)
             if r.status_code == 429:
-                wait = self._reset_wait()
-                if self.max_wait_s is not None and wait > self.max_wait_s:
-                    raise WCLError(f"Закончился часовой лимит запросов Warcraft Logs для вашего ключа — разбор остановлен. "
-                                   f"Сброс примерно через {max(1, round(wait / 60))} мин — тогда запустите снова: "
-                                   "уже скачанное сохранено и лимит повторно не тратит.")
+                limited += 1
+                wait = self._reset_wait(r)
+                # ждать нельзя — сразу сказать; ждать можно — не больше 12 раз подряд (почти сутки сбоев — уже не лимит)
+                if (self.max_wait_s is not None and wait > self.max_wait_s) or limited > (3 if self.max_wait_s is not None else 12):
+                    raise RateLimitError(
+                        "Закончился часовой лимит запросов Warcraft Logs для вашего ключа — разбор остановлен. "
+                        f"Сброс примерно через {max(1, round(wait / 60))} мин — тогда нажмите «Продолжить»: "
+                        "уже скачанное сохранено и лимит повторно не тратит.")
                 self._log(f"Лимит очков исчерпан, жду {wait:.0f} с до сброса…")
                 if self.on_wait:
                     try:
@@ -275,7 +273,10 @@ class WCLClient:
                 time.sleep(wait)
                 continue
             if r.status_code >= 500:
-                time.sleep(2 ** attempt)
+                errors_5xx += 1
+                if errors_5xx > 6:
+                    break
+                time.sleep(min(30, 2 ** errors_5xx))
                 continue
             if r.status_code != 200:
                 raise WCLError(f"WCL API вернул {r.status_code}: {r.text[:300]}")
@@ -289,7 +290,33 @@ class WCLClient:
             return data
         raise WCLError("WCL API не ответил после нескольких попыток")
 
-    def _reset_wait(self) -> float:
+    def _post(self, query: str, variables: dict):
+        r = self.session.post(
+            API_URL,
+            json={"query": query, "variables": variables},
+            headers={"Authorization": f"Bearer {self.token()}"},
+            timeout=60,
+        )
+        with self._count_lock:
+            self.requests_made += 1
+        return r
+
+    def with_limits(self, max_wait_s: float | None, on_wait=None) -> "WCLClient":
+        """Тот же клиент (токен, кэш, соединение, общий счётчик параллельных запросов) со своими настройками
+        ожидания лимита — для одного разбора. Настройки одного разбора не влияют на другие."""
+        import copy
+        c = copy.copy(self)
+        c.max_wait_s, c.on_wait = max_wait_s, on_wait
+        return c
+
+    def _reset_wait(self, r=None) -> float:
+        """Сколько ждать сброса лимита: заголовок Retry-After, иначе — сколько осталось по данным WCL."""
+        try:
+            ra = float((r.headers or {}).get("Retry-After")) if r is not None else None
+            if ra and ra > 0:
+                return ra + 2
+        except (TypeError, ValueError, AttributeError):
+            pass
         try:
             info = self.rate_limit()
             return float(info.get("pointsResetIn", 60)) + 5

@@ -853,7 +853,7 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
             # сейвы на одну цель (Кокон, Подавление боли…) — в «нажатые кулдауны» и в MRT не попадают
             if ab not in RAID_CD_IDS and (ab in NOT_RAID_CD_IDS or NOT_RAID_CD_RE.search(name) or is_trinket(pid, ab)):
                 continue
-            known = ab in RAID_CD_IDS or bool(RAID_CD_RE.search(name))
+            known = ab in RAID_CD_IDS or _gd.name_known(name, p.get("cls", ""), p.get("spec", ""))
             if not known:
                 if p["role"] != "healer" or POTION_RE.search(name) or HEALTHSTONE_RE.search(name) \
                         or LUST_RE.search(name) or ab in LUST_IDS or RACIAL_RE.match(name.strip()) \
@@ -867,11 +867,23 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
     raid_cds.sort(key=lambda c: c["t"])
     raid_cds = merge_cd_ticks(raid_cds)
     lo, hi = HEAL_CD_LEAD
+    order = sorted(spikes, key=lambda x: x["t"])
+    nxt = {id(a): (b["t"] if b else None) for a, b in zip(order, order[1:] + [None])}
+    # Одно нажатие — одному пику: если окна соседних пиков перекрываются, нажатие достаётся ближайшему
+    near = {id(sp): [c for c in raid_cds if sp["t"] - lo <= c["t"] <= sp["t"] + 5 + hi] for sp in spikes}
+    press_owner: dict = {}
     for sp in spikes:
-        # Секунда самого сильного удара внутри пика — от неё считается время нажатия в плане
-        sp["peak_t"] = float(max(range(int(sp["t"]), int(sp["t"]) + 5 + SPIKE_GAP_S),
-                                 key=lambda x: per_s.get(x, 0.0)))
-        cov = _uniq_cds([c for c in raid_cds if sp["t"] - lo <= c["t"] <= sp["t"] + 5 + hi])
+        for c in near[id(sp)]:
+            if id(c) not in press_owner or abs(c["t"] - sp["t"]) < abs(c["t"] - press_owner[id(c)]["t"]):
+                press_owner[id(c)] = sp
+    for sp in spikes:
+        # Секунда самого сильного удара внутри пика — от неё считается время нажатия в плане;
+        # не дальше начала следующего пика, иначе пик «съезжает» на соседа
+        end = int(sp["t"]) + 5 + SPIKE_GAP_S
+        if nxt[id(sp)] is not None:
+            end = max(int(sp["t"]) + 1, min(end, int(nxt[id(sp)])))
+        sp["peak_t"] = float(max(range(int(sp["t"]), end), key=lambda x: per_s.get(x, 0.0)))
+        cov = _uniq_cds([c for c in near[id(sp)] if press_owner.get(id(c)) is sp])
         sp["covered_by"] = [f"{c['name']} ({c['player']})" for c in cov]
         sp["covered_ids"] = sorted({c["id"] for c in cov})
         sp["covered_self"] = [f"{c['name']} ({c['player']})" for c in cov if _gd.scope(c["id"]) == "self"]

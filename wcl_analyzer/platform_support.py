@@ -138,7 +138,7 @@ def pick_folder(start: str = "") -> str | None:
     import shutil
     import subprocess
     if os.name == "nt":
-        ps = ("[Console]::OutputEncoding=[Text.Encoding]::UTF8;Add-Type -AssemblyName System.Windows.Forms;"
+        ps = ("[Console]::OutputEncoding=New-Object Text.UTF8Encoding $false;Add-Type -AssemblyName System.Windows.Forms;"
               "$d=New-Object System.Windows.Forms.FolderBrowserDialog;$d.Description='WCL Analyzer: куда сохранять файлы';"
               "$d.ShowNewFolderButton=$true;$d.SelectedPath=$env:WCL_START;"
               "$f=New-Object System.Windows.Forms.Form -Property @{TopMost=$true};"
@@ -155,7 +155,13 @@ def pick_folder(start: str = "") -> str | None:
     env = {**os.environ, "WCL_START": start or ""}
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     r = subprocess.run(cmd, capture_output=True, timeout=600, env=env, creationflags=flags)
-    out = r.stdout.decode("utf-8", "replace").strip()
+    out = r.stdout.decode("utf-8", "replace").strip().lstrip("\ufeff")
+    if r.returncode != 0 and not out:
+        err = r.stderr.decode("utf-8", "replace").strip()
+        if err and os.name == "nt":   # отмена в окне — пустой ответ без ошибки; иначе окно не открылось
+            raise OSError(err.splitlines()[-1][:200])
+        if err and sys.platform == "darwin" and "-128" not in err:   # -128 — «Отменить» в Finder
+            raise OSError(err[:200])
     return out or None
 
 

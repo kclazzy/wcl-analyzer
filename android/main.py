@@ -17,10 +17,22 @@ try:
     wcl_boot.activate()
 except Exception:  # загрузчик не должен мешать запуску
     traceback.print_exc()
+    wcl_boot = None
+
+
+def _serve():
+    from wcl_analyzer.web import serve  # после отката — уже встроенная версия
+    serve(port=8765, open_browser=False, local_only=True)
+
 
 try:
-    from wcl_analyzer.web import serve
-    serve(port=8765, open_browser=False, local_only=True)
+    try:
+        _serve()
+    except Exception as e:  # скачанный код упал — один раз пробуем встроенную версию
+        traceback.print_exc()
+        if wcl_boot is None or not wcl_boot.fall_back(e):
+            raise
+        _serve()
 except Exception:  # ошибка запуска видна в журнале Android (adb logcat)
     traceback.print_exc()
     raise

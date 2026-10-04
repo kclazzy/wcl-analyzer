@@ -85,6 +85,10 @@ def default_client_factory(creds: tuple[str, str] | None):
     with _CLIENTS_LOCK:
         if k not in _CLIENTS:
             _CLIENTS[k] = WCLClient(creds[0], creds[1], None, verbose=False)
+            while len(_CLIENTS) > 200:   # публичный сервер: не копим клиентов всех когда-либо приходивших ключей
+                _CLIENTS.pop(next(iter(_CLIENTS)))
+        else:
+            _CLIENTS[k] = _CLIENTS.pop(k)   # недавно использованный — в конец очереди
         client = _CLIENTS[k]
     client.cache = _shared_cache()
     return client
@@ -112,10 +116,19 @@ CHECK_KEY = check_key  # тесты подменяют
 
 
 # ------------------------------------------------------------- задачи
+MAX_DONE = int(os.environ.get("WCL_MAX_DONE", "60"))  # готовых результатов в памяти не больше (публичный сервер)
+
+
 def _cleanup() -> None:
     now = time.time()
     with JOBS_LOCK:
-        for jid in [j for j, job in JOBS.items() if job["state"] != "running" and now - job["created"] > JOB_TTL_S]:
+        done = [(j, job) for j, job in JOBS.items() if job["state"] != "running"]
+        for jid, job in done:
+            if now - job.get("finished", job["created"]) > JOB_TTL_S:
+                JOBS.pop(jid, None)
+        done = sorted(((j, job) for j, job in JOBS.items() if job["state"] != "running"),
+                      key=lambda x: x[1].get("finished", x[1]["created"]))
+        for jid, _job in done[:max(0, len(done) - MAX_DONE)]:  # сверх лимита — самые старые
             JOBS.pop(jid, None)
 
 
@@ -168,6 +181,7 @@ def _run_job(job: dict, params: dict, creds) -> None:
         job["state"], job["error"] = "error", _friendly(e)
         job["trace"] = traceback.format_exc()
     finally:
+        job["finished"] = time.time()   # час хранения — от конца разбора, а не от начала
         JOB_SLOTS.release()
 
 
@@ -178,23 +192,26 @@ def app_mode_is_desktop() -> bool:
 
 def _client(creds, job: dict, log, wait: bool = False):
     """Клиент WCL для задачи. Кончился часовой лимит API — разбор останавливается с понятной ошибкой
-    (уже скачанное остаётся в кэше). wait=True — ждать сброса лимита (галочка «Разобрать всех боссов»)."""
+    (уже скачанное остаётся в кэше). wait=True — ждать сброса лимита (галочка «ждать сброса лимита»).
+    Настройки ожидания — свои у каждого разбора: общий клиент ключа не меняется."""
     client = CLIENT_FACTORY(creds)
-    if not wait:
-        try:
-            client.max_wait_s = 0
-        except AttributeError:
-            pass
 
     def on_wait(seconds: float) -> None:
         job["wait_until"] = time.time() + seconds
         log(f"Закончился часовой лимит запросов Warcraft Logs. Жду сброса: {max(1, round(seconds / 60))} мин. "
             "Не закрывайте страницу: разбор продолжится сам.")
 
-    try:
-        client.on_wait = on_wait
-    except AttributeError:
-        pass
+    return _limited(client, None if wait else 0, on_wait)
+
+
+def _limited(client, max_wait_s, on_wait=None):
+    if hasattr(client, "with_limits"):
+        return client.with_limits(max_wait_s, on_wait)
+    for k, v in (("max_wait_s", max_wait_s), ("on_wait", on_wait)):  # тестовые клиенты
+        try:
+            setattr(client, k, v)
+        except AttributeError:
+            pass
     return client
 
 
@@ -205,9 +222,14 @@ def _excel_bytes(job: dict, name: str, writer, data, key: str = "xlsx") -> None:
         job.writers.append((key, name, writer, data))
         return
     fname = re.sub(r"[^\w\-]+", "_", f"{name}_{time.strftime('%Y%m%d_%H%M%S')}") + ".xlsx"
-    with tempfile.TemporaryDirectory() as tmp:
-        path = writer(data, Path(tmp) / fname)
-        job[key] = Path(path).read_bytes()
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = writer(data, Path(tmp) / fname)
+            job[key] = Path(path).read_bytes()
+    except Exception as e:  # noqa: BLE001 — сбой Excel не должен терять уже готовый разбор
+        job.setdefault("log", []).append(f"Excel не собран: {e}. Результат на странице — полный.")
+        job["trace_excel"] = traceback.format_exc()
+        return
     job[key + "_name"] = fname
 
 
@@ -374,7 +396,7 @@ def _run_fight(job: dict, params: dict, creds, log) -> None:
                     m = re.match(r"(.+?)(\d+)$", ws.title)
                     if key in kinds:  # бой каждого босса — листы с его именем: «Sszorak — Выжимка»
                         base = m.group(1) if m and m.group(1) in before else ws.title
-                        ws.title = f"{titles[key][:14]} — {base}"[:31]
+                        ws.title = _sheet_prefix(titles[key], key) + f" — {base}"[:31 - len(_sheet_prefix(titles[key], key))]
                     elif m and m.group(1) in before:
                         ws.title = f"{short.get(key, key)} — {m.group(1)}"[:31]
             wb.save(path)
@@ -452,8 +474,9 @@ def _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titl
             continue
         parts[k] = {**R, "excel": f"/api/report/{job['id']}", "source_url": url}
         writers.append((f"Все_боссы_{zone or code}", write_raid_workbook, R, k))
-    if not any(k in parts for k in keys):
+    if not any(k in parts for k in keys) and not any("лимит" in e.lower() for e in errors.values()):
         raise LookupError("Ни один бой не удалось разобрать: " + "; ".join(dict.fromkeys(errors.values())))
+    # кончился лимит уже на первом боссе — не ошибка: вкладки боссов с «Продолжить»
 
 
 def _prune_cache() -> None:
@@ -468,6 +491,17 @@ def _prune_cache() -> None:
 def _cache_file() -> Path:
     from .config import cache_path
     return Path(cache_path()).resolve()
+
+
+def _sheet_prefix(title: str, key: str) -> str:
+    """Начало имени листа для боя босса: номер вкладки + имя с сокращением сложности. Номер делает имя
+    уникальным, даже если один босс есть на двух сложностях (обрезка до 31 символа их не склеит)."""
+    m = re.match(r"b(\d+)$", key or "")
+    num = f"{int(m.group(1)) + 1}." if m else ""
+    diff = re.search(r"\((\w{2,5})\.?\)\s*$", title or "")
+    name = re.sub(r"\s*\([^)]*\)\s*$", "", title or "").strip()
+    tag = f" {diff.group(1)[:3]}" if diff else ""
+    return f"{num}{name[:12 - len(tag)]}{tag}".strip()
 
 
 def _new_wb():
@@ -542,7 +576,8 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
             # без событий нанесённого урона: экономия лимита (нет только оценки прироста от кулдаунов)
             me = load_my_log(client, params["url"], fid, actor_id=aid, shared=shared, damage_events=False)
             tops, ref_label = _player_ref(client, me, me.difficulty, p1, lambda m: log("    " + m), {})
-            res = _player_result(job, p1, client, me, tops, ref_label, {}, me.difficulty, lambda m: log("    " + m), alt=False)
+            res = _player_result(job, p1, client, me, tops, ref_label, {}, me.difficulty, lambda m: log("    " + m), alt=False,
+                                 excel=False)
             res.pop("ref", None)
             rk = ranks_of(fid).get(me.name) or ranks_of(fid).get(me.actor_id) or {}
             rows.append({"fight_id": fid, "actor": me.actor_id, "player": me.name, "cls": me.cls, "spec": me.spec,
@@ -622,7 +657,7 @@ def _player_ref(client, me, difficulty: int, params: dict, log, meta: dict):
     return tops, label
 
 
-def _player_result(job, params, client, me, tops, label, ref_meta, top_diff, log, alt: bool) -> dict:
+def _player_result(job, params, client, me, tops, label, ref_meta, top_diff, log, alt: bool, excel: bool = True) -> dict:
     from .compare import compare
     from .config import DIFFICULTY_NAMES
     from .excel_report import write_compare_workbook
@@ -645,8 +680,9 @@ def _player_result(job, params, client, me, tops, label, ref_meta, top_diff, log
         r.talents = None
     diff_name = DIFFICULTY_NAMES.get(int(top_diff or 0), "")
     suffix = "_эпохальный_топ" if alt else ""
-    _excel_bytes(job, f"{me.name}_{me.encounter_name}{suffix}", write_compare_workbook, r,
-                 key="xlsx_alt" if alt else "xlsx")
+    if excel:  # в «Все боссы» — общий Excel на всех игроков, отдельные книги на каждого не нужны
+        _excel_bytes(job, f"{me.name}_{me.encounter_name}{suffix}", write_compare_workbook, r,
+                     key="xlsx_alt" if alt else "xlsx")
     result = to_json(r, job["id"])
     if alt:
         result["excel"] = f"/api/report/{job['id']}/alt"
@@ -969,18 +1005,18 @@ def _run_top_progress_all(job: dict, params: dict, client, bosses: list[tuple], 
         R["excel"] = f"/api/report/{job['id']}"
         parts[key] = R
         writers.append((titles[key], write_raid_workbook, R))
-    if not parts:
+    if not parts and not any("лимит" in e.lower() for e in errors.values()):
         raise LookupError("Ни для одного босса не удалось разобрать топ прогресса: " + "; ".join(dict.fromkeys(errors.values())))
 
     def write_all(_data, path):
         wb = _new_wb()
-        for prefix, writer, data in writers:
+        for wi, (prefix, writer, data) in enumerate(writers):
             before = set(wb.sheetnames)
             writer(data, None, wb=wb)
             for ws in wb.worksheets:  # листы каждого босса — с его именем: «Sszorak — Выжимка»
                 if ws.title not in before:
                     base = re.sub(r"\d+$", "", ws.title) if re.sub(r"\d+$", "", ws.title) in before else ws.title
-                    ws.title = f"{prefix[:14]} — {base}"[:31]
+                    ws.title = _sheet_prefix(prefix, f"b{wi}") + f" — {base}"[:31 - len(_sheet_prefix(prefix, f"b{wi}"))]
         wb.save(path)
         return path
     _excel_bytes(job, f"Топ_прогресса_{report_title}", write_all, None)
@@ -1042,7 +1078,18 @@ def _page() -> bytes:
     html = STATIC.read_text(encoding="utf-8")
     html = html.replace("/*CLASS_RU*/{}", json.dumps(CLASSES, ensure_ascii=False))
     html = html.replace("/*SPEC_RU*/{}", json.dumps({f"{c}|{s}": v for (c, s), v in SPECS.items()}, ensure_ascii=False))
+    html = html.replace("<script>", f'<script nonce="{PAGE_NONCE}">')
     return html.encode("utf-8")
+
+
+# Политика содержимого страницы: выполняется только код самой программы (файлы /static и встроенный скрипт
+# с одноразовой меткой). Даже если в данные (имя игрока, гильдии, файл резервной копии) попадёт чужой HTML
+# со скриптом, браузер его не запустит.
+import secrets as _secrets  # noqa: E402
+PAGE_NONCE = _secrets.token_urlsafe(16)
+CSP = ("default-src 'self'; script-src 'self' 'nonce-{n}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+       "font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; "
+       "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 
 
 def _friendly(e: Exception) -> str:
@@ -1225,9 +1272,35 @@ class Handler(BaseHTTPRequestHandler):
         sec = (self.headers.get("X-WCL-Secret") or "").strip()
         return (cid, sec) if cid and sec else None
 
+    def _same_site(self) -> bool:
+        """Защита локальной программы от чужих сайтов, открытых в том же браузере.
+        Host — только адрес-число (127.0.0.1, адрес в Wi-Fi сети) или localhost: так не пройдёт подмена DNS
+        (чужой домен, указывающий на 127.0.0.1). POST — только со страницы самой программы (Origin совпадает
+        с адресом) и только JSON: простой кросс-сайтовый запрос без предварительной проверки браузера
+        с типом application/json отправить нельзя."""
+        host = (self.headers.get("Host") or "").strip().lower()
+        name = host.rsplit(":", 1)[0].strip("[]") if host else ""
+        if name not in ("localhost",) and not re.fullmatch(r"[0-9.]+|[0-9a-f:]+", name or "x"):
+            return False
+        if self.command == "POST":
+            origin = (self.headers.get("Origin") or "").strip().lower()
+            if origin and origin not in (f"http://{host}", f"https://{host}"):
+                return False
+            ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if ctype != "application/json":
+                return False
+        return True
+
     def _allowed(self) -> bool:
         """Публичный сервис открыт всем (данные у каждого в своём браузере).
-        Локальная программа: этот компьютер — всегда, телефон — по ссылке-ключу из QR-кода."""
+        Локальная программа: этот компьютер — всегда, телефон — по ссылке-ключу из QR-кода.
+        Запросы с чужих сайтов (подмена адреса, POST не со страницы программы) — отказ."""
+        if not SERVER["public"] and not self._same_site():
+            if urlparse(self.path).path.startswith("/api/"):
+                self._json({"error": "Запрос не со страницы программы — отклонён"}, 403)
+            else:
+                self._file(b"Forbidden", "text/plain; charset=utf-8", status=403)
+            return False
         if SERVER["public"] or self._is_local():
             return True
         st = settings.load()
@@ -1270,7 +1343,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _body(self) -> dict:
         n = int(self.headers.get("Content-Length") or 0)
-        if n > MAX_BODY:
+        if n > (1024 * 1024 if SERVER["public"] else MAX_BODY):  # публичному серверу большие запросы не нужны
             raise ValueError("Слишком большой запрос")
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
@@ -1281,7 +1354,8 @@ class Handler(BaseHTTPRequestHandler):
         SERVER["seen"] = True
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
-            self._file(_page(), "text/html; charset=utf-8")
+            self._file(_page(), "text/html; charset=utf-8", extra={"Content-Security-Policy": CSP.format(n=PAGE_NONCE) if not SERVER["public"]
+                                         else CSP.format(n=PAGE_NONCE).replace("; frame-ancestors 'none'", "")})
         elif path in STATIC_FILES:
             name, ctype = STATIC_FILES[path]
             self._file((WEB / name).read_bytes(), ctype, "max-age=86400")
@@ -1327,9 +1401,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "Разбор не найден: результаты хранятся на сервере не дольше часа"}, 404)
             since = int(self.headers.get("X-Log-Since") or 0)
             pv = int(self.headers.get("X-Partial-V") or 0)  # готовая часть «Разобрать бой» — один раз на версию
+            v, part = job.get("partial_v", 0), job.get("partial")  # читаем один раз: версия и часть — пара
             self._json({"state": job["state"], "progress": job["progress"], "log": job["log"][since:],
-                        "partial": job.get("partial") if job.get("partial_v", 0) > pv else None,
-                        "partial_v": job.get("partial_v", 0),
+                        "partial": part if v > pv else None,
+                        "partial_v": v,
                         "wait_left": max(0.0, job.get("wait_until", 0) - time.time()),
                         "log_total": len(job["log"]), "error": job.get("error"), "need_key": job.get("need_key", False),
                         "result": job.get("result") if job["state"] == "done" else None})
@@ -1355,13 +1430,11 @@ class Handler(BaseHTTPRequestHandler):
                 CHECK_KEY(str(body.get("client_id", "")).strip(), str(body.get("client_secret", "")).strip())
                 return self._json({"ok": True})
             if path == "/api/zones":  # рейды текущего дополнения — для «Топ прогресса» без лога
-                cl = CLIENT_FACTORY(creds)
-                cl.max_wait_s = 0
+                cl = _limited(CLIENT_FACTORY(creds), 0)
                 return self._json({"zones": cl.raid_zones()})
             if path == "/api/inspect":
                 from .collect import inspect_report
-                cl = CLIENT_FACTORY(creds)
-                cl.max_wait_s = 0  # поиск боя не ждёт сброса лимита: сразу объясняем, что случилось
+                cl = _limited(CLIENT_FACTORY(creds), 0)  # поиск боя не ждёт сброса лимита: сразу объясняем, что случилось
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "units", "prev", "wait",
@@ -1431,6 +1504,9 @@ class Handler(BaseHTTPRequestHandler):
                         return self._json(update.check())
                 except update.UpdateError as e:
                     return self._json({"error": str(e)}, 502)
+                if any(j.get("state") == "running" for j in list(JOBS.values())):  # перезапуск оборвал бы разбор
+                    return self._json({"error": "Сейчас идёт разбор — обновитесь, когда он закончится "
+                                                "(иначе разбор прервётся и его придётся запускать заново)."}, 409)
                 if body.get("kind") == "full":
                     return self._json(update.apply_full())
                 res = update.apply_code()
@@ -1510,6 +1586,12 @@ def serve(port: int = 8765, open_browser: bool = True, local_only: bool = False,
         threading.Thread(target=_prune_cache, daemon=True).start()
     SERVER.update(port=httpd.server_address[1], lan=not local_only and not public, public=public,
                   httpd=httpd, restart=False, seen=False)
+    if not public:  # сервер поднялся — загруженная версия кода рабочая: отката к встроенной не будет
+        try:
+            from . import update
+            update.confirm_running_build()
+        except Exception:  # noqa: BLE001
+            pass
     # После перезапуска (обновление .exe целиком) браузер уже открыт — страница сама переподключится.
     # Если за 20 с никто не зашёл (вкладку закрыли), открываем браузер как обычно.
     reopen = bool(os.environ.pop("WCL_NO_BROWSER", None))

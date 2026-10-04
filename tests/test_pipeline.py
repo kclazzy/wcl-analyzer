@@ -327,6 +327,43 @@ def test_save_dir_full_path():
     print("OK папка сохранения: полный путь («Загрузки» по умолчанию, выбор — системным окном)")
 
 
+def test_plan_press_times():
+    """В строке MRT нет кулдауна, который к её времени не откатился: у нажатий с разным временем — разные строки;
+    нажатие не раньше начала фазы пика, запас на смещение фазы — по фазе пика; совпадение кулдауна по названию —
+    целиком и у своего класса/спека; кулдауны лекарей на себя не завышают число сейвов."""
+    from wcl_analyzer import game_data
+    from wcl_analyzer.raid_top import _aggregate, make_plan, mrt_note
+    def sp(t, k, d=100, ph=None):
+        return {"t": t, "peak_t": t + 2, "ability": "Волна", "ability_id": 5, "k": k, "damage": d, "phase": ph}
+    roster = [{"pid": 1, "player": "Aa", "name": "Тотем духовной связи", "id": 98008, "cd": 180, "cls": "Shaman"},
+              {"pid": 2, "player": "Bb", "name": "Ободряющий клич", "id": 97462, "cd": 180, "cls": "Warrior"}]
+    # первый пик 0:10 — оба кулдауна; второй 3:12 — тотем откатится только к 3:08+, клич — к 3:07+
+    plan = make_plan({"roster_cds": roster, "spikes": [sp(10, 1, 300), sp(192, 2, 300)]}, {}, [], {})
+    for r in plan:
+        for ln in (r.get("mrt_lines") or []):
+            t_line = ln[0]
+            for p in r["picks"]:
+                if f"{{spell:{p['id']}}}" in ln[1]:
+                    prev = [q for rr in plan if rr is not r for q in rr["picks"] if q["id"] == p["id"]]
+                    for q in prev:   # к времени строки кулдаун откатан
+                        mm, ss = map(int, q["ready"].split(":")[:2]) if q["ready"].count(":") == 1 else (0, 0)
+                        assert t_line >= mm * 60 + ss - 1 or t_line < r["t"] - 1, (ln, q)
+    # фаза: пик в 2-й фазе через 1 с после её начала — нажатие не раньше начала фазы, строка p2
+    ph = [{"n": 1, "t": 0, "name": "Ф1"}, {"n": 2, "t": 200, "name": "Ф2"}]
+    pl = make_plan({"roster_cds": roster[1:], "spikes": [sp(18, 1, 300, 1), sp(201, 2, 300, 2)]}, {}, [], {}, ph)
+    second = [r for r in pl if r["phase"] == 2][0]
+    assert not second["picks"] or second["picks"][0]["at"] >= "3:20", second   # 180 + 10 запаса на смену фазы
+    note = mrt_note(pl, "Б")
+    assert "{time:0:00,p2}" not in note or not second["picks"], note
+    # название кулдауна: целиком и у своего спека
+    assert not game_data.name_known("Сумрак", "DemonHunter") and game_data.name_known("Мрак", "DemonHunter", "Havoc")
+    assert not game_data.name_known("Перерождение", "Shaman", "Elemental")
+    # кулдауны лекарей на себя не считаются в «сколько сейвов жмёт топ»
+    top = [{"spikes": [{**sp(30, 1), "covered_ids": [64843, 200183, 33891]}]} for _ in range(3)]
+    assert _aggregate(top)[(5, 1)]["n_cds"] == [1, 1, 1]
+    print("OK план: у нажатий свои времена, фаза пика и запас на её смену, кулдауны по полному названию")
+
+
 def test_roster_plan():
     """План по составу: экспорт WoWUtils Group Export (или список «Имя Класс Спек») + минуты боя → киллы топа
     ближе всего по длительности, план сейвов и одна заметка MRT; кулдауны-таланты — если их жмёт топ."""
@@ -343,7 +380,15 @@ def test_roster_plan():
                             ("Морг", "melee", "Death Knight", "Unholy"), ("Хант", "ranged", "Hunter", "Beast Mastery"))]}
     pl, meta = parse_roster(json.dumps(ex, ensure_ascii=False))
     assert meta == {"source": "wowutils", "guild": "Гильдия"} and len(pl) == 6
-    assert pl[4] == {"name": "Морг", "cls": "DeathKnight", "spec": "Unholy", "role": "DPS"} and pl[0]["role"] == "Лекарь"
+    assert pl[4] == {"name": "Морг", "realm": "X", "cls": "DeathKnight", "spec": "Unholy", "role": "DPS"} and pl[0]["role"] == "Лекарь"
+    # русские спеки, «Имя Спек Класс», тёзки с разных серверов
+    ru, _ = parse_roster("Анна Жрец Послушание\nБорис Исцеление Шаман\nВера Друид Восстановление")
+    assert [(p["spec"], p["role"]) for p in ru] == [("Discipline", "Лекарь"), ("Restoration", "Лекарь"), ("Restoration", "Лекарь")], ru
+    twins = {"members": [{"displayName": "Foo", "characters": [{"name": "Foo", "realm": r, "playerClass": c, "playerSpec": sp}]}
+                         for r, c, sp in (("Ravencrest", "Priest", "Holy"), ("Silvermoon", "Shaman", "Restoration"))]}
+    tw, _ = parse_roster(json.dumps(twins))
+    assert [p["name"] for p in tw] == ["Foo-Ravencrest", "Foo-Silvermoon"], tw
+    assert {c["player"] for c in roster_cooldowns(tw, 300)} == {"Foo-Ravencrest", "Foo-Silvermoon"}
     pl2, _ = parse_roster("Элария Priest Holy\nМорг Рыцарь смерти Unholy\nмусор")
     assert [p["cls"] for p in pl2] == ["Priest", "DeathKnight"]
     # таланты: Апофеоз — только если его жмут лучшие гильдии
@@ -437,7 +482,7 @@ def test_fight_mode():
     assert b0["brief"] and b0["extras"]["plan"], "у босса — тот же полный разбор, что у одиночного лога"
     assert seen["partial4"]["parts"].keys() == {"b0"} and seen["partial4"]["pending"] == "pall"
     names = load_workbook(io.BytesIO(job4["xlsx"])).sheetnames
-    assert any(n.startswith(b0["info"]["boss"][:14] + " — ") for n in names), names
+    assert any(n.startswith("1." + b0["info"]["boss"][:10]) and " — " in n for n in names), names
     print("OK «Разобрать бой»: рейд сразу, ротация следом, лимит не теряет готовое, один Excel, все боссы")
 
 
@@ -778,6 +823,7 @@ if __name__ == "__main__":
     test_top_progress()
     test_plan_longer_phase()
     test_plan_own_timings()
+    test_plan_press_times()
     test_roster_plan()
     test_save_dir_full_path()
     test_cache_prune()

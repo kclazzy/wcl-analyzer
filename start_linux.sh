@@ -14,7 +14,17 @@ if [ ! -x .venv/bin/python ]; then
   "$PY" -m venv .venv || { echo "Не удалось создать окружение Python."; read -r; exit 1; }
 fi
 
-.venv/bin/python -m pip install -q --disable-pip-version-check -r requirements.txt \
-  || { echo "Не удалось установить зависимости. Проверьте интернет."; read -r; exit 1; }
+# Зависимости ставятся только при первом запуске и когда изменился requirements.txt
+# (его отпечаток хранится в .venv) — без интернета программа запускается как обычно
+REQ_HASH="$(.venv/bin/python -c 'import hashlib; print(hashlib.sha256(open("requirements.txt", "rb").read()).hexdigest())')"
+if [ "$(cat .venv/requirements.sha256 2>/dev/null)" != "$REQ_HASH" ]; then
+  if .venv/bin/python -m pip install -q --disable-pip-version-check -r requirements.txt; then
+    echo "$REQ_HASH" > .venv/requirements.sha256
+  elif .venv/bin/python -c "import wcl_analyzer.web" 2>/dev/null; then
+    echo "Внимание: не удалось обновить зависимости (нет интернета?) — запускаю с уже установленными."
+  else
+    echo "Не удалось установить зависимости. Проверьте интернет."; read -r; exit 1
+  fi
+fi
 
 exec .venv/bin/python -m wcl_analyzer ui

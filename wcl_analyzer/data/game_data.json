@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "_about": "Игровые данные, которые меняются с патчами. Программа берёт этот файл из репозитория (main), если доступен, иначе — копию из сборки. Правка здесь не требует пересборки APK и .exe.",
  "raid_cds": [
   {
@@ -47,7 +47,23 @@
    "cd": 180,
    "core": true,
    "power": 3,
-   "scope": "raid"
+   "scope": "raid",
+   "choice_with": 271466
+  },
+  {
+   "class": "Priest",
+   "spec": "Discipline",
+   "id": 271466,
+   "name": "Сияющий барьер",
+   "en": "Luminous Barrier",
+   "cd": 180,
+   "core": false,
+   "power": 3,
+   "scope": "raid",
+   "choice_with": 62618,
+   "aliases": [
+    "сияющий барьер"
+   ]
   },
   {
    "class": "Priest",
@@ -297,7 +313,9 @@
    "aliases": [
     "перемотка"
    ],
-   "scope": "raid"
+   "scope": "raid",
+   "cd_common": 180,
+   "_cd_note": "Temporal Artificer (−1 мин) берут почти все"
   },
   {
    "class": "Evoker",
@@ -377,7 +395,9 @@
    "cd": 300,
    "core": true,
    "power": 2,
-   "scope": "raid"
+   "scope": "raid",
+   "cd_common": 180,
+   "_cd_note": "Pitch Black (−2 мин) берут почти все"
   }
  ],
  "lust_ids": [

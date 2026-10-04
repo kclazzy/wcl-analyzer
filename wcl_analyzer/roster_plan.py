@@ -41,8 +41,21 @@ def _cls(name: str) -> str:
     return CLASS_ALIASES.get(k) or str(name or "").replace(" ", "")
 
 
-def _spec(name: str) -> str:
-    return re.sub(r"\s+", "", str(name or "")).strip()
+SPEC_ALIASES = {"восстановление": "Restoration", "исцеление": "Restoration", "дисциплина": "Discipline",
+                "холи": "Holy", "рестор": "Restoration", "рдруид": "Restoration", "превока": "Preservation",
+                "мв": "Mistweaver", "бм": "BeastMastery", "лед": "Frost", "лёд": "Frost"}
+
+
+def _spec(name: str, cls: str = "") -> str:
+    """Спек по-английски (как в таблице кулдаунов): «Beast Mastery», «Исцеление», «Послушание» → BeastMastery,
+    Restoration, Discipline. Русские названия — из names_ru (как в игре) с учётом класса."""
+    from .names_ru import SPECS
+    raw = re.sub(r"\s+", " ", str(name or "")).strip()
+    k = raw.lower().replace("ё", "е")
+    for (c, sp), ru in SPECS.items():
+        if ru.lower().replace("ё", "е") == k and (not cls or c == cls):
+            return sp
+    return SPEC_ALIASES.get(k) or raw.replace(" ", "")
 
 
 def _role(cls: str, spec: str, given: str | None = None) -> str:
@@ -69,30 +82,45 @@ def parse_roster(text: str) -> tuple[list[dict], dict]:
         for m in data.get("members") or []:
             chars = m.get("characters") or [{}]
             main = next((c for c in chars if c.get("name") == m.get("displayName")), chars[0])
-            cls, spec = _cls(main.get("playerClass")), _spec(main.get("playerSpec"))
+            cls = _cls(main.get("playerClass"))
+            spec = _spec(main.get("playerSpec"), cls)
             if main.get("name") and cls:
-                players.append({"name": str(main["name"]), "cls": cls, "spec": spec, "role": _role(cls, spec, m.get("mainRole"))})
+                players.append({"name": str(main["name"]), "realm": str(main.get("realm") or ""), "cls": cls,
+                                "spec": spec, "role": _role(cls, spec, m.get("mainRole"))})
     else:
         for line in text.splitlines():
             parts = [p for p in re.split(r"[\s,;\t]+", line.strip()) if p]
             if len(parts) < 2:
                 continue
             name, rest = parts[0], parts[1:]
-            # класс из двух слов: «Death Knight», «Demon Hunter», «Рыцарь смерти»
-            for n in (2, 1):
-                if len(rest) >= n and _cls(" ".join(rest[:n])) in CLASS_ALIASES.values():
-                    cls, spec = _cls(" ".join(rest[:n])), _spec(" ".join(rest[n:]))
+            # класс — где угодно после имени («Имя Класс Спек» или «Имя Спек Класс»), из одного или двух слов:
+            # «Death Knight», «Demon Hunter», «Рыцарь смерти»
+            found = None
+            for i in range(len(rest)):
+                for n in (3, 2, 1):   # «Охотник на демонов» — три слова
+                    if i + n <= len(rest) and _cls(" ".join(rest[i:i + n])) in CLASS_ALIASES.values():
+                        found = (i, n)
+                        break
+                if found:
                     break
-            else:
+            if not found:
                 continue
-            players.append({"name": name, "cls": cls, "spec": spec, "role": _role(cls, spec)})
+            i, n = found
+            cls = _cls(" ".join(rest[i:i + n]))
+            spec = _spec(" ".join(rest[:i] + rest[i + n:]), cls)
+            players.append({"name": name, "realm": "", "cls": cls, "spec": spec, "role": _role(cls, spec)})
     if not players:
         raise LookupError("В тексте не нашлось ни одного игрока — нужен экспорт WoWUtils Group Export или строки «Имя Класс Спек»")
     seen, out = set(), []
-    for p in players:
-        if p["name"] not in seen:
-            seen.add(p["name"])
+    for p in players:   # один игрок — имя и сервер: тёзки с разных серверов — разные игроки
+        key = (p["name"].lower(), p.get("realm", "").lower())
+        if key not in seen:
+            seen.add(key)
             out.append(p)
+    names = [p["name"] for p in out]
+    for p in out:       # тёзкам — имя с сервером, как в игре: «Имя-Сервер»
+        if names.count(p["name"]) > 1 and p.get("realm"):
+            p["name"] = f"{p['name']}-{p['realm'].replace(' ', '')}"
     return out, meta
 
 
@@ -119,7 +147,9 @@ def roster_cooldowns(players: list[dict], duration: float, top_use: dict | None 
             if a in got and b in got:   # остаётся тот, что у топа чаще; поровну — основной кулдаун спека
                 rank = {x: (top_use.get(x, 0), "талант" not in got[x][2], -x) for x in (a, b)}
                 got.pop(min((a, b), key=rank.get))
+        common = {int(x["id"]): float(x["cd_common"]) for x in game_data.raid_cds() if x.get("cd_common")}
         for sid, (name, cd, source) in got.items():
+            cd = common.get(sid, cd)   # откат с талантом, который берут почти все (Мрак, Перемотка)
             out.append({"pid": i + 1, "player": p["name"], "role": p["role"], "cls": p["cls"], "spec": p["spec"],
                         "id": sid, "name": name, "cd": cd, "used": 0,
                         "max_uses": int(duration // cd) + 1 if duration else None, "source": source})
@@ -173,10 +203,13 @@ def plan_events(R: dict) -> list[dict]:
     for h in sorted(X.get("heaviest") or [], key=lambda h: h["t"]):
         if any(abs(h["t"] - s["t"]) <= NEAR_S or abs(h["t"] - s.get("peak_t", s["t"])) <= NEAR_S for s in spikes):
             continue
-        ab = h.get("ability_id")
-        count[ab] = count.get(ab, 0) + 1
+        # свой ключ (отрицательный id): не сдвигает нумерацию настоящих пиков этой способности и не
+        # сопоставляется с «№ k» у топа
+        extra = -(len(count) + 1000)
+        count[extra] = 1
+        name = (h.get("abilities") or ["урон по рейду"])[0]
         spikes.append({"t": h["t"], "peak_t": h["t"] + 2, "time": h["time"], "damage": h["damage"],
-                       "ability": (h.get("abilities") or ["Тяжёлый момент"])[0], "ability_id": ab, "k": count[ab],
+                       "ability": f"Тяжёлый момент: {name}", "ability_id": extra, "k": 1,
                        "phase": _phase_of(h["t"], phases), "heavy_moment": True})
     return sorted(spikes, key=lambda s: s["t"])
 

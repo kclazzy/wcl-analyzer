@@ -25,12 +25,27 @@ if not exist ".venv\Scripts\python.exe" (
   )
 )
 
-".venv\Scripts\python.exe" -m pip install -q --disable-pip-version-check -r requirements.txt
+rem Зависимости ставятся только при первом запуске и когда изменился requirements.txt
+rem (его отпечаток хранится в .venv) - без интернета программа запускается как обычно
+set "VPY=.venv\Scripts\python.exe"
+"%VPY%" -c "import hashlib, pathlib, sys; h = hashlib.sha256(pathlib.Path('requirements.txt').read_bytes()).hexdigest(); p = pathlib.Path('.venv/requirements.sha256'); sys.exit(0 if p.exists() and p.read_text().strip() == h else 1)"
+if not errorlevel 1 goto run
+
+"%VPY%" -m pip install -q --disable-pip-version-check -r requirements.txt
+if errorlevel 1 goto pipfail
+"%VPY%" -c "import hashlib, pathlib; pathlib.Path('.venv/requirements.sha256').write_text(hashlib.sha256(pathlib.Path('requirements.txt').read_bytes()).hexdigest())"
+goto run
+
+:pipfail
+"%VPY%" -c "import wcl_analyzer.web" >nul 2>nul
 if errorlevel 1 (
   echo Не удалось установить зависимости. Проверьте интернет и запустите снова.
   pause
   exit /b 1
 )
+echo Внимание: не удалось обновить зависимости ^(нет интернета?^) - запускаю с уже установленными.
 
-".venv\Scripts\python.exe" -m wcl_analyzer ui
+:run
+
+"%VPY%" -m wcl_analyzer ui
 pause

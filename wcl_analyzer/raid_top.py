@@ -130,7 +130,8 @@ def _aggregate(kills: list[dict], by_phase: bool = False) -> dict:
             if sp.get("covered_ids"):
                 r["covered"] += 1
             r["cds"].update(sp.get("covered_ids") or [])
-            r["n_cds"].append(len(sp.get("covered_ids") or []))  # сколько кулдаунов топ жмёт на этот пик
+            # сколько РЕЙДОВЫХ кулдаунов топ жмёт на этот пик (кулдауны лекарей на себя — отдельно, в число сейвов не идут)
+            r["n_cds"].append(sum(1 for i in sp.get("covered_ids") or [] if game_data.scope(i) != "self"))
     need = max(2, MIN_SHARE * len(kills)) if len(kills) >= 3 else 1
     return {key: r for key, r in ref.items() if r["kills"] >= need}
 
@@ -295,9 +296,29 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                 cur = p["n"]
         return cur
 
-    def free(k, at: float) -> bool:
-        return all(abs(at - t) >= cds[k]["cd"] + (PHASE_SHIFT_S if ph_n(at) != ph_n(t) else 0.0)
-                   for t in assigned[k])
+    def free(k, at: float, ph=None) -> bool:
+        """Кулдаун откатан к at. ph — фаза, от которой в заметке считается это нажатие (фаза пика): если два
+        нажатия привязаны к разным фазам, к перезарядке добавляется запас на смещение фазы."""
+        ph = ph if ph is not None else ph_n(at)
+        return all(abs(at - t) >= cds[k]["cd"] + (PHASE_SHIFT_S if ph != tph else 0.0)
+                   for t, tph in assigned[k])
+
+    def press_at(ev, lead) -> float:
+        """Время нажатия за lead с до пика; если оно выходит раньше начала фазы пика — с начала фазы:
+        в заметке время со 2-й фазы считается от её начала, и нажатие «до фазы» записать нельзя."""
+        at = max(0.0, ev["t"] - lead)
+        st = anchor_start(ev)
+        if st is not None and at < st <= ev["t"]:
+            at = st
+        return at
+
+    def anchor_start(ev):
+        n = ev.get("phase")
+        p = next((x for x in phases if x["n"] == n), None) if n else None
+        return p["t"] if p else ev.get("phase_start")
+
+    def anchor(ev, at):
+        return ev.get("phase") or ph_n(at)
     cds: dict = {}
     pool = X.get("roster_cds")
     if pool:
@@ -357,13 +378,13 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
         for k in order:
             # на один пик — разные игроки и разные способности: два одинаковых кулдауна
             # одного класса (два «Ободряющих клича», два гимна) не складываются в пользу рейда
-            if any(k == p[0] or k[1] == p[0][1] for p in picks) or cds[k]["player"] in players:
+            if any(k == p[0] or k[1] == p[0][1] for p in picks) or k[0] in players:
                 continue
             for lead in range(PRESS_WINDOW_S[1], PRESS_WINDOW_S[0] - 1, -1):
-                at = max(0.0, ev["t"] - lead)
-                if free(k, at):
-                    assigned[k].append(at)
-                    players.add(cds[k]["player"])
+                at = press_at(ev, lead)
+                if free(k, at, anchor(ev, at)):
+                    assigned[k].append((at, anchor(ev, at)))
+                    players.add(k[0])   # игрок — по id, а не по имени: тёзки с разных серверов — разные игроки
                     picks.append((k, at))
                     return True
         return False
@@ -386,12 +407,12 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
         for k in sorted(heal_keys, key=lambda k: (len(assigned[k]), -game_data.power(k[1]), cds[k]["cd"])):
             if len(st["heal"]) >= MAX_HEAL_PER_PEAK:
                 break
-            if any(cds[k]["player"] == cds[h]["player"] or k[1] == h[1] for h, _ in st["heal"]):
+            if any(k[0] == h[0] or k[1] == h[1] for h, _ in st["heal"]):
                 continue
             for lead in range(PRESS_WINDOW_S[1], PRESS_WINDOW_S[0] - 1, -1):
-                at = max(0.0, st["ev"]["t"] - lead)
-                if free(k, at):
-                    assigned[k].append(at)
+                at = press_at(st["ev"], lead)
+                if free(k, at, anchor(st["ev"], at)):
+                    assigned[k].append((at, anchor(st["ev"], at)))
                     st["heal"].append((k, at))
                     break
     plan = []
@@ -424,22 +445,30 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                           "cooldown": _fmt_t(cds[k]["cd"]), "ready": _fmt_t(at + cds[k]["cd"]), "at": _fmt_t(at),
                           "id": cds[k]["id"], "cls": cds[k].get("cls") or game_data.class_of(cds[k]["id"])}
                          for k, at in picks]}
-        row["mrt"] = mrt_line(t0, ev["mechanic"], row["picks"], n if (n or 0) > 1 else None, rel,
-                              mech_id=(ev.get("key") or (None,))[0])
+        mech_id = (ev.get("key") or (None,))[0]
+
+        def lines(pairs, dicts):
+            """Строки заметки: у каждого нажатия — своё время; кулдауны с одним временем — одной строкой.
+            Так в строке нет кулдауна, который к её времени ещё не откатился."""
+            groups: dict = {}
+            for (k, at), d in zip(pairs, dicts):
+                groups.setdefault(int(round(at)), (at, []))[1].append(d)
+            out = []
+            for _sec, (at, ds) in sorted(groups.items()):
+                r_ = max(0.0, at - start) if start is not None else None
+                out.append((at, mrt_line(at, ev["mechanic"], ds, n if (n or 0) > 1 else None, r_, mech_id=mech_id)))
+            return out
+        row["mrt_lines"] = lines(picks, row["picks"])
+        row["mrt"] = "\n".join(x[1] for x in row["mrt_lines"])
         heal = sorted(st.get("heal") or [], key=lambda p: p[1])
         row["heal_picks"] = [{"cd": cds[k]["name"], "player": cds[k]["player"], "cooldown": _fmt_t(cds[k]["cd"]),
                               "ready": _fmt_t(at + cds[k]["cd"]), "at": _fmt_t(at), "t": at, "id": cds[k]["id"],
                               "cls": cds[k].get("cls") or game_data.class_of(cds[k]["id"])} for k, at in heal]
-        if heal:  # своё время — первое нажатие лекаря; фаза — та же, что у пика (как у сейвов на этот пик),
-            th = heal[0][1]  # иначе нажатие за секунду до смены фазы ушло бы в другую строку заметки
-            nh, sh = (n, start) if start is not None else (ph_n(th), None)
-            if sh is None:
-                ph_info = next((p for p in phases if p["n"] == nh), None)
-                sh = ph_info["t"] if ph_info else None
-            row["heal_time"] = _fmt_t(th)
-            row["mrt_heal"] = mrt_line(th, ev["mechanic"], row["heal_picks"], nh if (nh or 0) > 1 else None,
-                                       max(0.0, th - sh) if sh is not None else None, mech_id=(ev.get("key") or (None,))[0])
-            row["heal_t"] = th
+        if heal:  # у кулдаунов лекарей — свои времена нажатия; фаза — та же, что у пика (как у сейвов)
+            row["mrt_heal_lines"] = lines(heal, row["heal_picks"])
+            row["mrt_heal"] = "\n".join(x[1] for x in row["mrt_heal_lines"])
+            row["heal_time"] = _fmt_t(heal[0][1])
+            row["heal_t"] = heal[0][1]
         if picks:
             f = row["picks"][0]
             row.update({"cd": f["cd"], "player": f["player"], "like_top": any(x["like_top"] for x in row["picks"])})
@@ -489,12 +518,14 @@ def mrt_line(t: float, mechanic: str, picks: list[dict], phase: int | None = Non
     for p in picks:
         color = CLASS_COLOR.get(p.get("cls") or "")
         name = f"|cff{color}{p['player']}|r" if color else p["player"]
-        mark = f"{{spell:{p['id']}}}" if p.get("id") else p["cd"]
+        # без id — название кулдауна неразрывными пробелами: строку потом можно разобрать на «игрок — иконки»
+        mark = f"{{spell:{p['id']}}}" if p.get("id") else str(p["cd"]).replace(" ", "\u00a0")
         if mark not in by.setdefault(name, []):
             by[name].append(mark)
     who = [f"{name} " + " ".join(marks) for name, marks in by.items()]
     tm = f"{_mrt_time(phase_t)},p{phase}" if phase and phase_t is not None else _mrt_time(t)
-    mech = f"{{spell:{mech_id}}}" if mech_id and int(mech_id) > 0 else mechanic.replace("«", "").replace("»", "")
+    mech = f"{{spell:{mech_id}}}" if mech_id and int(mech_id) > 0 else \
+        mechanic.replace("«", "").replace("»", "").replace(" - ", " – ")  # « - » — разделитель строки MRT
     return f"{{time:{tm}}}{mech} - " + "  ".join(who)
 
 
@@ -517,8 +548,13 @@ def mrt_note(plan: list[dict], title: str = "") -> str:
     лекарей по времени; на один пик в одно время — одной строкой. Только пики вашего боя по их фактическому
     времени: пики, до которых бой не дошёл (время у них — от лучших киллов), не входят."""
     rows = [r for r in plan if not r.get("after_end")]
-    lines = merge_mrt_lines([(r["t"], r.get("mrt")) for r in rows]
-                            + [(r.get("heal_t", r["t"]), r.get("mrt_heal")) for r in rows])
+
+    def items(r, f, t):
+        if r.get(f + "_lines"):
+            return [tuple(x) for x in r[f + "_lines"]]
+        return [(t, ln) for ln in (r.get(f) or "").split("\n") if ln]
+    lines = merge_mrt_lines([x for r in rows for x in items(r, "mrt", r["t"])]
+                            + [x for r in rows for x in items(r, "mrt_heal", r.get("heal_t", r["t"]))])
     if not lines:
         return ""
     return "\n".join([f"Сейвы: {title}" if title else "Сейвы"] + lines)
@@ -526,10 +562,12 @@ def mrt_note(plan: list[dict], title: str = "") -> str:
 
 def mrt_heal_note(plan: list[dict], title: str = "") -> str:
     """Только кулдауны лекарей из плана (для разборов старых версий; общая заметка — mrt_note)."""
-    rows = sorted((r for r in plan if r.get("mrt_heal") and not r.get("after_end")), key=lambda r: r.get("heal_t", r["t"]))
-    if not rows:
+    rows = [r for r in plan if r.get("mrt_heal") and not r.get("after_end")]
+    items = sorted(((tuple(x)[0], tuple(x)[1]) for r in rows for x in (r.get("mrt_heal_lines")
+                    or [(r.get("heal_t", r["t"]), ln) for ln in r["mrt_heal"].split("\n")])), key=lambda x: x[0])
+    if not items:
         return ""
-    return "\n".join([f"Кулдауны лекарей: {title}" if title else "Кулдауны лекарей"] + [r["mrt_heal"] for r in rows])
+    return "\n".join([f"Кулдауны лекарей: {title}" if title else "Кулдауны лекарей"] + [ln for _, ln in items])
 
 
 def brief_lines(vs: dict | None) -> list[str]:

@@ -139,6 +139,29 @@ def cd_name_re() -> re.Pattern:
     return _RE_CACHE[key]
 
 
+def _key(s) -> str:
+    return "".join(ch for ch in str(s or "") if ch.isalnum()).lower()
+
+
+def name_known(name: str, cls: str = "", spec: str = "") -> bool:
+    """Способность — рейдовый кулдаун из таблицы по НАЗВАНИЮ (когда id в логе другой): только полное
+    совпадение названия (не часть слова: «Сумрак» ≠ «Мрак») и только у того класса и спека, чей это кулдаун —
+    «Перерождение» шамана-энха или «Возрождение» друида (боевое воскрешение) рейдовыми сейвами не считаются."""
+    n = (name or "").strip().lower()
+    if not n:
+        return False
+    for c in raid_cds():
+        names = {x.lower() for x in [c.get("en", ""), c.get("name", ""), *(c.get("aliases") or [])] if x}
+        if n not in names:
+            continue
+        if cls and c.get("class") and _key(c["class"]) != _key(cls):
+            continue
+        if spec and c.get("spec") and _key(c["spec"]) != _key(spec):
+            continue
+        return True
+    return False
+
+
 def lust_ids() -> set[int]:
     return {int(x) for x in data().get("lust_ids") or []}
 

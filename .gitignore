@@ -10,3 +10,10 @@ dist/
 android/.buildozer/
 android/bin/
 android/wcl_analyzer/
+# копия игровых данных, которую программа при запуске из исходников кладёт в папку данных (здесь — корень)
+/game_data.json
+# ключи подписи APK — только в секретах репозитория
+*.keystore
+*.jks
+*.p12
+android/wcl_boot.py

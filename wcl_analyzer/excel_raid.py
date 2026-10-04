@@ -431,6 +431,8 @@ def _plan_text(r: dict) -> str:
         text += ". Лекари: " + "; ".join(f"{p['cd']} — {p['player']} в {p['at']}" for p in r["heal_picks"])
     if r.get("spare"):
         text += ". Запасные: " + "; ".join(f"{x['cd']} — {x['player']}" for x in r["spare"])
+    if r.get("after_end"):
+        text = "[По топу: ваш бой сюда не дошёл, время — у лучших киллов, в заметку MRT не входит] " + text
     return text
 
 

@@ -301,13 +301,21 @@ def _run_fight(job: dict, params: dict, creds, log) -> None:
     first = ("saves" if allb else "raid")
     second = None if ref == "none" else ("pall" if allb else ("rot" if actor in (None, "", "all") or demo else "player"))
     order = [first] + ([second] if second else [])
+    titles: dict = dict(FIGHT_PARTS)
+    kinds: dict = {}
+    queued: list = []
 
     def combined(pending=None) -> dict:
         base = parts.get(first) or {}
         return {"mode": "fight", "all_bosses": allb, "info": base.get("info") or {}, "parts": dict(parts),
-                "order": order, "errors": dict(errors), "pending": pending, "titles": FIGHT_PARTS,
+                "order": list(order), "errors": dict(errors), "pending": pending, "titles": dict(titles),
+                "kinds": dict(kinds), "queued": [k for k in queued if k not in parts and k not in errors and k != pending],
                 "focus": actor, "ref": ref, "excel": f"/api/report/{job['id']}", "source_url": params.get("url"),
                 "params": {k: params.get(k) for k in ("url", "fight", "actor", "ref", "pick", "mythic", "demo")}}
+
+    def publish(pending) -> None:
+        job["partial"] = combined(pending=pending)
+        job["partial_v"] = job.get("partial_v", 0) + 1
 
     def run_part(key, fn, sub_params, lo, hi) -> None:
         sj = _SubJob(job, lo, hi)
@@ -337,14 +345,14 @@ def _run_fight(job: dict, params: dict, creds, log) -> None:
         parts[key] = res
 
     if allb:
-        run_part("saves", _run_saves, {**params, "mode": "saves"}, 0.0, 0.45 if second else 0.95)
+        _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titles, kinds, queued, second,
+                        publish, 0.0, 0.6 if second else 0.95)
     else:
         run_part("raid", _run_raid, {**params, "mode": "raid"}, 0.0, 0.3 if second else 0.95)
     if second:
-        job["partial"] = combined(pending=second)
-        job["partial_v"] = job.get("partial_v", 0) + 1
+        publish(second)
         if second == "pall":
-            run_part("pall", _run_player_all, {**params, "mode": "allbosses", "actor": actor or "all"}, 0.45, 0.95)
+            run_part("pall", _run_player_all, {**params, "mode": "allbosses", "actor": actor or "all"}, 0.6, 0.95)
         elif second == "rot":
             run_part("rot", _run_raid_rotation, {**params, "mode": "raidrot", "ref": ref}, 0.3, 0.95)
         else:
@@ -358,16 +366,105 @@ def _run_fight(job: dict, params: dict, creds, log) -> None:
                 before = set(wb.sheetnames)
                 writer(data, None, wb=wb)
                 for ws in wb.worksheets:  # одноимённый лист второй части: «Выжимка1» → «Игрок — Выжимка»
+                    if ws.title in before:
+                        continue
                     m = re.match(r"(.+?)(\d+)$", ws.title)
-                    if ws.title not in before and m and m.group(1) in before:
+                    if key in kinds:  # бой каждого босса — листы с его именем: «Sszorak — Выжимка»
+                        base = m.group(1) if m and m.group(1) in before else ws.title
+                        ws.title = f"{titles[key][:14]} — {base}"[:31]
+                    elif m and m.group(1) in before:
                         ws.title = f"{short.get(key, key)} — {m.group(1)}"[:31]
             wb.save(path)
             return path
-        name = writers[0][0] + ("_и_ротация" if len(writers) > 1 else "")
+        name = writers[0][0] + ("_и_ротация" if any(w[3] in ("rot", "player", "pall") for w in writers) else "")
         _excel_bytes(job, name, write_all, None)
     job.pop("partial", None)
     job["result"] = combined()
     log("Готово.")
+
+
+def _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titles, kinds, queued, second,
+                    publish, lo, hi) -> None:
+    """«Все боссы отчёта»: на каждого босса — полный разбор боя, как у одиночного лога (главное по бою,
+    кому что поправить, урон, сейвы, смерти, механики, план с двумя заметками MRT), вкладка на босса.
+    Первая вкладка — сводка «Сейвы по боссам» (план и заметки всех боссов в одном месте). Готовые боссы
+    видны сразу; кончился лимит WCL — остальные боссы с «Продолжить» (скачанное повторно лимит не тратит)."""
+    from .config import DIFFICULTY_NAMES, SITE_URL
+    from .excel_raid import write_raid_workbook, write_saves_workbook
+    from .logs import parse_report_url
+    from .raid import run_raid
+    from .raid_saves import boss_entry, pick_fights
+
+    avoidable = set(_avoidable_list())
+    if params.get("demo"):
+        from .raid_demo import DEMO_AVOIDABLE, DEMO_URL, FakeRaidClient
+        client, url = FakeRaidClient(), DEMO_URL
+        avoidable |= {str(x) for x in DEMO_AVOIDABLE}
+        log("Демо-рейд: один босс — на настоящем отчёте вкладка будет на каждого босса вечера.")
+    else:
+        client, url = _client(creds, job, log, wait=bool(params.get("wait"))), params["url"]
+    code, _, _ = parse_report_url(url)
+    report = client.report(code)
+    chosen = pick_fights(report, difficulties=None)
+    if not chosen:
+        raise LookupError("В отчёте нет боёв с боссами")
+    multi = len({int(c["fight"].get("difficulty") or 0) for c in chosen}) > 1
+    keys = [f"b{i}" for i in range(len(chosen))]
+    for k, c in zip(keys, chosen):
+        f = c["fight"]
+        titles[k] = f.get("name", "") + (f" ({DIFFICULTY_NAMES.get(int(f.get('difficulty') or 0), '')[:4]}.)" if multi else "")
+        kinds[k] = "raid"
+    order[1:1] = keys   # «Сейвы по боссам», вкладки боссов, затем ротация
+    queued[:] = keys + ([second] if second else [])
+    zone = (report.get("zone") or {}).get("name", "")
+    bosses, skipped = [], []
+
+    def saves_part() -> dict:
+        return {"mode": "saves",
+                "info": {"code": code, "title": report.get("title", ""), "zone": zone, "url": f"{SITE_URL}/reports/{code}",
+                         "bosses": len(bosses), "boss": zone or report.get("title", ""),
+                         "difficulty": ", ".join(dict.fromkeys(b["difficulty"] for b in bosses)),
+                         "demo": code.startswith("DEMO")},
+                "bosses": list(bosses), "skipped": list(skipped), "excel": f"/api/report/{job['id']}", "source_url": url}
+
+    log(f"Боссов в отчёте: {len(chosen)}. На каждого — полный разбор боя (последний килл, без киллов — лучший пулл).")
+    n = len(chosen)
+    for i, (k, c) in enumerate(zip(keys, chosen)):
+        f = c["fight"]
+        diff = DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), "")
+        publish(k)
+        log(f"[{i + 1}/{n}] {f.get('name')} ({diff}): " + ("килл" if f.get("kill") else "лучший пулл"))
+        base = lo + (hi - lo) * i / n
+        try:
+            R = run_raid(client, url, int(f["id"]), log=lambda m: log("    " + m), avoidable=avoidable,
+                         talent_data=[] if params.get("demo") else None, save_talents=not SERVER["public"],
+                         mythic=params.get("mythic") is not False,
+                         progress=lambda x, b=base: job.__setitem__(
+                             "progress", max(job["progress"], min(0.97, b + (hi - lo) * min(1.0, x) / n))))
+        except SystemExit:
+            raise
+        except Exception as e:  # noqa: BLE001 — один босс не должен ронять остальные
+            msg = _friendly(e)
+            if "лимит" in msg.lower():
+                for k2, c2 in zip(keys[i:], chosen[i:]):
+                    errors[k2] = "Не хватило часового лимита WCL — нажмите «Продолжить» после сброса."
+                    skipped.append({"boss": c2["fight"].get("name", ""),
+                                    "difficulty": DIFFICULTY_NAMES.get(int(c2["fight"].get("difficulty") or 0), ""),
+                                    "reason": "не хватило лимита WCL — «Продолжить» после сброса"})
+                log("Закончился часовой лимит WCL — остальные боссы после сброса.")
+                break
+            errors[k] = msg
+            skipped.append({"boss": f.get("name", ""), "difficulty": diff, "reason": msg})
+            log(f"    пропущен: {msg}")
+            continue
+        parts[k] = {**R, "excel": f"/api/report/{job['id']}", "source_url": url}
+        writers.append((titles[k], write_raid_workbook, R, k))
+        bosses.append(boss_entry(R, c))
+        parts["saves"] = saves_part()
+    if not bosses:
+        raise LookupError("Ни один бой не удалось разобрать: " + "; ".join(dict.fromkeys(errors.values())))
+    parts["saves"] = saves_part()
+    writers.insert(0, (f"Все_боссы_{zone or code}", write_saves_workbook, parts["saves"], "saves"))
 
 
 def _new_wb():

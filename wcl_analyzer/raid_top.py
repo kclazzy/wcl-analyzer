@@ -227,10 +227,12 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
         if mine and ph_t is not None:  # ваш бой дошёл до этой фазы: время — от её начала у вас
             t = mine["t"] + ph_t
             peak_t = t + median(x[2] for x in r["ph"] if x[0] == ph_n)
+            if t <= (R["info"].get("duration_s") or 0):
+                continue  # по вашим фазам это время ваш бой прошёл, и пика не было — топ здесь не указ
         late.append({"t": t, "peak_t": peak_t, "phase": ph_n, "phase_t": ph_t, "time": _fmt_t(t), "mechanic": f"«{r['name']}» №{key[1]}", "my": None,
                      "top_share": r["covered"] / r["kills"],
                      "top_cds": [names.get(i, f"#{i}") for i, _ in r["cds"].most_common(2)],
-                     "top_time": _fmt_t(t), "_key": key, "_k": key, "my_self": None, "my_raid": None})
+                     "top_time": _fmt_t(t), "_key": key, "_k": key, "my_self": None, "my_raid": None, "after_end": True})
     rows += late
     for row in rows:  # на рейд и на себя (усиление лекаря) — раздельно
         r = row.pop("_r") if "_r" in row else (ref.get(row.pop("_k", None)) if "_k" in row else None)
@@ -321,7 +323,8 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
     top_dmg = max((e["prio"] for e in events), default=1.0)
     for r in late:
         events.append({"t": r["peak_t"], "mechanic": r["mechanic"], "key": r["_key"], "prio": top_dmg * 0.5 * (r["top_share"] or 0.5),
-                       "phase": r.get("phase"), "phase_start": (r["t"] - r["phase_t"]) if r.get("phase_t") is not None else None})
+                       "phase": r.get("phase"), "phase_start": (r["t"] - r["phase_t"]) if r.get("phase_t") is not None else None,
+                       "after_end": True})
     med = median([e["prio"] for e in events]) if events else 0
     assigned: dict = defaultdict(list)
     states = []
@@ -368,7 +371,9 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
     # Сначала — по одному сейву на каждый пик, от самых тяжёлых к лёгким: иначе кулдауны уходят на ранние
     # лёгкие пики, а сильный урон в конце длинного боя (у топа его нет — они убивают раньше) остаётся без сейва.
     # Потом — добираем второй и третий сейв на тяжёлые пики.
-    by_weight = sorted(states, key=lambda st: (-st["ev"]["prio"], -st["need"], st["ev"]["t"]))
+    # Пики после конца вашего боя (время — по лучшим киллам) — в последнюю очередь: кулдауны сначала на ваши
+    # настоящие пики, по их фактическому времени
+    by_weight = sorted(states, key=lambda st: (bool(st["ev"].get("after_end")), -st["ev"]["prio"], -st["need"], st["ev"]["t"]))
     for st in by_weight:
         add_one(st)
     for st in by_weight:
@@ -411,6 +416,8 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                # этой же способности у топа, иначе — только по тяжести пика
                "beyond_top": bool(ref) and st["how"] in (None, "template"),
                "by_template": st["how"] == "template",
+               # пика нет в вашем бою (он кончился раньше): время взято у лучших киллов — в заметки MRT не входит
+               "after_end": bool(ev.get("after_end")),
                "top_n": top_need,
                "top": ", ".join(names.get(i, f"#{i}") for i in pref[:2]),
                "picks": [{"cd": cds[k]["name"], "player": cds[k]["player"], "like_top": k[1] in pref[:2],
@@ -491,8 +498,9 @@ def mrt_line(t: float, mechanic: str, picks: list[dict], phase: int | None = Non
 
 
 def mrt_note(plan: list[dict], title: str = "") -> str:
-    """Весь план сейвов одной заметкой для MRT (вставить в Заметки → Общая заметка)."""
-    lines = [r.get("mrt") for r in plan if r.get("mrt")]
+    """Весь план сейвов одной заметкой для MRT (вставить в Заметки → Общая заметка). Только пики вашего боя
+    по их фактическому времени: пики, до которых бой не дошёл (время у них — от лучших киллов), не входят."""
+    lines = [r.get("mrt") for r in plan if r.get("mrt") and not r.get("after_end")]
     if not lines:
         return ""
     head = [f"Сейвы: {title}" if title else "Сейвы"]
@@ -501,7 +509,7 @@ def mrt_note(plan: list[dict], title: str = "") -> str:
 
 def mrt_heal_note(plan: list[dict], title: str = "") -> str:
     """Кулдауны лекарей из плана — отдельной заметкой MRT, по времени своих нажатий."""
-    rows = sorted((r for r in plan if r.get("mrt_heal")), key=lambda r: r.get("heal_t", r["t"]))
+    rows = sorted((r for r in plan if r.get("mrt_heal") and not r.get("after_end")), key=lambda r: r.get("heal_t", r["t"]))
     if not rows:
         return ""
     return "\n".join([f"Кулдауны лекарей: {title}" if title else "Кулдауны лекарей"] + [r["mrt_heal"] for r in rows])

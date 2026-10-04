@@ -363,7 +363,7 @@ dialog label.check input{width:auto;margin:0}
             <input id="pickMax" type="number" min="1" max="99" step="1" value="50" list="pickPresets" disabled></label>
           <datalist id="pickPresets"><option value="25"><option value="50"><option value="75"><option value="90"></datalist>
         </div></div>
-      <p class="hint" id="allHint" hidden style="grid-column:1/-1;margin:0;font-size:14px">Выбраны <b>все боссы отчёта</b> — по одному бою на босса (последний килл, без киллов — лучший пулл): план сейвов на каждого босса (героик и эпохальный) и ротация по боссам против топ-1, чтобы хватило лимита WCL.</p>
+      <p class="hint" id="allHint" hidden style="grid-column:1/-1;margin:0;font-size:14px">Выбраны <b>все боссы отчёта</b> — по одному бою на босса (последний килл, без киллов — лучший пулл): на каждого босса — свой полный разбор боя, как у одного лога (главное по бою, кому что поправить, урон, сейвы, смерти, план и заметки MRT с кулдаунами лекарей), плюс сводка «Сейвы по боссам» и ротация по боссам против топ-1, чтобы хватило лимита WCL.</p>
       <div class="runrow">
         <button class="btn you" id="runBtn" type="button" title="Одна кнопка — весь разбор: сначала урон, сейвы и смерти (готово через несколько секунд), затем ротация — всех DPS или выбранного игрока. Вкладки результата переключаются без новой загрузки, Excel — один на всё">Разобрать бой</button>
         <button class="btn" id="progBtn" type="button" title="Бой гильдии, которая первой в мире убила этого босса на этой сложности (рейтинг прогресса Warcraft Logs): урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения — просто посмотреть, как это сделали лучшие. С «Все боссы отчёта» — на каждого босса отчёта, вкладка на босса">Топ прогресса</button>
@@ -657,7 +657,7 @@ $("#findForm").onsubmit = ev => { ev.preventDefault(); inspect(); };
 $("#url").addEventListener("paste", () => setTimeout(() => inspect(), 50));
 $("#fight").onchange = () => { syncAllMode(); if ($("#fight").value !== "all") inspect($("#fight").value); };
 /* «Все боссы» в рамке «Бой»: разбор всего отчёта — по одному бою на босса (последний килл, без киллов —
-   лучший пулл): план сейвов на каждого босса и ротация по боссам против топ-1 ради экономии лимита WCL. */
+   лучший пулл): полный разбор боя на каждого босса (вкладка на босса), сводка сейвов и ротация по боссам против топ-1. */
 const allFights = () => $("#fight").value === "all";
 let REF_BEFORE_ALL = null;
 function syncAllMode(){
@@ -1237,6 +1237,8 @@ function scopeCell(raid, self, mine){
 /* План сейвов: на пик — один или два кулдауна; у каждого — откат и когда он снова готов */
 /* Заметка для Method Raid Tools: строки готовит сервер (поле mrt у каждого пика) */
 function mrtNote(plan, title, field = "mrt", prefix = "Сейвы"){
+  /* пики после конца вашего боя (время — у лучших киллов) в заметку не входят: таймеры — только по вашему бою */
+  plan = plan.filter(r => !r.after_end);
   const rows = field === "mrt" ? plan : [...plan].filter(r => r[field]).sort((a, b) => (a.heal_t ?? a.t ?? 0) - (b.heal_t ?? b.t ?? 0));
   const lines = rows.map(r => r[field] || (field === "mrt" && (r.picks||[]).length
     ? `{time:${(r.time||"0:00").replace(/,\d+$/,"")}}${String(r.mechanic||"").replace(/[«»]/g,"")} - ${r.picks.map(p=>p.player+" "+p.cd).join("  ")}` : "")).filter(Boolean);
@@ -1286,8 +1288,8 @@ function planRows(plan){
     const phc = r.phase && r.phase_time != null && (r.phase > 1 || r.intermission)
       ? `<div style="font-size:13.5px;color:var(--muted);white-space:nowrap">${esc(r.phase_name||"Фаза "+r.phase)} +${esc(r.phase_time)}</div>`
         + (r.intermission ? '<span class="tag MEDIUM">переход</span>' : "") : "";
-    return [r.time + phc, esc(r.mechanic) + (r.heavy ? ` <span class="tag LOW">опасный: ${r.need} ${plural(r.need,"сейв","сейва","сейвов")}</span>` : "")
-        + (r.top_n || r.deaths || r.beyond_top ? `<div style="font-size:13.5px;color:var(--muted)">${[r.top_n ? `топ жмёт: ${r.top_n}` : "", r.deaths ? `смертей в этот пик: ${r.deaths}` : "",
+    return [r.time + phc + (r.after_end ? '<div><span class="tag MEDIUM">по топу</span></div>' : ""), esc(r.mechanic) + (r.heavy ? ` <span class="tag LOW">опасный: ${r.need} ${plural(r.need,"сейв","сейва","сейвов")}</span>` : "")
+        + (r.top_n || r.deaths || r.beyond_top || r.after_end ? `<div style="font-size:13.5px;color:var(--muted)">${[r.after_end ? "ваш бой сюда не дошёл — время у лучших киллов, в заметку MRT не входит" : "", r.top_n ? `топ жмёт: ${r.top_n}` : "", r.deaths ? `смертей в этот пик: ${r.deaths}` : "",
             r.beyond_top ? (r.by_template ? "у лучших киллов этого повторения нет — бой у них короче; сейвы по образцу этой способности у топа" : "у лучших киллов этого пика нет — бой у них короче; сейвы по тяжести пика") : ""].filter(Boolean).join(", ")}</div>` : ""),
       (picks.length ? picks.map(p=>`<div><b>${esc(p.cd)}</b> — ${esc(p.player)}${p.like_top?' <span class="tag HIGH">как у топа</span>':""}`
           + (p.cooldown ? `<span style="color:var(--muted);font-size:13.5px"> · откат ${esc(p.cooldown)}, снова готов в ${esc(p.ready)}</span>` : "") + "</div>").join("")

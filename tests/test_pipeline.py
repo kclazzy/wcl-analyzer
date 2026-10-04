@@ -238,6 +238,36 @@ def test_plan_longer_phase():
     print("OK план сейвов: фаза длиннее, чем у топа — сопоставление по фазе и образцу способности")
 
 
+def test_plan_own_timings():
+    """Сравнение с топом не двигает таймеры MRT: в заметку — только пики вашего боя по их времени.
+    Пики топа после конца вашего боя — в плане с пометкой «по топу», в заметку не входят и не отнимают
+    кулдауны у ваших пиков; пик топа, время которого (по вашим фазам) ваш бой прошёл тихо, — не в плане."""
+    from wcl_analyzer.raid_top import compare_with_top, mrt_heal_note, mrt_note
+    HYMN = 64843
+
+    def sp(t, ab, k, ph=1, pt=None, cov=()):
+        return {"t": t, "peak_t": t + 2, "ability": f"М{ab}", "ability_id": ab, "k": k, "phase": ph,
+                "phase_t": pt if pt is not None else t, "damage": 100, "covered_ids": list(cov), "time": f"{t}"}
+    # топ: волна на 40 с, а во 2-й фазе (с 100 с) — «Удар» через 30 с от её начала и «Буря» через 100 с
+    kills = [{"guild": "G", "duration": 320, "code": "X", "fight": 1,
+              "cds": [{"id": HYMN, "name": "Гимн"}],
+              "spikes": [sp(40, 5, 1, cov=[HYMN]), sp(130, 7, 1, ph=2, pt=30), sp(200, 8, 1, ph=2, pt=100)]} for _ in range(3)]
+    # ваш бой: волна на 47 с (не на 40, как у топа), 2-я фаза с 60 с, бой кончился на 150 с
+    R = {"info": {"duration_s": 150, "phases": [{"n": 1, "t": 0, "name": "Фаза 1"}, {"n": 2, "t": 60, "name": "Фаза 2"}]},
+         "extras": {"spikes": [sp(47, 5, 1)], "raid_cds": [],
+                    "roster_cds": [{"pid": 1, "player": "Элария", "name": "Гимн", "id": HYMN, "cd": 180, "cls": "Priest"},
+                                   {"pid": 1, "player": "Элария", "name": "Апофеоз", "id": 200183, "cd": 120, "cls": "Priest"}]}}
+    V = compare_with_top(R, kills)
+    plan = {r["mechanic"]: r for r in V["plan"]}
+    assert "«М7» №1" not in plan, plan.keys()            # у вас 2-я фаза с 60 с: 60+30=90 — бой это прошёл тихо
+    wave, storm = plan["«М5» №1"], plan["«М8» №1"]
+    assert not wave.get("after_end") and 42 <= wave["t"] <= 46 and wave["picks"][0]["cd"] == "Гимн", wave
+    assert storm["after_end"] and not storm["picks"], storm  # гимн ушёл на ваш пик, а не на выдуманный топом
+    note = mrt_note(V["plan"], "Б") + mrt_heal_note(V["plan"], "Б")
+    assert "{spell:8}" not in note and "М8" not in note and "{spell:5}" in note, note
+    print("OK план с топом: таймеры MRT — по вашему бою, пики «по топу» в заметку не входят")
+
+
 def test_fight_mode():
     """«Разобрать бой» — одна кнопка: рейд, затем ротация; первая часть доступна до конца разбора,
     нехватка лимита на ротации не теряет готовый рейд; Excel один на всё. Все боссы — сейвы + ротация по боссам."""
@@ -280,24 +310,30 @@ def test_fight_mode():
     web._run_fight(job3, {"mode": "fight", "demo": True, "ref": "none"}, None, job3["log"].append)
     assert job3["result"]["order"] == ["raid"] and "partial_v" not in job3
 
-    # все боссы: сейвы на каждого босса, затем ротация по боссам (против топ-1)
+    # все боссы: сводка сейвов + полный разбор боя на каждого босса (как одиночный лог), затем ротация по боссам
     calls = []
-    o_saves, o_all = web._run_saves, web._run_player_all
-
-    def fake_saves(sj, params, creds, log):
-        calls.append(("saves", params.get("mode")))
-        sj["result"] = {"mode": "saves", "info": {"boss": "Рейд", "title": "Рейд"}, "bosses": [], "excel": "x"}
+    o_all = web._run_player_all
 
     def fake_all(sj, params, creds, log):
         calls.append(("pall", params.get("actor")))
+        seen["partial4"] = job4.get("partial")
         sj["result"] = {"mode": "playerall", "info": {}, "bosses": [], "pending": [], "excel": "x"}
-    web._run_saves, web._run_player_all = fake_saves, fake_all
+    web._run_player_all = fake_all
     try:
         job4 = {"id": "fight4", "log": [], "progress": 0.0, "state": "running"}
-        web._run_fight(job4, {"mode": "fight", "fight": "all", "url": "u", "actor": "all", "ref": "top1"}, None, job4["log"].append)
+        web._run_fight(job4, {"mode": "fight", "fight": "all", "demo": True, "actor": "all", "ref": "top1"}, None, job4["log"].append)
     finally:
-        web._run_saves, web._run_player_all = o_saves, o_all
-    assert calls == [("saves", "saves"), ("pall", "all")] and job4["result"]["order"] == ["saves", "pall"], calls
+        web._run_player_all = o_all
+    R4 = job4["result"]
+    assert calls == [("pall", "all")] and R4["order"] == ["saves", "b0", "pall"], (calls, R4["order"])
+    b0 = R4["parts"]["b0"]
+    assert R4["kinds"] == {"b0": "raid"} and R4["titles"]["b0"] == b0["info"]["boss"]
+    assert b0["brief"] and b0["extras"]["plan"], "у босса — тот же полный разбор, что у одиночного лога"
+    sv = R4["parts"]["saves"]["bosses"][0]
+    assert sv["mrt"].startswith("Сейвы:") and "mrt_heal" in sv
+    assert seen["partial4"]["parts"].keys() == {"saves", "b0"} and seen["partial4"]["pending"] == "pall"
+    names = load_workbook(io.BytesIO(job4["xlsx"])).sheetnames
+    assert any(n.startswith(b0["info"]["boss"][:14] + " — ") for n in names), names
     print("OK «Разобрать бой»: рейд сразу, ротация следом, лимит не теряет готовое, один Excel, все боссы")
 
 
@@ -637,6 +673,7 @@ if __name__ == "__main__":
     test_fight_mode()
     test_top_progress()
     test_plan_longer_phase()
+    test_plan_own_timings()
     test_plan_healer_cds()
     test_saves_all_bosses()
     test_gear_and_trinkets()

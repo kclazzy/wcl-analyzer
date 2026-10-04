@@ -186,6 +186,36 @@ def test_plan_long_fight():
     print("OK план сейвов: сильные пики в конце длинного боя (у топа их нет) тоже закрыты")
 
 
+def test_plan_longer_phase():
+    """Ваша фаза длиннее, чем у топа: пики сопоставляются по фазе и номеру в фазе, а повторения сверх топа
+    получают сейвы по образцу этой же способности у топа (какие кулдауны и сколько)."""
+    from wcl_analyzer.raid_top import _aggregate, make_plan
+    HYMN, TIDE, SHOUT, AMZ, DARK = 64843, 108280, 97462, 51052, 196718
+
+    def sp(t, ph, k, cov=()):
+        return {"t": t, "peak_t": t + 2, "ability": "Волна", "ability_id": 5, "k": k, "phase": ph, "phase_t": 0,
+                "damage": 100, "covered_ids": list(cov)}
+    # топ: в 1-й фазе 2 волны (по 1 кулдауну), во 2-й — 2 волны, на каждую 2 кулдауна
+    top = [{"spikes": [sp(30, 1, 1, [SHOUT]), sp(90, 1, 2, [AMZ]), sp(150, 2, 3, [HYMN, TIDE]), sp(210, 2, 4, [HYMN, TIDE])]}
+           for _ in range(3)]
+    ref, ref_ph = _aggregate(top), _aggregate(top, by_phase=True)
+    roster = [{"pid": i, "player": n, "name": nm, "id": cid, "cd": 60, "cls": ""}
+              for i, (n, nm, cid) in enumerate((("Торвин", "Клич", SHOUT), ("Элария", "Гимн", HYMN), ("Таргун", "Тотем", TIDE),
+                                               ("Морг", "Зона", AMZ), ("Илин", "Тьма", DARK)))]
+    # ваш бой: 1-я фаза длиннее — 3 волны, 2-я — тоже 3
+    X = {"roster_cds": roster, "spikes": [sp(30, 1, 1), sp(100, 1, 2), sp(170, 1, 3), sp(260, 2, 4), sp(340, 2, 5), sp(420, 2, 6)]}
+    phases = [{"n": 1, "t": 0, "name": "Фаза 1"}, {"n": 2, "t": 240, "name": "Фаза 2"}]
+    plan = {r["mechanic"]: r for r in make_plan(X, ref, [], {}, phases, ref_ph)}
+    w3, w4, w6 = plan["«Волна» №3"], plan["«Волна» №4"], plan["«Волна» №6"]
+    # №3 у вас ещё в 1-й фазе: образец — волны 1-й фазы (1 кулдаун), а не топовая №3 из 2-й фазы (2 кулдауна)
+    assert w3["by_template"] and w3["need"] == 1, w3
+    # №4 у вас — первая волна 2-й фазы: как у топа №3 — два кулдауна, гимн и тотем
+    assert not w4["beyond_top"] and w4["need"] == 2 and {p["cd"] for p in w4["picks"]} == {"Гимн", "Тотем"}, w4
+    # №6 у топа нет (их 2-я фаза короче): по образцу 2-й фазы — тоже два кулдауна
+    assert w6["by_template"] and w6["beyond_top"] and w6["need"] == 2 and len(w6["picks"]) == 2, w6
+    print("OK план сейвов: фаза длиннее, чем у топа — сопоставление по фазе и образцу способности")
+
+
 def test_player_all_bosses():
     """Игрок на всех боссах: эталон топ-1; не хватило лимита — оставшиеся боссы в «pending», потом «Продолжить»."""
     import copy
@@ -342,6 +372,7 @@ if __name__ == "__main__":
     test_cache_reuse_between_modes()
     test_player_all_bosses()
     test_plan_long_fight()
+    test_plan_longer_phase()
     test_saves_all_bosses()
     test_gear_and_trinkets()
     main()

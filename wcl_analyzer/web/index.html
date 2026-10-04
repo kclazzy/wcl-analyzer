@@ -1049,7 +1049,7 @@ function planRows(plan){
         + (r.intermission ? '<span class="tag MEDIUM">переход</span>' : "") : "";
     return [r.time + phc, esc(r.mechanic) + (r.heavy ? ` <span class="tag LOW">опасный: ${r.need} ${plural(r.need,"сейв","сейва","сейвов")}</span>` : "")
         + (r.top_n || r.deaths || r.beyond_top ? `<div style="font-size:13.5px;color:var(--muted)">${[r.top_n ? `топ жмёт: ${r.top_n}` : "", r.deaths ? `смертей в этот пик: ${r.deaths}` : "",
-            r.beyond_top ? "у лучших киллов этого пика нет — бой у них короче; сейвы по тяжести пика" : ""].filter(Boolean).join(", ")}</div>` : ""),
+            r.beyond_top ? (r.by_template ? "у лучших киллов этого повторения нет — бой у них короче; сейвы по образцу этой способности у топа" : "у лучших киллов этого пика нет — бой у них короче; сейвы по тяжести пика") : ""].filter(Boolean).join(", ")}</div>` : ""),
       (picks.length ? picks.map(p=>`<div><b>${esc(p.cd)}</b> — ${esc(p.player)}${p.like_top?' <span class="tag HIGH">как у топа</span>':""}`
           + (p.cooldown ? `<span style="color:var(--muted);font-size:13.5px"> · откат ${esc(p.cooldown)}, снова готов в ${esc(p.ready)}</span>` : "") + "</div>").join("")
         : '<span class="worse">нет свободного кулдауна</span>')

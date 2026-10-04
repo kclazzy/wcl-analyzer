@@ -100,12 +100,26 @@ def _roster_lines(roster: list[dict], plan: list[dict]) -> list[str]:
     return out
 
 
-def _aggregate(kills: list[dict]) -> dict:
+def _phase_keys(spikes: list[dict]) -> dict:
+    """id(пик) → (способность, фаза, номер повторения внутри фазы). Без фаз — пусто."""
+    out, cnt = {}, Counter()
+    for sp in sorted(spikes, key=lambda x: x["t"]):
+        if sp.get("phase"):
+            cnt[(sp.get("ability_id"), sp["phase"])] += 1
+            out[id(sp)] = (sp.get("ability_id"), sp["phase"], cnt[(sp.get("ability_id"), sp["phase"])])
+    return out
+
+
+def _aggregate(kills: list[dict], by_phase: bool = False) -> dict:
+    """Пики лучших киллов, сведённые по ключу: (способность, №) или, с by_phase, (способность, фаза, № в фазе)."""
     ref: dict = defaultdict(lambda: {"times": [], "peaks": [], "covered": 0, "kills": 0, "cds": Counter(),
                                      "name": None, "damage": [], "n_cds": [], "ph": []})
     for k in kills:
+        pk = _phase_keys(k["spikes"]) if by_phase else {}
         for sp in k["spikes"]:
-            r = ref[(sp.get("ability_id"), sp.get("k", 1))]
+            if by_phase and id(sp) not in pk:
+                continue
+            r = ref[pk[id(sp)] if by_phase else (sp.get("ability_id"), sp.get("k", 1))]
             r["times"].append(sp["t"])
             r["peaks"].append(sp.get("peak_t", sp["t"] + 2))
             if sp.get("phase"):
@@ -119,6 +133,42 @@ def _aggregate(kills: list[dict]) -> dict:
             r["n_cds"].append(len(sp.get("covered_ids") or []))  # сколько кулдаунов топ жмёт на этот пик
     need = max(2, MIN_SHARE * len(kills)) if len(kills) >= 3 else 1
     return {key: r for key, r in ref.items() if r["kills"] >= need}
+
+
+def _merge(rs: list[dict]) -> dict | None:
+    if not rs:
+        return None
+    m = {"times": [], "peaks": [], "covered": 0, "kills": 0, "cds": Counter(), "name": rs[0]["name"],
+         "damage": [], "n_cds": [], "ph": []}
+    for r in rs:
+        for f in ("times", "peaks", "damage", "n_cds", "ph"):
+            m[f] += r.get(f, [])
+        m["covered"] += r.get("covered", 0)
+        m["kills"] += r.get("kills", 0)
+        m["cds"].update(r.get("cds", Counter()))
+    return m
+
+
+def resolver(ref: dict, ref_ph: dict | None = None):
+    """Аналог вашего пика у лучших киллов → (данные топа, как сопоставлено).
+
+    1) «phase» — та же способность, та же фаза и тот же номер повторения внутри фазы. Так пики не
+       «съезжают», если ваша фаза длиннее, чем у топа, и способность в ней повторяется больше раз;
+    2) «k» — та же способность и тот же номер повторения за бой;
+    3) «template» — такого повторения у топа нет (ваш бой или фаза длиннее): берём, что топ жмёт на эту
+       же способность в других повторениях (сначала — в этой же фазе), и сколько кулдаунов ставит;
+    4) None — этой способности у топа нет вовсе."""
+    ref_ph = ref_ph or {}
+
+    def find(ab, k, phase=None, kp=None):
+        if phase and kp and (ab, phase, kp) in ref_ph:
+            return ref_ph[(ab, phase, kp)], "phase"
+        if (ab, k) in ref and not (phase and any(x[0] == ab and x[1] == phase for x in ref_ph)):
+            return ref[(ab, k)], "k"
+        same = [r for key, r in ref_ph.items() if key[0] == ab and key[1] == phase] if phase else []
+        tpl = _merge(same) or _merge([r for key, r in ref.items() if key[0] == ab])
+        return (tpl, "template") if tpl else (None, None)
+    return find
 
 
 def _split_scope(row: dict, r: dict | None, names: dict) -> None:
@@ -144,11 +194,17 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
     for c in X.get("raid_cds", []):
         names[c["id"]] = c["name"]  # названия из вашего отчёта (ваш язык) важнее
     ref = _aggregate(kills)
+    ref_ph = _aggregate(kills, by_phase=True)
+    find = resolver(ref, ref_ph)
+    my_pk = _phase_keys(X.get("spikes", []))
 
     rows, matched = [], set()
     for sp in X.get("spikes", []):
         key = (sp.get("ability_id"), sp.get("k", 1))
-        r = ref.get(key)
+        pk = my_pk.get(id(sp))
+        r, how = find(key[0], key[1], *(pk[1:] if pk else (None, None)))
+        if how == "template":
+            r = None  # в таблице сравнения — только настоящий аналог у топа
         matched.add(key)
         own = set(sp.get("covered_self") or [])
         rows.append({"t": sp["t"], "time": sp["time"], "mechanic": f"«{sp['ability']}» №{sp.get('k', 1)}",
@@ -157,7 +213,7 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
                      "my_raid": [x for x in sp.get("covered_by") or [] if x not in own],
                      "top_share": (r["covered"] / r["kills"]) if r else None,
                      "top_cds": [names.get(i, f"#{i}") for i, _ in r["cds"].most_common(2)] if r else [],
-                     "top_time": _fmt_t(median(r["times"])) if r else None})
+                     "top_time": _fmt_t(median(r["times"])) if r else None, "_r": r})
     late = []
     for key, r in ref.items():
         if key in matched:
@@ -177,13 +233,14 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
                      "top_time": _fmt_t(t), "_key": key, "_k": key, "my_self": None, "my_raid": None})
     rows += late
     for row in rows:  # на рейд и на себя (усиление лекаря) — раздельно
-        r = ref.get(row.pop("_k", None)) if "_k" in row else None
+        r = row.pop("_r") if "_r" in row else (ref.get(row.pop("_k", None)) if "_k" in row else None)
+        row.pop("_k", None)
         _split_scope(row, r, names)
 
     my_cover = (sum(1 for s in X.get("spikes", []) if s.get("covered_by")) / len(X["spikes"])) if X.get("spikes") else None
     tot = sum(r["kills"] for r in ref.values())
     top_cover = (sum(r["covered"] for r in ref.values()) / tot) if tot else None
-    plan = make_plan(X, ref, late, names, R["info"].get("phases"))
+    plan = make_plan(X, ref, late, names, R["info"].get("phases"), ref_ph)
     marks = [{"t": median(r["times"]), "name": ", ".join(names.get(i, f"#{i}") for i, _ in r["cds"].most_common(2))}
              for r in ref.values() if r["kills"] and r["covered"] / r["kills"] >= 0.5]
     return {"kills": [{"guild": k["guild"], "duration": _fmt_t(k["duration"]),
@@ -210,7 +267,8 @@ def _top_phase(r: dict) -> tuple[int | None, float | None]:
     return n, median(x[1] for x in r["ph"] if x[0] == n)
 
 
-def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[dict] | None = None) -> list[dict]:
+def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[dict] | None = None,
+              ref_ph: dict | None = None) -> list[dict]:
     """Кто какой кулдаун жмёт на каждый пик следующего пулла.
 
     Доступные кулдауны — из состава рейда (X["roster_cds"]: класс, спек, взятые таланты, перезарядка);
@@ -221,7 +279,10 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
 
     Фазы: если два нажатия одного кулдауна в разных фазах, к перезарядке добавляется запас PHASE_SHIFT_S —
     в следующем пулле фаза может начаться раньше (больше урона по боссу), и интервал между нажатиями сократится.
-    Время в плане и в заметке MRT для второй фазы и дальше — от начала фазы."""
+    Время в плане и в заметке MRT для второй фазы и дальше — от начала фазы.
+
+    Ваш бой длиннее, чем у топа: пики сопоставляются по фазе и номеру повторения в фазе (resolver), а пикам,
+    которых у топа нет, план берёт образец с этой же способности у топа — какие кулдауны и сколько."""
     phases = phases or []
 
     def ph_n(t: float) -> int | None:
@@ -251,8 +312,11 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
             known = game_data.cooldown(key[1])
             seen = min(gaps) if gaps else None
             cds[key]["cd"] = min(v for v in (known, seen) if v) if (known or seen) else DEFAULT_CD_S
+    find = resolver(ref, ref_ph)
+    my_pk = _phase_keys(X.get("spikes", []))
     events = [{"t": s.get("peak_t", s["t"]), "mechanic": f"«{s['ability']}» №{s.get('k', 1)}", "key": (s.get("ability_id"), s.get("k", 1)),
-               "prio": s["damage"], "deaths": s.get("deaths", 0), "phase": s.get("phase")} for s in X.get("spikes", [])]
+               "prio": s["damage"], "deaths": s.get("deaths", 0), "phase": s.get("phase"),
+               "pk": my_pk.get(id(s))} for s in X.get("spikes", [])]
     top_dmg = max((e["prio"] for e in events), default=1.0)
     for r in late:
         events.append({"t": r["peak_t"], "mechanic": r["mechanic"], "key": r["_key"], "prio": top_dmg * 0.5 * (r["top_share"] or 0.5),
@@ -261,7 +325,11 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
     assigned: dict = defaultdict(list)
     states = []
     for ev in events:
-        r = ref.get(ev["key"])
+        if "pk" in ev:  # пик вашего боя
+            r, how = find(ev["key"][0], ev["key"][1], *(ev["pk"][1:] if ev.get("pk") else (None, None)))
+        else:  # пик из «late» — он и так взят у топа
+            r, how = ref.get(ev["key"]), "k"
+        ev["how"] = how
         pref = [i for i, _ in r["cds"].most_common()] if r else []
         # Сколько кулдаунов: по тяжести пика и по тому, сколько на него жмёт топ (медиана по киллам).
         # Пики, которых у топа нет (ваш бой длиннее — топ убил босса раньше), — только по тяжести
@@ -269,7 +337,8 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                + (ev.get("deaths", 0) > 0))  # в этот пик в вашем бою кто-то умер
         top_need = int(round(median(r["n_cds"]))) if r and r.get("n_cds") else 0
         need = max(1, min(MAX_PER_PEAK, max(sev, top_need), len({c["player"] for c in cds.values()})))
-        states.append({"ev": ev, "r": r, "pref": pref, "top_need": top_need, "need": need, "picks": [], "players": set()})
+        states.append({"ev": ev, "r": r, "pref": pref, "top_need": top_need, "need": need, "picks": [], "players": set(),
+                       "how": how})
 
     def add_one(st) -> bool:
         ev, pref, picks, players = st["ev"], st["pref"], st["picks"], st["players"]
@@ -317,7 +386,10 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                "intermission": bool((pinfo or {}).get("intermission")),
                "phase_time": _fmt_t(rel) if rel is not None else None, "phase_t": rel,
                "deaths": ev.get("deaths", 0),
-               "beyond_top": bool(ref) and r is None,  # у лучших киллов такого пика нет (бой у них короче)
+               # у лучших киллов такого пика нет (бой или фаза у них короче): «template» — сейвы по образцу
+               # этой же способности у топа, иначе — только по тяжести пика
+               "beyond_top": bool(ref) and st["how"] in (None, "template"),
+               "by_template": st["how"] == "template",
                "top_n": top_need,
                "top": ", ".join(names.get(i, f"#{i}") for i in pref[:2]),
                "picks": [{"cd": cds[k]["name"], "player": cds[k]["player"], "like_top": k[1] in pref[:2],

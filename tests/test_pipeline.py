@@ -403,12 +403,14 @@ def test_burst_rules():
                           deb(500, "applybuff", 7005), deb(508, "removebuff", 7005)]}
     names[7004] = "Vulnerable Spot"
     phases = []
-    orig = game_data.amp_windows
+    import json as _json
+    orig, orig_data = game_data.amp_windows, game_data._DATA
     game_data.amp_windows = lambda: [{"name": "Hardened Shell", "note": "снять щит"}]
+    game_data._DATA = _json.loads(game_data.BUNDLED.read_text(encoding="utf-8"))   # таблица из сборки (в репозитории может быть старее)
     try:
         B = rb.burst_analysis(raw, players, lambda x: x, lambda ev: ev["timestamp"] / 1000, nm, 700.0, phases)
     finally:
-        game_data.amp_windows = orig
+        game_data.amp_windows, game_data._DATA = orig, orig_data
     rows = {r["player"]: r for r in B["bursts"]}
     assert [L["time"] for L in B["lusts"]] == ["0:10", "10:20"], B["lusts"]
     assert rows["War"]["with_lust"] is True and rows["Arms"]["with_lust"] is None, rows["Arms"]

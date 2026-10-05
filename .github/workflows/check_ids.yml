@@ -12,35 +12,26 @@ jobs:
       - name: fetch
         run: |
           python3 - <<'PY'
-          import json, re, urllib.request, html, urllib.parse
+          import urllib.request, urllib.error, re
           UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124"}
-          def get(u):
-              return urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=25).read().decode("utf-8", "replace")
           out = []
-          for i in open("debug_ids.txt").read().split():
-              for loc in ("0", "7"):
+          for sub in ("www", "classic", "fresh", "sod", "vanilla", "era", "anniversary", "mop", "cata"):
+              for path, data in (("/oauth/token", b"grant_type=client_credentials"), ("/api/v2/client", b'{"query":"{__typename}"}')):
+                  u = f"https://{sub}.warcraftlogs.com{path}"
                   try:
-                      d = json.loads(get(f"https://nether.wowhead.com/tooltip/spell/{i}?dataEnv=1&locale={loc}"))
-                      tip = html.unescape(re.sub(r"<[^>]+>", " ", d.get("tooltip", "")))
-                      cd = re.search(r"(\d+(?:\.\d+)?)\s*(min|sec)\s*(?:recharge|cooldown)", tip) or re.search(r"(?:Восстановление|Перезарядка):?\s*(\d+(?:[.,]\d+)?)\s*(мин|сек)", tip)
-                      ch = re.search(r"(\d)\s*Charges", tip)
-                      du = re.search(r"(?:for|на|в течение)\s+(\d+(?:[.,]\d+)?)\s*(sec|сек|min|мин)", tip)
-                      out.append(f"{i}\t{loc}\t{d.get('name')}\t{cd.group(0) if cd else '-'}\t{ch.group(0) if ch else ''}\tdur={du.group(0) if du else '-'}")
+                      h = dict(UA); h["Content-Type"] = "application/x-www-form-urlencoded" if "oauth" in path else "application/json"
+                      r = urllib.request.urlopen(urllib.request.Request(u, data=data, headers=h), timeout=20)
+                      out.append(f"{u}\t{r.status}\t{r.read()[:150]!r}")
+                  except urllib.error.HTTPError as e:
+                      out.append(f"{u}\tHTTP {e.code}\t{e.read()[:150]!r}")
                   except Exception as e:
-                      out.append(f"{i}\t{loc}\tERR {e}")
-          for n in open("debug_names.txt").read().splitlines():
+                      out.append(f"{u}\tERR {e}")
               try:
-                  for base in ("https://nether.wowhead.com/search/suggestions-template?q=", "https://www.wowhead.com/search/suggestions-template?q="):
-                      try:
-                          t = get(base + urllib.parse.quote(n))
-                          d = json.loads(t)
-                          res = [(r.get("id"), r.get("name"), r.get("typeName") or r.get("type")) for r in d.get("results", []) if str(r.get("type")) in ("6", "spell") or r.get("typeName") == "Spell"][:8]
-                          out.append(f"NAME {n} [{base[:20]}]: {res}")
-                          break
-                      except Exception as e:
-                          out.append(f"NAME {n} [{base[:20]}]: ERR {e}")
+                  t = urllib.request.urlopen(urllib.request.Request(f"https://{sub}.warcraftlogs.com/", headers=UA), timeout=20).read().decode("utf-8", "replace")
+                  m = re.search(r"<title>(.*?)</title>", t, re.S)
+                  out.append(f"{sub} HOME title={m.group(1).strip() if m else '-'} final")
               except Exception as e:
-                  out.append(f"NAME {n}: ERR {e}")
+                  out.append(f"{sub} HOME ERR {e}")
           open("debug_ids_out.txt", "w").write("\n".join(out))
           PY
       - name: commit

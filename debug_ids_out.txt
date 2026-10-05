@@ -1,27 +1,48 @@
-https://www.warcraftlogs.com/oauth/token	HTTP 400	b'{"error":"invalid_request","error_description":"The request is missing a required parameter, includes an invalid parameter value, includes a parameter'
-https://www.warcraftlogs.com/api/v2/client	HTTP 404	b'<!DOCTYPE html>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1"'
-www HOME title=Human Verification final
-https://classic.warcraftlogs.com/oauth/token	HTTP 400	b'{"error":"invalid_request","error_description":"The request is missing a required parameter, includes an invalid parameter value, includes a parameter'
-https://classic.warcraftlogs.com/api/v2/client	HTTP 404	b'<!DOCTYPE html>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1"'
-classic HOME title=Human Verification final
-https://fresh.warcraftlogs.com/oauth/token	HTTP 400	b'{"error":"invalid_request","error_description":"The request is missing a required parameter, includes an invalid parameter value, includes a parameter'
-https://fresh.warcraftlogs.com/api/v2/client	HTTP 404	b'<!DOCTYPE html>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1"'
-fresh HOME title=Human Verification final
-https://sod.warcraftlogs.com/oauth/token	HTTP 400	b'{"error":"invalid_request","error_description":"The request is missing a required parameter, includes an invalid parameter value, includes a parameter'
-https://sod.warcraftlogs.com/api/v2/client	HTTP 404	b'<!DOCTYPE html>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1"'
-sod HOME title=Human Verification final
-https://vanilla.warcraftlogs.com/oauth/token	HTTP 400	b'{"error":"invalid_request","error_description":"The request is missing a required parameter, includes an invalid parameter value, includes a parameter'
-https://vanilla.warcraftlogs.com/api/v2/client	HTTP 404	b'<!DOCTYPE html>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1"'
-vanilla HOME title=Human Verification final
-https://era.warcraftlogs.com/oauth/token	ERR <urlopen error [Errno -2] Name or service not known>
-https://era.warcraftlogs.com/api/v2/client	ERR <urlopen error [Errno -2] Name or service not known>
-era HOME ERR <urlopen error [Errno -2] Name or service not known>
-https://anniversary.warcraftlogs.com/oauth/token	ERR <urlopen error [Errno -2] Name or service not known>
-https://anniversary.warcraftlogs.com/api/v2/client	ERR <urlopen error [Errno -2] Name or service not known>
-anniversary HOME ERR <urlopen error [Errno -2] Name or service not known>
-https://mop.warcraftlogs.com/oauth/token	ERR <urlopen error [Errno -2] Name or service not known>
-https://mop.warcraftlogs.com/api/v2/client	ERR <urlopen error [Errno -2] Name or service not known>
-mop HOME ERR <urlopen error [Errno -2] Name or service not known>
-https://cata.warcraftlogs.com/oauth/token	ERR <urlopen error [Errno -2] Name or service not known>
-https://cata.warcraftlogs.com/api/v2/client	ERR <urlopen error [Errno -2] Name or service not known>
-cata HOME ERR <urlopen error [Errno -2] Name or service not known>
+31850	0	Ardent Defender	1.5 min cooldown		dur=for 12 sec
+31850	7	Ревностный защитник	Восстановление: 1.5 мин		dur=на 12 сек
+86659	0	Guardian of Ancient Kings	3 min cooldown		dur=for 8 sec
+86659	7	Защитник древних королей	Восстановление: 3 мин		dur=на 8 сек
+48792	0	Icebound Fortitude	2 min cooldown		dur=for 8 sec
+48792	7	Незыблемость льда	Восстановление: 2 мин		dur=в течение 8 сек
+187827	0	Metamorphosis	2 min cooldown		dur=for 15 sec
+187827	7	Метаморфоза	Восстановление: 2 мин		dur=на 15 сек
+12975	0	Last Stand	3 min cooldown		dur=for 8 sec
+12975	7	Ни шагу назад	Восстановление: 3 мин		dur=на 8 сек
+115203	0	Fortifying Brew	6 min cooldown		dur=for 15 sec
+115203	7	Укрепляющий отвар	Восстановление: 6 мин		dur=-
+122783	0	Diffuse Magic	1.5 min cooldown		dur=for 6 sec
+122783	7	Распыление магии	Восстановление: 1.5 мин		dur=-
+23920	0	Spell Reflection	25 sec cooldown		dur=for 5 sec
+23920	7	Отражение заклинаний	Восстановление: 25 сек		dur=на 5 сек
+204018	0	Blessing of Spellwarding	5 min cooldown		dur=for 10 sec
+204018	7	Благословение защиты от заклинаний	Восстановление: 5 мин		dur=на 10 сек
+1022	0	Blessing of Protection	5 min cooldown		dur=for 10 sec
+1022	7	Благословение защиты	Восстановление: 5 мин		dur=на 10 сек
+3411	0	Intervene	30 sec cooldown		dur=for 6 sec
+3411	7	Вмешательство	Восстановление: 30 сек		dur=в течение 6 сек
+62618	0	Power Word: Barrier	3 min cooldown		dur=for 10 sec
+62618	7	Слово силы: Барьер	Восстановление: 3 мин		dur=в течение 10 сек
+633	0	Lay on Hands	10 min cooldown		dur=for 30 sec
+633	7	Возложение рук	Восстановление: 10 мин		dur=на 30 сек
+207744	0	Fiery Brand	-		dur=-
+207744	7	Огненное клеймо	-		dur=-
+207771	0	Fiery Brand	-		dur=-
+207771	7	Огненное клеймо	-		dur=-
+204021	0	Fiery Brand	1 min cooldown		dur=-
+204021	7	Огненное клеймо	Восстановление: 1 мин		dur=-
+61336	0	Survival Instincts	3 min cooldown		dur=for 6 sec
+61336	7	Инстинкты выживания	Восстановление: 3 мин		dur=в течение 6 сек
+33206	0	Pain Suppression	3 min cooldown		dur=for 8 sec
+33206	7	Подавление боли	Восстановление: 3 мин		dur=на 8 сек
+871	0	Shield Wall	3 min cooldown		dur=for 8 sec
+871	7	Глухая оборона	Восстановление: 3 мин		dur=на 8 сек
+48707	0	Anti-Magic Shell	1 min cooldown		dur=for 5 sec
+48707	7	Антимагический панцирь	Восстановление: 1 мин		dur=в течение 5 сек
+1160	0	Demoralizing Shout	45 sec cooldown		dur=for 8 sec
+1160	7	Деморализующий крик	Восстановление: 45 сек		dur=на 8 сек
+642	0	Divine Shield	5 min cooldown		dur=for 8 sec
+642	7	Божественный щит	Восстановление: 5 мин		dur=в течение 8 сек
+102558	0	Incarnation: Guardian of Ursoc	3 min cooldown		dur=-
+102558	7	Воплощение: Страж Урсока	Восстановление: 3 мин		dur=-
+49028	0	Dancing Rune Weapon	2 min cooldown		dur=for  8 sec
+49028	7	Танцующее руническое оружие	Восстановление: 2 мин		dur=в течение  8 сек

@@ -210,6 +210,16 @@ dialog::backdrop{background:rgba(22,33,58,.45)}
 .gdesc .gsrc{display:block;margin-top:6px;font-size:12.5px;color:var(--muted)}
 #videoDlg video{display:block;width:100%;max-height:70vh;border-radius:var(--r-sm);background:#000}
 #videoDlg .vsrc{font-size:13px;color:var(--muted);margin-top:8px}
+/* «На весь экран»: окно ролика на весь экран на чёрном фоне; телефон вертикально, ролик широкий — картинка
+   повёрнута на 90°, чтобы занять весь экран, когда телефон держат боком */
+#videoDlg.vfull{max-width:none;max-height:none;width:100vw;height:100vh;margin:0;padding:0;border:0;border-radius:0;background:#000;overflow:hidden}
+#videoDlg.vfull > :not(video):not(.vfx){display:none!important}
+#videoDlg.vfull video{position:absolute;left:50%;top:50%;width:100vw;height:100vh;max-height:none;border-radius:0;object-fit:contain;transform:translate(-50%,-50%)}
+#videoDlg.vfull.rot video{width:100vh;height:100vw;transform:translate(-50%,-50%) rotate(90deg)}
+#videoDlg .vfx{display:none}
+#videoDlg .row{flex-wrap:wrap}
+#videoDlg.vfull .vfx{display:flex;position:absolute;z-index:2;top:12px;right:12px;align-items:center;justify-content:center;min-width:44px;height:44px;padding:0 14px;border:0;border-radius:22px;background:rgba(0,0,0,.55);color:#fff;font:600 15px/1 inherit;cursor:pointer}
+#videoDlg.vfull.rot .vfx{top:auto;bottom:12px;right:12px;transform:rotate(90deg)}
 #videoDlg .verr{display:none;padding:18px;border-radius:var(--r-sm);background:var(--warn-soft);color:var(--ink)}
 dialog h3{margin:0 0 8px;font-size:20px}
 dialog ol{padding-left:20px;color:var(--muted);font-size:14px}
@@ -484,10 +494,12 @@ dialog label.check input{width:auto;margin:0}
 <dialog id="videoDlg" aria-labelledby="videoTitle">
   <h3 id="videoTitle">Ролик механики</h3>
   <video id="videoEl" controls loop muted playsinline preload="metadata"></video>
+  <button type="button" class="vfx" id="videoFullExit" aria-label="Свернуть ролик">✕ Свернуть</button>
   <div class="verr" id="videoErr">Ролик не открылся: сайт не разрешает показывать его здесь или нет интернета. Посмотрите его в гайде.</div>
   <div class="vsrc">Ролик и гайд — <a href="https://www.mythictrap.com" target="_blank" rel="noopener">Mythic Trap</a>. Видео загружается с их сайта при просмотре, в программе хранится только адрес.</div>
   <div class="row">
     <a class="btn alt" id="videoGuide" href="#" target="_blank" rel="noopener">Открыть гайд</a>
+    <button class="btn alt" id="videoFull" type="button">На весь экран</button>
     <button class="btn" id="videoClose" type="button">Закрыть</button>
   </div>
 </dialog>
@@ -1278,7 +1290,8 @@ function openVideo(btn){
   document.getElementById("videoTitle").textContent = "Ролик: " + btn.dataset.n;
   document.getElementById("videoGuide").href = btn.dataset.g;
   err.style.display = "none"; v.style.display = "";
-  v.onerror = () => { v.style.display = "none"; err.style.display = "block"; };
+  const full = document.getElementById("videoFull"); full.hidden = false;
+  v.onerror = () => { v.style.display = "none"; err.style.display = "block"; full.hidden = true; };
   v.src = btn.dataset.v;
   dlg.showModal();
   const p = v.play(); if (p && p.catch) p.catch(() => {});
@@ -1287,12 +1300,36 @@ document.addEventListener("click", e => {
   const b = e.target.closest && e.target.closest(".vplay");
   if (b) { e.preventDefault(); openVideo(b); }
 });
-function closeVideo(){ const v = document.getElementById("videoEl"); v.onerror = null; v.pause(); v.removeAttribute("src"); v.load(); }
+function closeVideo(){ videoFull(false); const v = document.getElementById("videoEl"); v.onerror = null; v.pause(); v.removeAttribute("src"); v.load(); }
+/* «На весь экран» без системного полноэкранного режима (в приложении Android его нет): окно ролика растягивается
+   на весь экран; телефон вертикально, а ролик широкий — картинка поворачивается на 90°. «Назад» на телефоне,
+   «✕ Свернуть» или Esc — обратно. */
+let VFULL = false;
+function videoRotate(){
+  const dlg = document.getElementById("videoDlg"), v = document.getElementById("videoEl");
+  const wide = (v.videoWidth || 16) >= (v.videoHeight || 9);
+  dlg.classList.toggle("rot", VFULL && wide && innerHeight > innerWidth);
+}
+function videoFull(on, fromBack){
+  const dlg = document.getElementById("videoDlg");
+  if (on === VFULL) return;
+  VFULL = on;
+  dlg.classList.toggle("vfull", on);
+  videoRotate();
+  if (on) { try { history.pushState({vfull: 1}, ""); } catch(e){} }   // «Назад» на телефоне — свернуть, а не уйти со страницы
+  else if (!fromBack && history.state && history.state.vfull) { try { history.back(); } catch(e){} }
+}
+addEventListener("popstate", () => { if (VFULL) videoFull(false, true); });
+addEventListener("resize", videoRotate);
 document.addEventListener("DOMContentLoaded", () => {
   const dlg = document.getElementById("videoDlg");
+  document.getElementById("videoFull").onclick = () => videoFull(true);
+  document.getElementById("videoFullExit").onclick = () => videoFull(false);
+  document.getElementById("videoEl").addEventListener("loadedmetadata", videoRotate);
+  dlg.addEventListener("cancel", e => { if (VFULL) { e.preventDefault(); videoFull(false); } });   // Esc — сначала свернуть
   document.getElementById("videoClose").onclick = () => dlg.close();
   dlg.addEventListener("close", closeVideo);
-  dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });  // клик по фону — закрыть
+  dlg.addEventListener("click", e => { if (e.target === dlg && !VFULL) dlg.close(); });  // клик по фону — закрыть (не на весь экран)
 });
 function btT(t){ if (t==null) return "—"; t=Math.max(0,t); const m=Math.floor(t/60), s=Math.floor(t-m*60); return m+":"+(s<10?"0":"")+s; }  // м:сс без долей
 const KIND_CLS = {"Тринкет":"k-trinket","Зелье":"k-potion","Расовая":"k-racial"};

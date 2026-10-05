@@ -89,6 +89,8 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
                     if x.get("encounterID") == f.get("encounterID") and x.get("difficulty") == f.get("difficulty")],
                    key=lambda x: float(x["startTime"]))
     batched = None
+    from . import game_data as _gdb
+    burst_ids = ", ".join(str(c["id"]) for c in _gdb.dps_cds() if c.get("kind") == "burst")
     if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
         from .api import WCLError
         log("Урон, лечение, касты, смерти всех пуллов — одним запросом…")
@@ -99,6 +101,9 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
         bosses = boss_actor_ids(report, f)[:2]
         for i, bid in enumerate(bosses):
             specs[f"boss_debuffs_{i}"] = {"data_type": "Debuffs", "target_id": bid, "hostility": "Enemies"}
+            specs[f"boss_buffs_{i}"] = {"data_type": "Buffs", "target_id": bid, "hostility": "Enemies"}
+        if burst_ids:   # бурсты, которые включаются сами (бафф без каста)
+            specs["burst_buffs"] = {"data_type": "Buffs", "filter_expression": f"ability.id in ({burst_ids})"}
         for x in pulls:
             if int(x["id"]) != fid:
                 specs[f"pull_{x['id']}"] = {"data_type": "Deaths", "fight_id": int(x["id"]),
@@ -113,6 +118,8 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
                   "dmg_table", "heal_table"):
             raw[k] = batched[k]
         raw["boss_debuffs"] = [ev for i in range(len(bosses)) for ev in batched[f"boss_debuffs_{i}"]]
+        raw["boss_buffs"] = [ev for i in range(len(bosses)) for ev in batched.get(f"boss_buffs_{i}") or []]
+        raw["burst_buffs"] = batched.get("burst_buffs") or []
     else:
         raw["dmg_table"] = client.raid_table(code, fid, "DamageDone")
         raw["heal_table"] = client.raid_table(code, fid, "Healing")
@@ -129,11 +136,17 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
             raw["combatant"] = client.events(code, fid, s, s + 1000, "CombatantInfo")
         except Exception:  # noqa: BLE001
             raw["combatant"] = []
-        raw["boss_debuffs"] = []
+        raw["boss_debuffs"], raw["boss_buffs"], raw["burst_buffs"] = [], [], []
         for bid in boss_actor_ids(report, f)[:2]:
             try:
                 raw["boss_debuffs"] += client.events(code, fid, s, e, "Debuffs", target_id=bid, hostility="Enemies")
+                raw["boss_buffs"] += client.events(code, fid, s, e, "Buffs", target_id=bid, hostility="Enemies")
             except Exception:  # noqa: BLE001
+                pass
+        if burst_ids:
+            try:
+                raw["burst_buffs"] = client.events(code, fid, s, e, "Buffs", filter_expression=f"ability.id in ({burst_ids})")
+            except Exception:  # noqa: BLE001 — бурсты без нажатия необязательны
                 pass
     try:
         raw["rankings"] = client.report_rankings(code, fid) if f.get("kill") else None
@@ -580,11 +593,11 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
     # ------------------------------------------------------------ таймлайн
     timeline = [{"lane": "Смерти", "t": d["t"], "label": f"{d['player']} — {d['ability']}"} for d in deaths]
     if lust:
-        timeline.append({"lane": "Жажда крови", "t": lust["t"], "label": f"Жажда крови ({lust['caster']})"})
+        timeline.append({"lane": "Героизм", "t": lust["t"], "label": f"Героизм ({lust['caster']})"})
     for a in [a for a in abilities if a["category"] != CAT_TANK][:4]:
         for k, t in enumerate(a["occurrences"][:40]):
             timeline.append({"lane": a["name"], "t": t, "label": f"{a['name']} №{k + 1}"})
-    lanes = ["Смерти", "Жажда крови"] + [a["name"] for a in abilities if a["category"] != CAT_TANK][:4]
+    lanes = ["Смерти", "Героизм"] + [a["name"] for a in abilities if a["category"] != CAT_TANK][:4]
 
     extras = _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, taken, tanks, dur, kill,
                           rel, nm, owner, avoidable)
@@ -695,6 +708,27 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
                            "parse": PARSE_LOW, "wipe_tail": WIPE_TAIL_S}}
 
 
+BRIEF_MAX = 7
+_BRIEF_LOW = ("Расходники —", "Почти не били аддов", "Больше всего избегаемого урона", "Пропущенные прерывания")
+
+
+def _brief_insert(brief: list[str], line: str, pos: int, force: bool = False) -> None:
+    """Добавить строку в «Главное по бою», ничего не теряя молча: есть место — вставить; нет — заменить
+    наименее важную строку (расходники, адды, избегаемый урон, прерывания — они есть в своих вкладках)."""
+    if len(brief) < BRIEF_MAX:
+        brief.insert(min(pos, len(brief)), line)
+        return
+    for low in _BRIEF_LOW:
+        i = next((i for i, x in enumerate(brief) if x.startswith(low)), None)
+        if i is not None:
+            del brief[i]
+            brief.insert(min(pos, len(brief)), line)
+            return
+    if force:   # сравнение с лучшими киллами важнее последней строки
+        brief.pop()
+        brief.insert(min(pos, len(brief)), line)
+
+
 def _pull_trend(pulls: list[dict], death_abs: dict[int, list]) -> dict:
     """Какие механики убивают рейд от пулла к пуллу (без смертей в конце вайпа)."""
     per_pull = []
@@ -743,6 +777,7 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
         from .raid_top import TOP_KILLS, brief_lines, compare_with_top, fetch_top_kills
         f = raw["fight"]
         log(f"Сравниваю с лучшими киллами этого босса (топ-{TOP_KILLS} гильдий по скорости)…")
+        kills: list = []
         try:
             kills = fetch_top_kills(client, int(f["encounterID"]), int(f.get("difficulty") or 0), log=log,
                                     progress=lambda x: progress(0.5 + 0.25 * x))
@@ -767,20 +802,20 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
             except Exception as e:  # noqa: BLE001
                 log(f"Эпохальные киллы недоступны: {e}")
         extra = brief_lines(vs)
-        try:  # нанесение урона: когда героизм и бурсты у лучших киллов
-            from .raid_burst import compare_lust, compare_waves, top_summary
+        try:  # нанесение урона: когда героизм и бурсты у лучших киллов, как часто их спеки жмут бурсты
+            from .raid_burst import refresh, top_summary
             B = R["extras"].get("burst") or {}
-            if "error" not in B:
+            if "error" not in B and B.get("bursts") is not None:
                 B["top"] = top_summary(kills)
-                lines = [x for x in (compare_lust(B.get("lust"), B["top"]), compare_waves(B.get("waves"), B["top"])) if x]
-                B["hints"] = lines + list(B.get("hints") or [])
+                refresh(B)
         except Exception as e:  # noqa: BLE001
             log(f"Бурсты лучших киллов не сопоставлены: {e}")
         if extra:  # строка «Пики урона по рейду…» дублирует сравнение с топом
             R["brief"] = [x for x in R["brief"] if not x.startswith("Пики урона по рейду")]
             # Сразу после строки про самый тяжёлый момент
             pos = next((i + 1 for i, line in enumerate(R["brief"]) if line.startswith("Больше всего урона")), 1)
-            R["brief"] = (R["brief"][:pos] + extra + R["brief"][pos:])[:7]
+            for j, line in enumerate(extra):
+                _brief_insert(R["brief"], line, pos + j, force=True)
     from .raid_top import _roster_lines, brief_lines as _bl, make_plan
     X = R["extras"]
     vs = X.get("vs_top")
@@ -788,13 +823,13 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
     X["saves_brief"] = _bl(vs) + _roster_lines(X.get("roster_cds") or [], X["plan"])
     if X.get("vs_top_alt"):
         X["saves_brief_alt"] = _bl(X["vs_top_alt"]) + _roster_lines(X.get("roster_cds") or [], X["vs_top_alt"]["plan"])
+    B = R["extras"].get("burst") or {}
+    key = B.get("key")
+    if key:   # главное по нанесению урона — после строк про урон и сейвы, подробно во вкладке
+        _brief_insert(R["brief"], key + " (подробно — во вкладке «Нанесение урона»)", 5)
     trend = R["extras"].get("pull_trend") or {}
     if trend.get("line") and len(R["brief"]) < 7:
         R["brief"].append(trend["line"])
-    B = R["extras"].get("burst") or {}
-    key = next((h for h in B.get("hints") or [] if h.startswith(("Лучшие киллы делают", "Окно «", "Героизм: у вас"))), None)
-    if key:   # главное по нанесению урона — после строк про урон и сейвы, подробно во вкладке
-        R["brief"] = (R["brief"][:5] + [key + " (подробно — во вкладке «Нанесение урона»)"] + R["brief"][5:])[:7]
     if hasattr(client, "points_left"):
         left = client.points_left()
         if left is not None:

@@ -53,7 +53,8 @@ def _burst(wb, R, demo):
         return
     s = Sheet(wb, "Нанесение урона", demo, {"A": 12, "B": 22, "C": 46, "D": 34, "E": 16})
     s.title("Нанесение урона: героизм, бурсты, окна на боссе",
-            "Бурсты — крупные боевые кулдауны DPS. Окна на боссе — дебаффы самой механики боя (уязвимость, оглушение).")
+            "Бурсты — крупные боевые кулдауны DPS. Окна на боссе — механики, под которые жмут бурсты "
+            "(по гайду: снять щит, бить цель; «возможно» — по описанию босс получает больше урона).")
     if B.get("hints"):
         s.section("Главное")
         for line in B["hints"]:
@@ -64,13 +65,17 @@ def _burst(wb, R, demo):
     kinds = {"lust": "Героизм", "window": "Окно на боссе", "external": "Усиление", "burst": "Бурсты рейда"}
     s.table(["Когда", "Фаза", "Что", "Кто", "Тип"],
             [[e["time"], e.get("phase") or "", e["what"], e.get("who") or "", kinds.get(e["kind"], "")] for e in B.get("timeline") or []])
-    s.section("Бурсты DPS", "Нажато / можно — сколько раз кулдаун нажат и сколько раз его можно было нажать за бой.")
+    s.section("Бурсты DPS", "Нажато / можно — сколько раз кулдаун нажат и сколько раз его можно было нажать, пока игрок был жив. "
+                            "Под героизм — главный бурст за 5 с до героизма или в первые 25 с после. «сам» — включился без нажатия.")
     rows = []
     for r in B.get("bursts") or []:
         if not r["cds"]:
             rows.append([r["player"], "— не найдено", "", "", ""])
         for c in r["cds"]:
-            rows.append([r["player"], c["name"], c["time"], f"{c['used']} / {c['max_uses']}", "да" if r["with_lust"] else "нет"])
+            wl = r.get("with_lust")
+            rows.append([r["player"], c["name"], c["time"],
+                         f"{c['used']} (сам)" if c.get("proc") else f"{c['used']} / {c['max_uses']}",
+                         "да" if wl is True else "нет" if wl is False else "—"])
     s.table(["Игрок", "Кулдаун", "Нажат в", "Нажато / можно", "Под героизм"], rows)
     T = B.get("top")
     if T:
@@ -193,7 +198,7 @@ def _overview(wb, R, demo):
         ("Медиана активного времени", S["median_active"]),
         ("Смертей (без конца вайпа)", f"{S['deaths_before_tail']} из {S['deaths']}"),
         ("Первая смерть", f"{fd['time']} — {fd['player']}, «{fd['ability']}»" if fd else "нет"),
-        ("Жажда крови", f"{S['lust']['caster']}, {_fmt(S['lust']['t'])}" if S["lust"] else "не найден"),
+        ("Героизм", f"{S['lust']['caster']}, {_fmt(S['lust']['t'])}" if S["lust"] else "не найден"),
         ("Урон от выборочных механик", S["selective_share"]),
         ("Зелий за бой", f"{S['potions']} ({'по данным WCL, с пре-потом' if S['potion_source'] == 'playerDetails' else 'по кастам, без пре-пота'})"),
         ("Камней здоровья", S["healthstones"]),
@@ -427,7 +432,7 @@ def _timeline(wb, R, demo):
     if not rows:
         return
     ch = ScatterChart()
-    ch.title = "Смерти, Жажда крови и механики по времени"
+    ch.title = "Смерти, героизм и механики по времени"
     ch.x_axis.title = "Время боя, с"
     ch.y_axis.title = "дорожка"
     ch.y_axis.scaling.min = 0
@@ -445,7 +450,7 @@ def _timeline(wb, R, demo):
             j += 1
         ser = Series(Reference(s.ws, min_col=2, min_row=f + i, max_row=f + j - 1),
                      Reference(s.ws, min_col=3, min_row=f + i, max_row=f + j - 1), title=lane)
-        ser.marker.symbol = "x" if lane == "Смерти" else "diamond" if lane == "Жажда крови" else "circle"
+        ser.marker.symbol = "x" if lane == "Смерти" else "diamond" if lane in ("Героизм", "Жажда крови") else "circle"
         ser.marker.size = 9
         col = colors[k % len(colors)]
         ser.marker.graphicalProperties = GraphicalProperties(solidFill=col)

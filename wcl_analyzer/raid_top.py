@@ -76,7 +76,7 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
             B = R["extras"].get("burst") or {}
             return {"guild": guild, "duration": R["info"]["duration_s"], "code": code, "fight": fid,
                     "spikes": R["extras"]["spikes"], "cds": R["extras"]["raid_cds"],
-                    "burst": {"lust": B.get("lust"), "waves": B.get("waves") or []}}
+                    "burst": {"lust": B.get("lust"), "waves": B.get("waves") or [], "uses": B.get("uses") or []}}
         except (WCLError, StopIteration, KeyError, LookupError) as ex:
             log(f"  пропущен килл {code}: {ex}")
             return None

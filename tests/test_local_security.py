@@ -82,10 +82,14 @@ def main():
     # «i» у способности без описания в разборе: описание с Wowhead по запросу
     from wcl_analyzer import wowhead
     orig = wowhead.lookup
-    wowhead.lookup = lambda ids, save=None, limit=15: {int(i): {"name": "Волна", "desc": "Наносит урон всем."} for i in ids}
+    wowhead.lookup = lambda ids, save=None, limit=15, timeout=8: {int(i): {"name": "Волна", "desc": "Наносит урон всем."} for i in ids}
     try:
         st, _, b = req(port, "POST", "/api/spell", {"id": 1234}, headers={"Origin": f"http://127.0.0.1:{port}"})
         assert st == 200 and json.loads(b)["desc"] == "Наносит урон всем.", (st, b)
+        st, _, b = req(port, "POST", "/api/spell", {"id": 99_000_000}, headers={"Origin": f"http://127.0.0.1:{port}"})
+        assert st == 400, (st, b)   # номер вне диапазона способностей
+        assert all(web._spell_rate_ok("1.2.3.4") for _ in range(web.SPELL_PER_MIN))
+        assert not web._spell_rate_ok("1.2.3.4"), "публичный сервер: не больше SPELL_PER_MIN описаний в минуту с адреса"
     finally:
         wowhead.lookup = orig
     # резервные копии из «Загрузок» — только в Android-приложении

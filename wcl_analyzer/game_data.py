@@ -162,24 +162,44 @@ def name_known(name: str, cls: str = "", spec: str = "") -> bool:
     return False
 
 
-def dps_cds() -> list[dict]:
-    """Крупные боевые кулдауны DPS и внешние усиления урона (Придание сил) — вкладка «Нанесение урона».
-    В старой копии таблицы раздела ещё нет — берём из сборки."""
-    d = data().get("dps_cds")
+_BUNDLED_SECTIONS: dict = {}
+
+
+def _section(name: str) -> list:
+    """Раздел таблицы; в старой копии с устройства его может не быть — берём из сборки (читается один раз)."""
+    d = data().get(name)
     if d:
         return d
-    try:
-        return json.loads(BUNDLED.read_text(encoding="utf-8")).get("dps_cds") or []
-    except (OSError, ValueError):
-        return []
+    if name not in _BUNDLED_SECTIONS:
+        try:
+            _BUNDLED_SECTIONS[name] = json.loads(BUNDLED.read_text(encoding="utf-8")).get(name) or []
+        except (OSError, ValueError):
+            _BUNDLED_SECTIONS[name] = []
+    return _BUNDLED_SECTIONS[name]
+
+
+def dps_cds() -> list[dict]:
+    """Крупные боевые кулдауны DPS и внешние усиления урона (Придание сил) — вкладка «Нанесение урона»."""
+    return _section("dps_cds")
+
+
+_IDS_CACHE: dict = {}
 
 
 def dps_cd_ids() -> set[int]:
-    return {int(c["id"]) for c in dps_cds()}
+    src = dps_cds()
+    if _IDS_CACHE.get("src") is not src:
+        _IDS_CACHE["src"], _IDS_CACHE["ids"] = src, {int(c["id"]) for c in src}
+    return _IDS_CACHE["ids"]
+
+
+def amp_windows() -> list[dict]:
+    """Механики босса, под которые жмут бурсты (уязвимость, снятый щит…): id и/или название."""
+    return _section("amp_windows")
 
 
 def lust_ids() -> set[int]:
-    return {int(x) for x in data().get("lust_ids") or []}
+    return {int(x) for x in _section("lust_ids")}
 
 
 class LazyIds:

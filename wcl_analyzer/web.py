@@ -1249,6 +1249,24 @@ def lan_ip() -> str | None:
         return None
 
 
+_SPELL_HITS: dict[str, list[float]] = {}
+_SPELL_LOCK = threading.Lock()
+SPELL_PER_MIN = 30   # публичный сервер: не больше 30 описаний в минуту с одного адреса
+
+
+def _spell_rate_ok(ip: str) -> bool:
+    now = time.time()
+    with _SPELL_LOCK:
+        if len(_SPELL_HITS) > 5000:
+            _SPELL_HITS.clear()
+        hits = [t for t in _SPELL_HITS.get(ip, []) if now - t < 60]
+        ok = len(hits) < SPELL_PER_MIN
+        if ok:
+            hits.append(now)
+        _SPELL_HITS[ip] = hits
+        return ok
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "WCLAnalyzer/3.0"
 
@@ -1438,7 +1456,11 @@ class Handler(BaseHTTPRequestHandler):
                     sid = int(body.get("id"))
                 except (TypeError, ValueError):
                     raise ValueError("Нет номера способности") from None
-                w = wowhead.lookup([sid], limit=1).get(sid) or {}
+                if not 0 < sid < 2_000_000:
+                    raise ValueError("Нет такой способности")
+                if SERVER["public"] and not _spell_rate_ok(self.client_address[0]):
+                    return self._json({"name": None, "desc": None, "url": wowhead.page_url(sid)})
+                w = wowhead.lookup([sid], limit=1, timeout=5).get(sid) or {}
                 return self._json({"name": w.get("name"), "desc": w.get("desc"), "url": wowhead.page_url(sid)})
             if path == "/api/inspect":
                 from .collect import inspect_report

@@ -1310,16 +1310,22 @@ function videoRotate(){
   const wide = (v.videoWidth || 16) >= (v.videoHeight || 9);
   dlg.classList.toggle("rot", VFULL && wide && innerHeight > innerWidth);
 }
+let VBACK = false, VREENTER = false;   // свой history.back() ещё не дошёл — его popstate не трогает новое «на весь экран»
 function videoFull(on, fromBack){
   const dlg = document.getElementById("videoDlg");
+  if (on && VBACK) { VREENTER = true; return; }   // вернёмся на весь экран, когда закончится «Назад»
+  if (!on) VREENTER = false;
   if (on === VFULL) return;
   VFULL = on;
   dlg.classList.toggle("vfull", on);
   videoRotate();
   if (on) { try { history.pushState({vfull: 1}, ""); } catch(e){} }   // «Назад» на телефоне — свернуть, а не уйти со страницы
-  else if (!fromBack && history.state && history.state.vfull) { try { history.back(); } catch(e){} }
+  else if (!fromBack && history.state && history.state.vfull) { try { VBACK = true; history.back(); } catch(e){ VBACK = false; } }
 }
-addEventListener("popstate", () => { if (VFULL) videoFull(false, true); });
+addEventListener("popstate", () => {
+  if (VBACK) { VBACK = false; if (VREENTER && document.getElementById("videoDlg").open) { VREENTER = false; videoFull(true); } return; }
+  if (VFULL) videoFull(false, true);
+});
 addEventListener("resize", videoRotate);
 document.addEventListener("DOMContentLoaded", () => {
   const dlg = document.getElementById("videoDlg");
@@ -1832,16 +1838,17 @@ function renderBurst(B, el){
   const T = B.top;
   el.innerHTML = `
     ${(B.hints||[]).length ? `<div class="box brief"><h3>Главное по урону</h3><ul class="lines">${B.hints.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
-    ${box("По времени боя", "Героизм, усиления от других игроков (Придание сил), окна механики на боссе (уязвимость, оглушение — то, что босс получает сам, а не от игроков) и моменты, когда сразу несколько DPS жмут бурсты.",
+    ${box("По времени боя", "Героизм, усиления от других игроков (Придание сил), окна на боссе, под которые жмут бурсты (механика из гайда — снять щит, бить цель; «возможно» — по описанию босс получает больше урона), и моменты, когда сразу несколько DPS жмут бурсты.",
       table(["Когда","Фаза","Что","Кто"], (B.timeline||[]).map(e => [esc(e.time), esc(e.phase||""),
         `<span class="tag ${KIND[e.kind] ? KIND[e.kind][1] : "none"}">${esc((KIND[e.kind]||[""])[0])}</span> ${esc(e.what)}`, esc(e.who||"")]),
         {empty: "Ни героизма, ни бурстов, ни окон на боссе не найдено."}))}
-    ${box("Бурсты DPS", "Крупные боевые кулдауны каждого DPS: когда нажаты и сколько раз из возможных за этот бой. «Под героизм» — бурст нажат в первые 25 с героизма. Красным — нажато минимум на 2 раза меньше, чем можно.",
+    ${box("Бурсты DPS", "Крупные боевые кулдауны каждого DPS: когда нажаты и сколько раз из возможных за время, пока игрок был жив. «Под героизм» — главный бурст (самый долгий) нажат за 5 с до героизма или в первые 25 с после; «—» — бурстов нет или игрок лежал. «Сам» — бурст включился без нажатия (талант). Красным — нажато минимум на 2 раза меньше, чем можно, и реже, чем у лучших игроков спека.",
       table(["Игрок","Кулдаун","Нажат в","Нажато / можно","Под героизм"], (B.bursts||[]).flatMap(r => r.cds.length
         ? r.cds.map((c, i) => [i ? "" : `${esc(r.player)} <span style="color:var(--muted);font-size:13.5px">${esc(who(r.cls, r.spec))}</span>`,
-            esc(c.name), esc(c.time), `${c.used} / ${c.max_uses}`, i ? "" : (B.lust ? (r.with_lust ? "да" : '<span class="worse">нет</span>') : "—")])
+            esc(c.name), esc(c.time), c.proc ? `${c.used} (сам)` : `${c.used} / ${c.max_uses}`,
+            i ? "" : (r.with_lust === true ? "да" : r.with_lust === false ? '<span class="worse">нет</span>' : "—")])
         : [[`${esc(r.player)} <span style="color:var(--muted);font-size:13.5px">${esc(who(r.cls, r.spec))}</span>`, '<span style="color:var(--muted)">крупных бурстов не найдено</span>', "", "", ""]]),
-        {flag: (() => { const f = (B.bursts||[]).flatMap(r => r.cds.length ? r.cds.map(c => c.max_uses - c.used >= 2) : [false]); return i => f[i]; })()}))}
+        {flag: (() => { const f = (B.bursts||[]).flatMap(r => r.cds.length ? r.cds.map(c => !!c.lazy) : [false]); return i => f[i]; })()}))}
     ${T ? box("Лучшие киллы", `Как жмут героизм и бурсты гильдии с лучшими киллами этого босса (${T.kills}).`,
       (T.lust ? `<p>Героизм: <b>${esc(T.lust.time)}</b>${T.lust.label ? ` (${esc(T.lust.label)})` : ""} — у ${T.lust.n} из ${T.lust.of}.</p>` : "")
       + table(["Гильдия","Волны бурстов рейда"], (T.waves||[]).map(w => [esc(w.guild), esc((w.times||[]).join(", ") || "—")]))) : ""}`;
@@ -1905,7 +1912,7 @@ function renderRaid(R){
           <div>${esc(i.text)}</div><span class="sev s${i.severity}">${sevName[i.severity]}</span></div>`).join("") : '<p class="empty">Замечаний нет.</p>')}
       <div>
         ${box("Бой в цифрах", "", `<div class="kpis">
-          ${kpi(S.lust ? mmss(S.lust.t) : "—", S.lust ? `Жажда крови (${esc(S.lust.caster)})` : "Жажды крови не было")}
+          ${kpi(S.lust ? mmss(S.lust.t) : "—", S.lust ? `Героизм (${esc(S.lust.caster)})` : "Героизма не было")}
           ${kpi(pct(S.median_active,0), "медиана активного времени")}
           ${kpi(pct(S.selective_share,0), "урона — от выборочных механик")}
           ${kpi(num(S.potions), S.potion_source==="playerDetails" ? "зелий (с пре-потом)" : "зелий по кастам")}
@@ -1994,13 +2001,13 @@ function renderRaid(R){
   const lanes = R.lanes, ly = Object.fromEntries(lanes.map((l,i)=>[l, lanes.length-i]));
   const laneColor = ["#C9423A","#D2691E","#1F8A7E","#4F7CC0","#7A4FB5","#5C6781"];
   $("#p-r-death").innerHTML = `
-    ${box("Смерти и механики на одной оси", "Крестики — смерти, ромб — Жажда крови, точки — моменты урона от самых опасных механик.", '<div class="chart" style="height:320px"><canvas id="cRaidTl"></canvas></div>')}
+    ${box("Смерти и механики на одной оси", "Крестики — смерти, ромб — героизм, точки — моменты урона от самых опасных механик.", '<div class="chart" style="height:320px"><canvas id="cRaidTl"></canvas></div>')}
     ${box("Смерти", "Урон за 5 секунд до смерти и последние действия игрока за 10 секунд.",
       table(["№","Время","Игрок","Причина","Урон за 5 с","Последние действия",""], R.deaths.map(d=>[d.n, d.time, `${esc(d.player)}<div class="ps" style="font-size:13.5px;color:var(--muted)">${esc(d.role)}, ${esc(who(d.cls, d.spec))}</div>`,
         esc(d.ability), d.sources.map(x=>`${esc(x.name)}: ${num(x.damage)}`).join("<br>"), esc(d.last_casts.join(" → ")||"—"),
         d.first?'<span class="sev s5">первая смерть</span>':d.wipe_tail?'<span class="sev s1">конец вайпа</span>':""]), {empty:"В этом бою никто не умер."}))}`;
   chart("cRaidTl", {type:"scatter", data:{datasets:lanes.map((l,i)=>({label:l, data:R.timeline.filter(e=>e.lane===l).map(e=>({x:e.t, y:ly[l], e})),
-      pointStyle: l==="Смерти"?"crossRot":l==="Жажда крови"?"rectRot":"circle", pointRadius: l==="Смерти"?9:6, borderWidth: l==="Смерти"?3:1,
+      pointStyle: l==="Смерти"?"crossRot":(l==="Героизм"||l==="Жажда крови")?"rectRot":"circle", pointRadius: l==="Смерти"?9:6, borderWidth: l==="Смерти"?3:1,
       backgroundColor:laneColor[i%laneColor.length], borderColor:laneColor[i%laneColor.length]}))},
     options:{maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`${c.raw.e.label}: ${mmss(c.raw.e.t)}`}}},
       scales:{x:{min:0, max:I.duration_s+5, ticks:{callback:v=>mmss(v).replace(/,0$/,"")}, title:{display:true,text:"время боя"}},

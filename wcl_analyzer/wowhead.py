@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import html
 import json
+import time
 import re
 import threading
 import urllib.request
@@ -121,11 +122,18 @@ def _load_disk() -> dict:
         return {}
 
 
-def lookup(spell_ids, save: bool | None = None, limit: int = 15) -> dict:
+MEM_MAX = 4000        # описаний в памяти не больше (публичный сервер: любой может спросить любой id)
+MISS_TTL_S = 600      # не нашлось или нет связи — не спрашиваем снова 10 минут
+_MISS: dict = {}
+
+
+def lookup(spell_ids, save: bool | None = None, limit: int = 15, timeout: float = 8) -> dict:
     """{id: {name, desc}} для способностей, которых нет в гайдах. Уже известные — из памяти и файла,
     остальные (не больше limit) — параллельными запросами к Wowhead. save=False — ничего не пишем на диск."""
     save = SAVE["enabled"] if save is None else save
-    ids = [int(i) for i in dict.fromkeys(spell_ids) if i]
+    now = time.time()
+    ids = [int(i) for i in dict.fromkeys(spell_ids) if i and 0 < int(i) < 2_000_000
+           and now - _MISS.get(int(i), -1e9) > MISS_TTL_S]
     with _LOCK:
         if save and not _MEM.get("_disk"):
             _MEM.update(_load_disk())
@@ -134,13 +142,21 @@ def lookup(spell_ids, save: bool | None = None, limit: int = 15) -> dict:
     todo = [i for i in ids if i not in out][:limit]
     if todo:
         with ThreadPoolExecutor(max_workers=min(6, len(todo))) as ex:
-            for i, info in zip(todo, ex.map(fetch, todo)):
+            for i, info in zip(todo, ex.map(lambda x: fetch(x, timeout), todo)):
                 if info:
                     out[i] = info
+                else:
+                    _MISS[i] = now
+        if len(_MISS) > MEM_MAX:
+            for k in sorted(_MISS, key=_MISS.get)[: len(_MISS) - MEM_MAX]:
+                _MISS.pop(k, None)
         with _LOCK:
             for i in todo:
                 if i in out:
                     _MEM[str(i)] = out[i]
+            extra = [k for k in _MEM if k != "_disk"][: max(0, len(_MEM) - 1 - MEM_MAX)]
+            for k in extra:   # самые старые записи — первыми (словарь хранит порядок добавления)
+                _MEM.pop(k, None)
             if save:
                 f = _cache_file()
                 if f:

@@ -349,8 +349,9 @@ def test_burst_analysis():
     B = R["extras"]["burst"]
     assert B["lust"]["caster"] == "Таргун" and B["lust"]["time"] == "0:01"
     hints = " | ".join(B["hints"])
-    assert "Без бурста под героизм: Лиана" in hints, hints
-    assert "Обнажённое ядро" in hints and "Лучшие киллы делают ещё волны бурстов рейдом: 2:21" in hints, hints
+    assert "Без главного бурста под героизм: Лиана" in hints, hints
+    assert "Уязвимое ядро" in hints and "Лучшие киллы делают ещё волны бурстов рейдом: 2:21" in hints, hints
+    assert "нажаты реже" in hints and "у лучших киллов этот спек" in hints, hints
     kinds = {e["kind"] for e in B["timeline"]}
     assert kinds >= {"lust", "external", "window", "burst"}, kinds
     assert any(e["kind"] == "external" and "Кассия" in e["what"] for e in B["timeline"])
@@ -364,6 +365,87 @@ def test_burst_analysis():
         wb = load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx"))
         assert "Нанесение урона" in wb.sheetnames
     print("OK нанесение урона: героизм, бурсты, окна на боссе, сравнение с лучшими киллами, лист Excel")
+
+
+def test_burst_rules():
+    """Правила вкладки «Нанесение урона»: лежавший игрок не «без бурста под героизм» и не «держал бурст»;
+    «нажато / можно» — за время жизни; бурст без нажатия (бафф без каста) — «сам»; заряды; два героизма;
+    окна на боссе — с обновлениями, висевшее до пулла, баффы босса, один дебафф на двух боссах — одно окно;
+    «возможно» — только «получает больше урона», не оглушение и не «снижает урон»; механика из таблицы — наверняка;
+    волны топа — по разным киллам и только до конца вашего боя; героизм — сравнение и по времени."""
+    from wcl_analyzer import game_data, raid_burst as rb
+    names = {1719: "Recklessness", 31884: "Avenging Wrath", 137639: "Storm, Earth, and Fire", 2825: "Bloodlust",
+             7001: "Exposed Core", 7002: "Stunned", 7003: "Hardened Shell", 7004: "Weak Spot", 7005: "Glass Armor"}
+    nm = lambda ab: names.get(ab, f"Spell {ab}")
+    players = {1: {"name": "War", "role": "dps", "cls": "Warrior", "spec": "Fury"},
+               2: {"name": "Pal", "role": "dps", "cls": "Paladin", "spec": "Retribution"},
+               3: {"name": "Monk", "role": "dps", "cls": "Monk", "spec": "Windwalker"},
+               4: {"name": "Sham", "role": "healer", "cls": "Shaman", "spec": "Restoration"},
+               5: {"name": "Arms", "role": "dps", "cls": "Warrior", "spec": "Arms"}}
+    ms = lambda t: int(t * 1000)
+    cast = lambda t, src, ab, tgt=-1: {"timestamp": ms(t), "type": "cast", "sourceID": src, "targetID": tgt, "abilityGameID": ab}
+    deb = lambda t, typ, ab, tgt=100, src=100: {"timestamp": ms(t), "type": typ, "sourceID": src, "targetID": tgt, "abilityGameID": ab}
+    raw = {"fight": {"name": "Test Boss"},
+           "casts": [cast(10, 4, 2825), cast(12, 4, 2825), cast(620, 4, 2825),     # героизм 0:10 и через 10 мин
+                     cast(8, 1, 1719), cast(99, 1, 1719),                            # Fury: Recklessness
+                     cast(5, 3, 137639), cast(6, 3, 137639),                         # SEF: 2 заряда подряд
+                     cast(10, 5, 1719),                                              # Arms с бурстом Fury — не его
+                     cast(400, 1, 6)],                                               # War встал (боевое воскрешение)
+           "deaths": [{"timestamp": ms(200), "type": "death", "targetID": 1}, {"timestamp": ms(5), "type": "death", "targetID": 5}],
+           "burst_buffs": [{"timestamp": ms(30), "type": "applybuff", "sourceID": 2, "targetID": 2, "abilityGameID": 31884},
+                           {"timestamp": ms(80), "type": "applybuff", "sourceID": 2, "targetID": 2, "abilityGameID": 31884}],
+           "boss_debuffs": [deb(300, "refreshdebuff", 7001), deb(310, "removedebuff", 7001),      # висело до пулла? нет: 0..310 — длинное
+                            deb(100, "applydebuff", 7004), deb(100, "applydebuff", 7004, tgt=101),
+                            deb(110, "removedebuff", 7004), deb(112, "removedebuff", 7004, tgt=101),
+                            deb(150, "applydebuff", 7002), deb(160, "removedebuff", 7002),
+                            deb(170, "applydebuff", 7004, src=1), deb(180, "removedebuff", 7004, src=1)],   # от игрока — не окно
+           "boss_buffs": [deb(250, "applybuff", 7003), deb(262, "removebuff", 7003),
+                          deb(500, "applybuff", 7005), deb(508, "removebuff", 7005)]}
+    names[7004] = "Vulnerable Spot"
+    phases = []
+    orig = game_data.amp_windows
+    game_data.amp_windows = lambda: [{"name": "Hardened Shell", "note": "снять щит"}]
+    try:
+        B = rb.burst_analysis(raw, players, lambda x: x, lambda ev: ev["timestamp"] / 1000, nm, 700.0, phases)
+    finally:
+        game_data.amp_windows = orig
+    rows = {r["player"]: r for r in B["bursts"]}
+    assert [L["time"] for L in B["lusts"]] == ["0:10", "10:20"], B["lusts"]
+    assert rows["War"]["with_lust"] is True and rows["Arms"]["with_lust"] is None, rows["Arms"]
+    assert not rows["Arms"]["cds"], "бурст чужого спека не засчитан"
+    war = rows["War"]["cds"][0]
+    assert war["max_uses"] == 1 + int((700 - 200) // 90), war     # лежал 200–400 с
+    monk = rows["Monk"]["cds"][0]
+    assert monk["charges"] == 2 and monk["max_uses"] == 2 + int(700 // 90), monk
+    pal = rows["Pal"]["cds"][0]
+    assert pal["proc"] and pal["used"] == 2 and pal["max_uses"] is None and not pal["lazy"], pal
+    W = {w["name"]: w for w in B["windows"]}
+    assert "Exposed Core" in W and W["Exposed Core"]["t0"] == 0.0, W.keys()           # обновление без наложения — с пулла
+    assert W["Vulnerable Spot"]["t1"] == 112.0 and sum(1 for w in B["windows"] if w["name"] == "Vulnerable Spot") == 1
+    assert W["Vulnerable Spot"]["amp"] == "maybe" and W["Stunned"]["amp"] is None
+    assert W["Hardened Shell"]["amp"] == "sure" and W["Hardened Shell"]["note"] == "снять щит"
+    assert W["Glass Armor"]["amp"] is None
+    assert "War" not in W["Hardened Shell"]["missed_ready"], "лежал — не «держал бурст»"
+    assert rb.amp_text("Damage taken increased by 50%") and rb.amp_text("Урон, получаемый целью, увеличен на 20%")
+    assert not rb.amp_text("Damage taken reduced by 90%") and not rb.amp_text("Оглушает цель") and not rb.amp_text("Shatter")
+    tl_windows = [e for e in B["timeline"] if e["kind"] == "window"]
+    assert {e["what"].split("»")[0] for e in tl_windows} == {"«Vulnerable Spot", "«Hardened Shell"}, tl_windows
+    # волны лучших киллов: одна гильдия с тремя волнами рядом — не «большинство»; после конца боя — не считаем
+    top = {"waves": [{"kill": 0, "t": [100, 110, 120]}, {"kill": 1, "t": [300]}, {"kill": 2, "t": [302, 800]},
+                     {"kill": 3, "t": [800]}]}
+    assert rb.compare_waves([], top, 700) == ("Лучшие киллы делают ещё волны бурстов рейдом: 5:01 — у вас в это время "
+                                              "бурсты почти никто не жал"), rb.compare_waves([], top, 700)
+    tl = {"lust": {"phase": 1, "n": 4, "of": 5, "time": "1:30", "phase_t": 90.0, "label": ""}}
+    assert rb.compare_lust({"t": 10, "phase": 1, "phase_t": 10}, tl)[1]
+    assert not rb.compare_lust({"t": 100, "phase": 1, "phase_t": 100}, tl)[1]
+    from wcl_analyzer.raid import _brief_insert
+    br = [f"line {i}" for i in range(6)] + ["Расходники — без еды: 1"]
+    _brief_insert(br, "NEW", 5)
+    assert len(br) == 7 and "NEW" in br and not any(x.startswith("Расходники") for x in br)
+    br = [f"line {i}" for i in range(7)]
+    _brief_insert(br, "NEW", 5)
+    assert "NEW" not in br and br[-1] == "line 6", "важные строки не теряются молча"
+    print("OK правила бурстов: смерти, заряды, «сам», два героизма, окна на боссе, волны и героизм топа, «Главное»")
 
 
 def test_save_dir_full_path():
@@ -877,6 +959,7 @@ if __name__ == "__main__":
     test_roster_plan()
     test_save_dir_full_path()
     test_burst_analysis()
+    test_burst_rules()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()

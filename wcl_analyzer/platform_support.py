@@ -104,12 +104,29 @@ def android_list_backups(limit: int = 30) -> list[dict]:
     return out
 
 
+BACKUP_MAX = 50 * 1024 * 1024
+
+
 def android_read_backup(file_id) -> str:
     """Текст резервной копии из «Загрузок» (id из android_list_backups)."""
     Build = _j("Build")
     if Build.SDK_INT >= 29:
         uri = _j("ContentUris").withAppendedId(_j("MediaStore").EXTERNAL_CONTENT_URI, int(file_id))
-        stream = _j("activity").getContentResolver().openInputStream(uri)
+        resolver = _j("activity").getContentResolver()
+        cur = resolver.query(uri, ["_display_name", "_size"], None, None, None)
+        if cur is None:
+            raise OSError("Android не дал прочитать файл")
+        try:   # только резервная копия программы и не больше 50 МБ — не любой файл по номеру
+            if not cur.moveToFirst():
+                raise OSError("Файл не найден")
+            name, size = cur.getString(0) or "", int(cur.getLong(1))
+        finally:
+            cur.close()
+        if not (name.startswith(BACKUP_PREFIX) and name.endswith(".json")):
+            raise OSError("Это не резервная копия программы")
+        if size > BACKUP_MAX:
+            raise OSError("Файл слишком большой для резервной копии")
+        stream = resolver.openInputStream(uri)
         if stream is None:
             raise OSError("Android не дал прочитать файл")
         try:   # весь файл одной строкой: разделитель «\A» — начало текста, второго такого нет
@@ -122,6 +139,8 @@ def android_read_backup(file_id) -> str:
     name = Path(str(file_id)).name   # только имя: из этой папки и никуда больше
     if not name.startswith(BACKUP_PREFIX):
         raise OSError("Это не резервная копия программы")
+    if (folder / name).stat().st_size > BACKUP_MAX:
+        raise OSError("Файл слишком большой для резервной копии")
     return (folder / name).read_text(encoding="utf-8")
 
 

@@ -1,26 +1,82 @@
-391528	0	Convoke the Spirits	2 min cooldown	
-391528	7	Созыв духов	Восстановление: 2 мин	
-466904	0	Harrier's Cry	6 min cooldown	
-466904	7	Крик загонщика	Восстановление: 6 мин	
-63560	0	Dark Transformation	-	
-63560	7	Темное превращение	-	
-444995	0	Surging Totem	25 sec cooldown	
-444995	7	Пульсирующий тотем	Восстановление: 25 сек	
-1217605	0	Void Metamorphosis	-	
-1217605	7	Метаморфоза Бездны	-	
-442294	0	Reaver's Glaive	-	
-442294	7	Клинок разорителя	-	
-370965	0	The Hunt	1.5 min cooldown	
-370965	7	Охота	Восстановление: 1.5 мин	
-442501	0	Woven Ironblast	5 sec cooldown	
-442501	7	Стальной паутинный заряд	Восстановление: 5 сек	
-NAME Void Metamorphosis [https://nether.wowhe]: ERR HTTP Error 404: Not Found
-NAME Void Metamorphosis [https://www.wowhead.]: ERR HTTP Error 403: Forbidden
-NAME Collapsing Star [https://nether.wowhe]: ERR HTTP Error 404: Not Found
-NAME Collapsing Star [https://www.wowhead.]: ERR HTTP Error 403: Forbidden
-NAME Void Ray [https://nether.wowhe]: ERR HTTP Error 404: Not Found
-NAME Void Ray [https://www.wowhead.]: ERR HTTP Error 403: Forbidden
-NAME The Hunt [https://nether.wowhe]: ERR HTTP Error 404: Not Found
-NAME The Hunt [https://www.wowhead.]: ERR HTTP Error 403: Forbidden
-NAME Harrier's Cry [https://nether.wowhe]: ERR HTTP Error 404: Not Found
-NAME Harrier's Cry [https://www.wowhead.]: ERR HTTP Error 403: Forbidden
+871	0	Shield Wall	3 min cooldown		dur=for 8 sec
+871	7	Глухая оборона	Восстановление: 3 мин		dur=на 8 сек
+12975	0	Last Stand	3 min cooldown		dur=for 8 sec
+12975	7	Ни шагу назад	Восстановление: 3 мин		dur=на 8 сек
+1160	0	Demoralizing Shout	45 sec cooldown		dur=for 8 sec
+1160	7	Деморализующий крик	Восстановление: 45 сек		dur=на 8 сек
+23920	0	Spell Reflection	25 sec cooldown		dur=for 5 sec
+23920	7	Отражение заклинаний	Восстановление: 25 сек		dur=на 5 сек
+31850	0	Ardent Defender	1.5 min cooldown		dur=for 12 sec
+31850	7	Ревностный защитник	Восстановление: 1.5 мин		dur=на 12 сек
+86659	0	Guardian of Ancient Kings	3 min cooldown		dur=for 8 sec
+86659	7	Защитник древних королей	Восстановление: 3 мин		dur=на 8 сек
+212641	0	Guardian of Ancient Kings	3 min cooldown		dur=for 8 sec
+212641	7	Защитник древних королей	Восстановление: 3 мин		dur=в течение 8 сек
+642	0	Divine Shield	5 min cooldown		dur=for 8 sec
+642	7	Божественный щит	Восстановление: 5 мин		dur=в течение 8 сек
+387174	0	Eye of Tyr	1 min cooldown		dur=for 6 sec
+387174	7	Око Тира	Восстановление: 1 мин		dur=на 6 сек
+389539	0	Sentinel	2 min cooldown		dur=for 20 sec
+389539	7	Часовой	Восстановление: 2 мин		dur=на 20 сек
+204018	0	Blessing of Spellwarding	5 min cooldown		dur=for 10 sec
+204018	7	Благословение защиты от заклинаний	Восстановление: 5 мин		dur=на 10 сек
+48792	0	Icebound Fortitude	2 min cooldown		dur=for 8 sec
+48792	7	Незыблемость льда	Восстановление: 2 мин		dur=в течение 8 сек
+55233	0	Vampiric Blood	1.5 min cooldown		dur=for  10 sec
+55233	7	Кровь вампира	Восстановление: 1.5 мин		dur=на  10 сек
+48707	0	Anti-Magic Shell	1 min cooldown		dur=for 5 sec
+48707	7	Антимагический панцирь	Восстановление: 1 мин		dur=в течение 5 сек
+49028	0	Dancing Rune Weapon	2 min cooldown		dur=for  8 sec
+49028	7	Танцующее руническое оружие	Восстановление: 2 мин		dur=в течение  8 сек
+219809	0	Tombstone	1 min cooldown		dur=for 8 sec
+219809	7	Надгробный камень	Восстановление: 1 мин		dur=в течение 8 сек
+194679	0	Rune Tap	25 sec recharge	2 Charges	dur=for 4 sec
+194679	7	Захват рун	-		dur=на 4 сек
+187827	0	Metamorphosis	2 min cooldown		dur=for 15 sec
+187827	7	Метаморфоза	Восстановление: 2 мин		dur=на 15 сек
+204021	0	Fiery Brand	1 min cooldown		dur=-
+204021	7	Огненное клеймо	Восстановление: 1 мин		dur=-
+207771	0	Fiery Brand	-		dur=-
+207771	7	Огненное клеймо	-		dur=-
+263648	0	Soul Barrier	30 sec cooldown		dur=for 10 sec
+263648	7	Призрачный барьер	Восстановление: 30 сек		dur=на 10 сек
+61336	0	Survival Instincts	3 min cooldown		dur=for 6 sec
+61336	7	Инстинкты выживания	Восстановление: 3 мин		dur=в течение 6 сек
+22812	0	Barkskin	1 min cooldown		dur=-
+22812	7	Дубовая кожа	Восстановление: 1 мин		dur=-
+200851	0	Rage of the Sleeper	1 min cooldown		dur=for 8 sec
+200851	7	Ярость Спящего	Восстановление: 1 мин		dur=-
+102558	0	Incarnation: Guardian of Ursoc	3 min cooldown		dur=-
+102558	7	Воплощение: Страж Урсока	Восстановление: 3 мин		dur=-
+115203	0	Fortifying Brew	6 min cooldown		dur=for 15 sec
+115203	7	Укрепляющий отвар	Восстановление: 6 мин		dur=-
+120954	0	Fortifying Brew	-		dur=for 15 sec
+120954	7	Укрепляющий отвар	-		dur=-
+322507	0	Celestial Brew	1.5 min cooldown		dur=-
+322507	7	Божественный отвар	Восстановление: 1.5 мин		dur=-
+122278	0	Dampen Harm	2 min cooldown		dur=for 10 sec
+122278	7	Смягчение удара	Восстановление: 2 мин		dur=в течение 10 сек
+115176	0	Zen Meditation	5 min cooldown		dur=for 8 sec
+115176	7	Дзен-медитация	Восстановление: 5 мин		dur=на 8 сек
+132578	0	Invoke Niuzao, the Black Ox	2 min cooldown		dur=for  25 sec
+132578	7	Призыв Нюцзао, Черного Быка	Восстановление: 2 мин		dur=-
+325153	0	Exploding Keg	1 min cooldown		dur=-
+325153	7	Взрывной бочонок	Восстановление: 1 мин		dur=-
+33206	0	Pain Suppression	3 min cooldown		dur=for 8 sec
+33206	7	Подавление боли	Восстановление: 3 мин		dur=на 8 сек
+102342	0	Ironbark	1.5 min cooldown		dur=for  12 sec
+102342	7	Железная кора	Восстановление: 1.5 мин		dur=-
+6940	0	Blessing of Sacrifice	2 min cooldown		dur=-
+6940	7	Жертвенное благословение	Восстановление: 2 мин		dur=-
+116849	0	Life Cocoon	2 min cooldown		dur=for 12 sec
+116849	7	Исцеляющий кокон	Восстановление: 2 мин		dur=в течение 12 сек
+47788	0	Guardian Spirit	3 min cooldown		dur=for  10 sec
+47788	7	Оберегающий дух	Восстановление: 3 мин		dur=в течение  10 сек
+357170	0	Time Dilation	1 min cooldown		dur=-
+357170	7	Растяжение времени	Восстановление: 1 мин		dur=на 8 сек
+1022	0	Blessing of Protection	5 min cooldown		dur=for 10 sec
+1022	7	Благословение защиты	Восстановление: 5 мин		dur=на 10 сек
+3411	0	Intervene	30 sec cooldown		dur=for 6 sec
+3411	7	Вмешательство	Восстановление: 30 сек		dur=в течение 6 сек
+374227	0	Zephyr	2 min cooldown		dur=for 8 sec
+374227	7	Южный ветер	Восстановление: 2 мин		dur=на 8 сек

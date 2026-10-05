@@ -79,6 +79,15 @@ def main():
     st, _, _ = req(port, "POST", "/api/zones", {}, headers={"Origin": f"http://127.0.0.1:{port}"})
     assert st != 403, st
 
+    # «i» у способности без описания в разборе: описание с Wowhead по запросу
+    from wcl_analyzer import wowhead
+    orig = wowhead.lookup
+    wowhead.lookup = lambda ids, save=None, limit=15: {int(i): {"name": "Волна", "desc": "Наносит урон всем."} for i in ids}
+    try:
+        st, _, b = req(port, "POST", "/api/spell", {"id": 1234}, headers={"Origin": f"http://127.0.0.1:{port}"})
+        assert st == 200 and json.loads(b)["desc"] == "Наносит урон всем.", (st, b)
+    finally:
+        wowhead.lookup = orig
     # резервные копии из «Загрузок» — только в Android-приложении
     st, _, _ = req(port, "POST", "/api/android/backups", {}, headers={"Origin": f"http://127.0.0.1:{port}"})
     assert st == 403, st

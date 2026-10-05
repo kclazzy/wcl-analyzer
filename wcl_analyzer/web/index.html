@@ -291,6 +291,8 @@ dialog label.check input{width:auto;margin:0}
   .refs-head{flex-direction:column}.ref{grid-template-columns:1fr auto}.ref .age{grid-column:1}
   .qr{flex-direction:column;align-items:center}
   .kpis{grid-template-columns:1fr 1fr}.issue{grid-template-columns:1fr}.issue .sev{justify-self:start}
+  /* «▶» и «i» у способностей — крупнее под палец, с отступом от ссылки, чтобы не попадать в неё */
+  .vplay,.vinfo{width:32px;height:32px;margin:0 2px 0 8px;font-size:15px}
   /* План сейвов на телефоне — карточками: время, пик, кто жмёт — друг под другом, без прокрутки вбок */
   table.plan thead{display:none} table.plan,table.plan tbody,table.plan tr,table.plan td{display:block;width:auto}
   table.plan tr{padding:10px 0;border-bottom:1px solid var(--line)} table.plan td{border:0;padding:2px 0}
@@ -348,7 +350,7 @@ dialog label.check input{width:auto;margin:0}
         <div><label for="tpBoss">Босс</label><select id="tpBoss"></select></div>
         <div><button class="btn" id="tpRun" type="button">Разобрать топ прогресса</button></div>
       </div>
-      <p class="hint" id="tpInfo" style="margin:10px 0 0">Бой гильдии, которая первой в мире убила босса на этой сложности: урон, сейвы и кто какие кулдауны жал, смерти, состав, заметка MRT. Без сравнения и без вашего лога; нужен только ключ Warcraft Logs. «Все боссы» — вкладка на каждого босса. На героической и обычной сложности рейтинга прогресса нет — берётся самый ранний по дате килл среди 300 лучших в рейтинге WCL. Не все эпохальные логи открыты: если лог гильдии закрыт, программа возьмёт следующее место (до 6-го) и напишет, чьи логи недоступны.</p>
+      <p class="hint" id="tpInfo" style="margin:10px 0 0">Бой первой гильдии, которая убила босса на этой сложности и выложила открытый лог убийства в Warcraft Logs. В нём урон, сейвы и кто какие кулдауны жал, смерти, состав, заметка MRT. Без сравнения и без вашего лога, нужен только ключ Warcraft Logs. «Все боссы» — вкладка на каждого босса. На эпохальной сложности гильдии берутся по рейтингу прогресса (первые убийства в мире). Если лог закрыт, программа возьмёт следующее место (до 6-го) и напишет, чьи логи недоступны. На героической и обычной сложности такого рейтинга нет — берётся самый ранний по дате открытый килл среди 300 лучших в рейтинге WCL.</p>
     </details>
     <details class="tpbox" id="rpBox">
       <summary>План сейвов по составу — состав из игры и длительность боя</summary>
@@ -388,7 +390,7 @@ dialog label.check input{width:auto;margin:0}
       <p class="hint" id="allHint" hidden style="grid-column:1/-1;margin:0;font-size:14px">Выбраны <b>все боссы отчёта</b> — по одному бою на босса (последний килл, без киллов — лучший пулл): на каждого босса — свой полный разбор боя, как у одного лога (главное по бою, кому что поправить, урон, сейвы, смерти, план и заметка MRT с сейвами и кулдаунами лекарей), затем ротация по боссам против топ-1, чтобы хватило лимита WCL.</p>
       <div class="runrow">
         <button class="btn you" id="runBtn" type="button" title="Одна кнопка — весь разбор: сначала урон, сейвы и смерти (готово через несколько секунд), затем ротация — всех DPS или выбранного игрока. Вкладки результата переключаются без новой загрузки, Excel — один на всё">Разобрать бой</button>
-        <button class="btn" id="progBtn" type="button" title="Бой гильдии, которая первой в мире убила этого босса на этой сложности (рейтинг прогресса Warcraft Logs): урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения — просто посмотреть, как это сделали лучшие. С «Все боссы отчёта» — на каждого босса отчёта, вкладка на босса">Топ прогресса</button>
+        <button class="btn" id="progBtn" type="button" title="Бой первой гильдии, которая убила этого босса на этой сложности и выложила открытый лог убийства (рейтинг прогресса Warcraft Logs): урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения — просто посмотреть, как это сделали лучшие. С «Все боссы отчёта» — на каждого босса отчёта, вкладка на босса">Топ прогресса</button>
         <label class="chk" title="Когда часовой лимит WCL кончится, не останавливаться, а дождаться сброса и продолжить (можно оставить на ночь)"><input type="checkbox" id="waitLimit"> Кончится лимит — ждать и продолжать</label>
         <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
@@ -760,7 +762,7 @@ $("#runBtn").onclick = () => !inspected ? showErr("Сначала нажмите
 $("#player").addEventListener("change", syncAllMode);
 $("#demoBtn").onclick = () => run({demo:true});
 $("#demoRaidBtn").onclick = () => run({mode:"fight", demo:true, ref:"top3"});
-/* «Топ прогресса»: бой гильдии, первой в мире убившей этого босса на этой сложности, — без сравнения */
+/* «Топ прогресса»: бой первой гильдии, убившей этого босса на этой сложности и выложившей открытый лог, — без сравнения */
 $("#progBtn").onclick = () => {
   if (!inspected) return showErr("Сначала нажмите «Найти бой».");
   run({mode:"progress", url:inspected.url, fight:$("#fight").value, wait: $("#waitLimit").checked});
@@ -1233,7 +1235,8 @@ function guideText(text, links, videos, info){
     if (!g || !g.url) return esc(part);
     const wh = g.src === "wowhead";
     const play = g.video ? `<button type="button" class="vplay" data-v="${esc(g.video)}" data-g="${esc(g.url)}" data-n="${esc(m[1])}" title="Смотреть ролик механики" aria-label="Смотреть ролик: ${esc(m[1])}">▶</button>` : "";
-    const more = (g.desc || g.todo || g.type) ? `<button type="button" class="vinfo" data-k="${esc(m[1])}" aria-expanded="false" title="Кратко о способности" aria-label="Кратко о способности: ${esc(m[1])}">i</button>` : "";
+    /* «i» — у каждой способности с номером: нет описания в разборе — подгрузим по нажатию */
+    const more = (g.desc || g.todo || g.type || g.id) ? `<button type="button" class="vinfo" data-k="${esc(m[1])}" aria-expanded="false" title="Кратко о способности" aria-label="Кратко о способности: ${esc(m[1])}">i</button>` : "";
     return `«<a href="${esc(g.url)}" target="_blank" rel="noopener" title="${wh ? "Способность на Wowhead (гайда Mythic Trap нет)" : "Гайд Mythic Trap по этой способности"}">${esc(m[1])}</a>»${play}${more}`;
   }).join("");
 }
@@ -1243,14 +1246,15 @@ function guideDesc(text, info){
   const seen = new Set();
   return (String(text).match(/«[^»]+»/g) || []).map(q => q.slice(1, -1)).filter(n => !seen.has(n) && seen.add(n)).map(n => {
     const g = info[n];
-    if (!g || !(g.desc || g.todo || g.type)) return "";
+    if (!g || !(g.desc || g.todo || g.type || g.id)) return "";
     const ru = g.name_ru && g.name_ru !== n ? g.name_ru : "", en = g.name_en && g.name_en !== n && g.name_en !== ru ? g.name_en : "";
     const src = [g.desc ? "описание — Wowhead" : "", (g.todo || g.type) ? "совет — Mythic Trap" : ""].filter(Boolean).join(", ");
-    return `<div class="gdesc" data-k="${esc(n)}" hidden>
+    return `<div class="gdesc" data-k="${esc(n)}" ${!g.desc && g.id ? `data-sid="${esc(g.id)}"` : ""} hidden>
       <div class="gh"><b>${esc(ru || n)}</b>${ru ? `<span class="en">${esc(n)}</span>` : en ? `<span class="en">${esc(en)}</span>` : ""}${g.type ? `<span class="gt">${esc(g.type)}</span>` : ""}</div>
-      ${g.desc ? `<p>${esc(g.desc)}</p>` : ""}
+      ${g.desc ? `<p>${esc(g.desc)}</p>` : g.id ? `<p class="gload">Загружаю описание…</p>` : ""}
       ${g.todo ? `<p><b>Что делать:</b> ${esc(g.todo)}</p>` : ""}
-      <span class="gsrc">${esc(src[0].toUpperCase() + src.slice(1))}</span></div>`;
+      <span class="gsrc">${esc(src ? src[0].toUpperCase() + src.slice(1) : "Описание — Wowhead")}</span>
+      <a class="gsrc" href="${esc(g.url)}" target="_blank" rel="noopener">${g.src === "wowhead" ? "Открыть на Wowhead" : "Открыть гайд"}</a></div>`;
   }).join("");
 }
 document.addEventListener("click", e => {
@@ -1261,6 +1265,13 @@ document.addEventListener("click", e => {
   if (!d) return;
   d.hidden = !d.hidden;
   b.setAttribute("aria-expanded", String(!d.hidden));
+  if (!d.hidden && d.dataset.sid && !d.dataset.loaded) {   // описания не было в разборе — берём с Wowhead сейчас
+    d.dataset.loaded = "1";
+    const p = d.querySelector(".gload");
+    api("/api/spell", {id: +d.dataset.sid}, 30)
+      .then(r => { if (p) p.textContent = r.desc || "Описание с Wowhead не получено: нет связи или у способности нет описания. Откройте её по ссылке ниже."; })
+      .catch(() => { if (p) p.textContent = "Описание не загрузилось — нет связи с Wowhead. Откройте способность по ссылке."; d.dataset.loaded = ""; });
+  }
 });
 function openVideo(btn){
   const dlg = document.getElementById("videoDlg"), v = document.getElementById("videoEl"), err = document.getElementById("videoErr");

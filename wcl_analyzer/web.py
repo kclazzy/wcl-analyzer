@@ -1432,6 +1432,14 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/zones":  # рейды текущего дополнения — для «Топ прогресса» без лога
                 cl = _limited(CLIENT_FACTORY(creds), 0)
                 return self._json({"zones": cl.raid_zones()})
+            if path == "/api/spell":  # краткое описание способности с Wowhead (по нажатию «i», если в разборе его не было)
+                from . import wowhead
+                try:
+                    sid = int(body.get("id"))
+                except (TypeError, ValueError):
+                    raise ValueError("Нет номера способности") from None
+                w = wowhead.lookup([sid], limit=1).get(sid) or {}
+                return self._json({"name": w.get("name"), "desc": w.get("desc"), "url": wowhead.page_url(sid)})
             if path == "/api/inspect":
                 from .collect import inspect_report
                 cl = _limited(CLIENT_FACTORY(creds), 0)  # поиск боя не ждёт сброса лимита: сразу объясняем, что случилось

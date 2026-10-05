@@ -1607,9 +1607,12 @@ class Handler(BaseHTTPRequestHandler):
                 if any(j.get("state") == "running" for j in list(JOBS.values())):  # перезапуск оборвал бы разбор
                     return self._json({"error": "Сейчас идёт разбор — обновитесь, когда он закончится "
                                                 "(иначе разбор прервётся и его придётся запускать заново)."}, 409)
-                if body.get("kind") == "full":
-                    return self._json(update.apply_full())
-                res = update.apply_code()
+                try:
+                    if body.get("kind") == "full":
+                        return self._json(update.apply_full())
+                    res = update.apply_code()
+                except update.UpdateError as e:
+                    return self._json({"error": str(e)}, 502)
                 if res.get("ok"):
                     request_restart()  # новый код подключается сразу, страница перезагрузится сама
                     res = {**res, "restart": "Перезапускаю программу…", "soft_restart": True}

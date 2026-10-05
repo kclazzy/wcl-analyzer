@@ -60,6 +60,31 @@ jobs:
           $s = Invoke-RestMethod "http://127.0.0.1:8799/api/job/$job"
           if ($s.state -ne "done") { throw "Демо-разбор не завершился: $($s.state) $($s.error)" }
           Stop-Process -Id $p.Id
+      - name: Проверка обновления целиком (как у пользователей)
+        shell: pwsh
+        run: |
+          # Новая сборка скачивает последний выпуск .exe, заменяет себя и перезапускается с теми же параметрами
+          $dir = Join-Path $env:RUNNER_TEMP "upd"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item "dist\WCL Analyzer.exe" "$dir\WCL-Analyzer.exe"
+          $before = (Get-FileHash "$dir\WCL-Analyzer.exe").Hash
+          Start-Process -FilePath "$dir\WCL-Analyzer.exe" -ArgumentList "ui","--no-browser","--port","8798" | Out-Null
+          $v = $null
+          for ($i = 0; $i -lt 40 -and -not $v; $i++) { try { $v = Invoke-RestMethod http://127.0.0.1:8798/api/version } catch { Start-Sleep 1 } }
+          if (-not $v) { throw "Программа не запустилась" }
+          $r = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8798/api/update/apply -ContentType "application/json" `
+                 -Headers @{ Origin = "http://127.0.0.1:8798" } -Body '{"kind":"full"}' -TimeoutSec 600
+          if (-not $r.ok) { throw "Обновление не началось: $($r | ConvertTo-Json -Compress)" }
+          $new = $null
+          for ($i = 0; $i -lt 60 -and -not $new; $i++) {
+            Start-Sleep 2
+            try { $x = Invoke-RestMethod http://127.0.0.1:8798/api/version; if ("$($x.build)" -ne "$($v.build)") { $new = $x } } catch {}
+          }
+          if (-not $new) { throw "После обновления программа не перезапустилась новой версией (была сборка $($v.build))" }
+          if ((Get-FileHash "$dir\WCL-Analyzer.exe").Hash -eq $before) { throw ".exe не заменён" }
+          if (Test-Path "$dir\WCL Analyzer.new.exe") { throw "Остался временный файл обновления" }
+          Write-Host "Обновление целиком работает: сборка $($v.build) -> $($new.build)"
+          Get-Process | Where-Object { $_.Path -like "$dir*" } | Stop-Process -Force
       - uses: actions/upload-artifact@v4
         with:
           name: WCL-Analyzer-Windows

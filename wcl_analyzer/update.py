@@ -332,10 +332,18 @@ RESTART_BAT = "\r\n".join([
     ":failed",
     'del /f /q "%WCL_NEW_EXE%" >nul 2>&1',
     ":run",
-    'start "" "%WCL_OLD_EXE%"',
+    'start "" "%WCL_OLD_EXE%" %WCL_ARGS%',
     '(goto) 2>nul & del "%~f0"',
     "",
 ])
+
+
+def _restart_args() -> str:
+    """Те же параметры запуска (например, --port), что у работающей программы: страница ждёт её
+    по тому же адресу. Только простые аргументы — без кавычек и спецсимволов командной строки."""
+    import re as _re
+    args = [a for a in sys.argv[1:] if _re.fullmatch(r"[\w.:=/-]+", a)]
+    return " ".join(args)
 
 
 def _restart_env(exe: Path, new_exe: Path | None) -> dict:
@@ -343,7 +351,7 @@ def _restart_env(exe: Path, new_exe: Path | None) -> dict:
            if k not in ("WCL_CODE_BUILD", "WCL_CODE_PATH", "WCL_NEW_EXE", "_MEIPASS2") and not k.startswith("_PYI")}
     # WCL_NO_BROWSER: новая программа не открывает ещё одну вкладку — открытая страница переподключится сама.
     # PYINSTALLER_RESET_ENVIRONMENT: новый .exe — отдельная программа, а не дочерний процесс этой
-    env.update(WCL_NO_BROWSER="1", WCL_OLD_EXE=str(exe), PYINSTALLER_RESET_ENVIRONMENT="1")
+    env.update(WCL_NO_BROWSER="1", WCL_OLD_EXE=str(exe), PYINSTALLER_RESET_ENVIRONMENT="1", WCL_ARGS=_restart_args())
     if new_exe:
         env["WCL_NEW_EXE"] = str(new_exe)
     return env

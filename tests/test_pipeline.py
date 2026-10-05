@@ -1133,6 +1133,36 @@ def test_saves_all_bosses():
     print("OK сейвы на всех боссов: героическая и эпохальная, килл или лучший пулл, заметка MRT на каждого")
 
 
+def test_spikes_dense_damage():
+    """Бой с ровным плотным уроном: медиана высокая, но пики (и план сейвов) всё равно находятся;
+    сейвы «по логу» у лекаря известного спека не угадываются (тринкеты, бафы, «Стазис (выпуск)»)."""
+    from wcl_analyzer import game_data
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    f0, f1 = float(raw["fight"]["startTime"]), float(raw["fight"]["endTime"])
+    det = raw["details"]
+    ids = [int(p["id"]) for r in ("healers", "dps") for p in det.get(r) or []]
+    boss = next(int(e["sourceID"]) for e in raw["taken"] if e.get("type") == "damage" and int(e.get("sourceID", -1)) not in ids)
+    base = max(float(e.get("amount", 0) or 0) for e in raw["taken"] if e.get("type") == "damage")
+    t = f0
+    while t < f1:  # фон: каждую секунду по всем — столько же, сколько самый сильный удар
+        raw["taken"] += [{"type": "damage", "timestamp": t, "sourceID": boss, "targetID": pid, "abilityGameID": 999001,
+                          "amount": base * 0.4} for pid in ids]
+        t += 1000
+    R = analyze_raid(raw)
+    assert R["extras"]["spikes"], "пиков нет при плотном уроне"
+    assert game_data.spec_covered("Priest", "Holy") and not game_data.spec_covered("Nonexistent", "")
+    healer = next(p for p in det["healers"])
+    raw2 = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    raw2["report"]["masterData"]["abilities"].append({"gameID": 999002, "name": "Some Raid Trinket", "icon": "x.jpg"})
+    raw2["casts"] = list(raw2["casts"]) + [{"type": "cast", "timestamp": f0 + 30_000, "sourceID": int(healer["id"]),
+                                            "abilityGameID": 999002}]
+    R2 = analyze_raid(raw2)
+    assert not any(c["id"] == 999002 for c in R2["extras"]["raid_cds"]), "тринкет лекаря попал в сейвы"
+    print("OK пики при плотном уроне; сейвы лекаря известного спека — только из таблицы")
+
+
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
@@ -1151,6 +1181,7 @@ if __name__ == "__main__":
     test_burst_rules()
     test_tank_analysis()
     test_game_versions()
+    test_spikes_dense_damage()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()
@@ -1207,6 +1238,36 @@ def test_raid():
     write_raid_workbook(R, out)
     assert out.exists()
     print(f"OK рейд: {len(R['players'])} игроков, {len(R['issues'])} замечаний, {len(R['pulls'])} пуллов")
+
+
+def test_spikes_dense_damage():
+    """Бой с ровным плотным уроном: медиана высокая, но пики (и план сейвов) всё равно находятся;
+    сейвы «по логу» у лекаря известного спека не угадываются (тринкеты, бафы, «Стазис (выпуск)»)."""
+    from wcl_analyzer import game_data
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    f0, f1 = float(raw["fight"]["startTime"]), float(raw["fight"]["endTime"])
+    det = raw["details"]
+    ids = [int(p["id"]) for r in ("healers", "dps") for p in det.get(r) or []]
+    boss = next(int(e["sourceID"]) for e in raw["taken"] if e.get("type") == "damage" and int(e.get("sourceID", -1)) not in ids)
+    base = max(float(e.get("amount", 0) or 0) for e in raw["taken"] if e.get("type") == "damage")
+    t = f0
+    while t < f1:  # фон: каждую секунду по всем — столько же, сколько самый сильный удар
+        raw["taken"] += [{"type": "damage", "timestamp": t, "sourceID": boss, "targetID": pid, "abilityGameID": 999001,
+                          "amount": base * 0.4} for pid in ids]
+        t += 1000
+    R = analyze_raid(raw)
+    assert R["extras"]["spikes"], "пиков нет при плотном уроне"
+    assert game_data.spec_covered("Priest", "Holy") and not game_data.spec_covered("Nonexistent", "")
+    healer = next(p for p in det["healers"])
+    raw2 = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    raw2["report"]["masterData"]["abilities"].append({"gameID": 999002, "name": "Some Raid Trinket", "icon": "x.jpg"})
+    raw2["casts"] = list(raw2["casts"]) + [{"type": "cast", "timestamp": f0 + 30_000, "sourceID": int(healer["id"]),
+                                            "abilityGameID": 999002}]
+    R2 = analyze_raid(raw2)
+    assert not any(c["id"] == 999002 for c in R2["extras"]["raid_cds"]), "тринкет лекаря попал в сейвы"
+    print("OK пики при плотном уроне; сейвы лекаря известного спека — только из таблицы")
 
 
 if __name__ == "__main__":
@@ -1292,6 +1353,36 @@ def test_analysis_quality():
     print("OK анализ: смерть нормирована, шум топа отсечён, дебаффы босса и выжимка на месте")
 
 
+def test_spikes_dense_damage():
+    """Бой с ровным плотным уроном: медиана высокая, но пики (и план сейвов) всё равно находятся;
+    сейвы «по логу» у лекаря известного спека не угадываются (тринкеты, бафы, «Стазис (выпуск)»)."""
+    from wcl_analyzer import game_data
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    f0, f1 = float(raw["fight"]["startTime"]), float(raw["fight"]["endTime"])
+    det = raw["details"]
+    ids = [int(p["id"]) for r in ("healers", "dps") for p in det.get(r) or []]
+    boss = next(int(e["sourceID"]) for e in raw["taken"] if e.get("type") == "damage" and int(e.get("sourceID", -1)) not in ids)
+    base = max(float(e.get("amount", 0) or 0) for e in raw["taken"] if e.get("type") == "damage")
+    t = f0
+    while t < f1:  # фон: каждую секунду по всем — столько же, сколько самый сильный удар
+        raw["taken"] += [{"type": "damage", "timestamp": t, "sourceID": boss, "targetID": pid, "abilityGameID": 999001,
+                          "amount": base * 0.4} for pid in ids]
+        t += 1000
+    R = analyze_raid(raw)
+    assert R["extras"]["spikes"], "пиков нет при плотном уроне"
+    assert game_data.spec_covered("Priest", "Holy") and not game_data.spec_covered("Nonexistent", "")
+    healer = next(p for p in det["healers"])
+    raw2 = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    raw2["report"]["masterData"]["abilities"].append({"gameID": 999002, "name": "Some Raid Trinket", "icon": "x.jpg"})
+    raw2["casts"] = list(raw2["casts"]) + [{"type": "cast", "timestamp": f0 + 30_000, "sourceID": int(healer["id"]),
+                                            "abilityGameID": 999002}]
+    R2 = analyze_raid(raw2)
+    assert not any(c["id"] == 999002 for c in R2["extras"]["raid_cds"]), "тринкет лекаря попал в сейвы"
+    print("OK пики при плотном уроне; сейвы лекаря известного спека — только из таблицы")
+
+
 if __name__ == "__main__":
     test_analysis_quality()
 
@@ -1319,6 +1410,36 @@ def test_raid_rotation():
         wb = load_workbook(f.name)
         assert wb.sheetnames[:2] == ["Ротация рейда", "Что исправить"] and "Ильвен" in wb.sheetnames, wb.sheetnames
     print("OK ротация рейда: 5 DPS, общие проблемы, переход к игроку, Excel")
+
+
+def test_spikes_dense_damage():
+    """Бой с ровным плотным уроном: медиана высокая, но пики (и план сейвов) всё равно находятся;
+    сейвы «по логу» у лекаря известного спека не угадываются (тринкеты, бафы, «Стазис (выпуск)»)."""
+    from wcl_analyzer import game_data
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    f0, f1 = float(raw["fight"]["startTime"]), float(raw["fight"]["endTime"])
+    det = raw["details"]
+    ids = [int(p["id"]) for r in ("healers", "dps") for p in det.get(r) or []]
+    boss = next(int(e["sourceID"]) for e in raw["taken"] if e.get("type") == "damage" and int(e.get("sourceID", -1)) not in ids)
+    base = max(float(e.get("amount", 0) or 0) for e in raw["taken"] if e.get("type") == "damage")
+    t = f0
+    while t < f1:  # фон: каждую секунду по всем — столько же, сколько самый сильный удар
+        raw["taken"] += [{"type": "damage", "timestamp": t, "sourceID": boss, "targetID": pid, "abilityGameID": 999001,
+                          "amount": base * 0.4} for pid in ids]
+        t += 1000
+    R = analyze_raid(raw)
+    assert R["extras"]["spikes"], "пиков нет при плотном уроне"
+    assert game_data.spec_covered("Priest", "Holy") and not game_data.spec_covered("Nonexistent", "")
+    healer = next(p for p in det["healers"])
+    raw2 = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    raw2["report"]["masterData"]["abilities"].append({"gameID": 999002, "name": "Some Raid Trinket", "icon": "x.jpg"})
+    raw2["casts"] = list(raw2["casts"]) + [{"type": "cast", "timestamp": f0 + 30_000, "sourceID": int(healer["id"]),
+                                            "abilityGameID": 999002}]
+    R2 = analyze_raid(raw2)
+    assert not any(c["id"] == 999002 for c in R2["extras"]["raid_cds"]), "тринкет лекаря попал в сейвы"
+    print("OK пики при плотном уроне; сейвы лекаря известного спека — только из таблицы")
 
 
 if __name__ == "__main__":
@@ -1786,6 +1907,36 @@ def test_talents_fallback():
     assert pl.talent_tree == [(5003, 1003, 1), (5004, 1004, 2)], pl.talent_tree
     assert talents_from_details({"dps": [{"id": 8}]}, 7) == []
     print("OK таланты: запасной источник — сведения об игроках боя")
+
+
+def test_spikes_dense_damage():
+    """Бой с ровным плотным уроном: медиана высокая, но пики (и план сейвов) всё равно находятся;
+    сейвы «по логу» у лекаря известного спека не угадываются (тринкеты, бафы, «Стазис (выпуск)»)."""
+    from wcl_analyzer import game_data
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    f0, f1 = float(raw["fight"]["startTime"]), float(raw["fight"]["endTime"])
+    det = raw["details"]
+    ids = [int(p["id"]) for r in ("healers", "dps") for p in det.get(r) or []]
+    boss = next(int(e["sourceID"]) for e in raw["taken"] if e.get("type") == "damage" and int(e.get("sourceID", -1)) not in ids)
+    base = max(float(e.get("amount", 0) or 0) for e in raw["taken"] if e.get("type") == "damage")
+    t = f0
+    while t < f1:  # фон: каждую секунду по всем — столько же, сколько самый сильный удар
+        raw["taken"] += [{"type": "damage", "timestamp": t, "sourceID": boss, "targetID": pid, "abilityGameID": 999001,
+                          "amount": base * 0.4} for pid in ids]
+        t += 1000
+    R = analyze_raid(raw)
+    assert R["extras"]["spikes"], "пиков нет при плотном уроне"
+    assert game_data.spec_covered("Priest", "Holy") and not game_data.spec_covered("Nonexistent", "")
+    healer = next(p for p in det["healers"])
+    raw2 = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    raw2["report"]["masterData"]["abilities"].append({"gameID": 999002, "name": "Some Raid Trinket", "icon": "x.jpg"})
+    raw2["casts"] = list(raw2["casts"]) + [{"type": "cast", "timestamp": f0 + 30_000, "sourceID": int(healer["id"]),
+                                            "abilityGameID": 999002}]
+    R2 = analyze_raid(raw2)
+    assert not any(c["id"] == 999002 for c in R2["extras"]["raid_cds"]), "тринкет лекаря попал в сейвы"
+    print("OK пики при плотном уроне; сейвы лекаря известного спека — только из таблицы")
 
 
 if __name__ == "__main__":

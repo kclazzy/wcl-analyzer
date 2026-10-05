@@ -138,7 +138,7 @@ def roster_cooldowns(players: list[dict], duration: float, top_use: dict | None 
     out = []
     for i, p in enumerate(players):
         got = {}
-        for sid, name, cd, core in candidates(p["cls"], p["spec"]):
+        for sid, name, cd, core, _en in candidates(p["cls"], p["spec"]):
             if core:
                 got[sid] = (name, cd, "обычно есть у спека")
             elif n_kills and top_use.get(sid, 0) >= max(1, n_kills / 2):

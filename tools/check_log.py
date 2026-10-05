@@ -40,7 +40,7 @@ for c in pick_fights(rep, difficulties=None):
             "tank": {"hints": T.get("hints"), "busters": T.get("busters"), "error": T.get("error"),
                      "events": [(e["time"], e["ability"], e["tank"], e["damage"], e.get("mitigated"), [x["name"] for x in e["own"]], [x["name"] for x in e["ext"]], e["ready"], e.get("held"), e["bare"], e["died"]) for e in T.get("events") or []],
                      "cds": [(c_["tank"], c_["name"], c_["time"], c_["used"], c_["max_uses"]) for c_ in T.get("cds") or []],
-                     "mrt": T.get("mrt")},
+                     "mrt": T.get("mrt"), "cand": sorted(list(__import__("wcl_analyzer.raid_tank", fromlist=["x"]).last_candidates), key=lambda c: ("base" not in c, -(c.get("total") or 0)))[:15]},
             "deaths": [(d["time"], d["player"], d["ability"], d.get("wipe_tail")) for d in R.get("deaths") or []],
             "top": {"n": (X.get("vs_top") or {}).get("n")},
         })

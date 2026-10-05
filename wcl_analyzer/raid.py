@@ -283,6 +283,13 @@ def _trinket_check(raw: dict):
             ts = [g for g in gear_slots(ci.get("gear") or []) if g.get("slot") in (12, 13)]
             trink[int(p.get("id", -1))] = ({g["icon"] for g in ts if g.get("icon")},
                                           {g["name"].lower() for g in ts if g.get("name")})
+    # Экипировка есть и в событиях CombatantInfo (составу боя без includeCombatantInfo её не отдают)
+    for ev in raw.get("combatant") or []:
+        ts = [g for g in gear_slots(ev.get("gear") or []) if g.get("slot") in (12, 13)]
+        if ts:
+            icons, names = trink.setdefault(int(ev.get("sourceID", -1)), (set(), set()))
+            icons.update(g["icon"] for g in ts if g.get("icon"))
+            names.update(g["name"].lower() for g in ts if g.get("name"))
 
     def check(pid, ab) -> bool:
         icons, names = trink.get(int(pid), (set(), set()))
@@ -401,6 +408,8 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
     kill = bool(f.get("kill"))
     rel = lambda ev: (float(ev["timestamp"]) - f0) / 1000  # noqa: E731
     names = {int(a["gameID"]): a["name"] for a in report["masterData"]["abilities"]}
+    # «Unknown Ability» в отчёте — с номером, чтобы способность можно было найти на Wowhead
+    names = {k: (f"Unknown Ability #{k}" if v == "Unknown Ability" and k > 1 else v) for k, v in names.items()}
     nm = lambda ab: names.get(int(ab), f"Spell {ab}") if ab is not None else "—"  # noqa: E731
     actors = {int(a["id"]): a for a in report["masterData"]["actors"]}
 
@@ -947,8 +956,11 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
     win = [sum(per_s.get(i + k, 0.0) for k in range(5)) for i in range(win_end)]
     spikes = []
     if win and max(win) > 0:
-        thr = max(float(_st.percentile(win, 95)), 2.5 * float(_st.median([w for w in win if w > 0] or [0])),
-                  0.35 * max(win))
+        # 2,5 медианы — только пока это ниже 60% максимума: на боях с ровным плотным уроном медиана высокая,
+        # и такой порог оказывался выше самого сильного пика — пиков (и плана сейвов) не было вовсе
+        top = max(win)
+        thr = max(float(_st.percentile(win, 95)), 0.35 * top,
+                  min(2.5 * float(_st.median([w for w in win if w > 0] or [0])), 0.6 * top))
         sec_ab: dict = defaultdict(Counter)   # секунда → урон по способностям (не по танкам): один проход, а не на каждый пик
         for pid, hits in last_hits.items():
             if pid not in tanks:
@@ -972,6 +984,7 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
     used_by_others = {ab for pid, cs in casts_by.items() if players.get(pid, {}).get("role") != "healer"
                       for _, ab in cs}
     is_trinket = _trinket_check(raw)
+    site = raw.get("site", "www")
     for pid, p in players.items():
         per_ab = defaultdict(list)
         for t, ab in casts_by[pid]:
@@ -985,7 +998,9 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
                 continue
             known = ab in RAID_CD_IDS or _gd.name_known(name, p.get("cls", ""), p.get("spec", ""))
             if not known:
-                if p["role"] != "healer" or POTION_RE.search(name) or HEALTHSTONE_RE.search(name) \
+                # угадываем сейв по логу только у спеков, которых нет в таблице (другие версии игры, новый спек):
+                # иначе сюда попадали тринкеты, бафы, боевое воскрешение, «Стазис (выпуск)», откидывания
+                if p["role"] != "healer" or (site == "www" and _gd.spec_covered(p.get("cls", ""), p.get("spec", ""))) or POTION_RE.search(name) or HEALTHSTONE_RE.search(name) \
                         or LUST_RE.search(name) or ab in LUST_IDS or RACIAL_RE.match(name.strip()) \
                         or ab in used_by_others:
                     continue

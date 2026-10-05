@@ -231,6 +231,14 @@ def name_known(name: str, cls: str = "", spec: str = "") -> bool:
 _BUNDLED_SECTIONS: dict = {}
 
 
+def spec_covered(cls: str, spec: str = "") -> bool:
+    """Для класса (и спека) в таблице есть рейдовые кулдауны — значит, список сейвов этого спека известен
+    и угадывать сейвы по логу не нужно."""
+    c, s = _key(cls), _key(spec)
+    return bool(c) and any(_key(x.get("class")) == c and (not x.get("spec") or not s or _key(x["spec"]) == s)
+                           for x in raid_cds())
+
+
 def _section(name: str) -> list:
     """Раздел таблицы; в старой копии с устройства его может не быть — берём из сборки (читается один раз)."""
     d = data().get(name)

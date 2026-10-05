@@ -20,7 +20,7 @@ def _norm(s) -> str:
 def candidates(cls: str, spec: str) -> list[tuple]:
     """Рейдовые кулдауны спека из таблицы игровых данных: [(id, название, откат, основной)]."""
     c, s = _norm(cls), _norm(spec)
-    return [(int(x["id"]), x["name"], float(x["cd"]), bool(x.get("core")))
+    return [(int(x["id"]), x["name"], float(x["cd"]), bool(x.get("core")), x.get("en") or x["name"])
             for x in game_data.raid_cds()
             if _norm(x.get("class")) == c and (not x.get("spec") or _norm(x["spec"]) == s)]
 
@@ -75,6 +75,8 @@ def roster_cds(raw: dict, R: dict, talent_data=None) -> list[dict]:
     players = _players(raw.get("details") or {})
     names = {int(a["gameID"]): a.get("name") for a in ((raw.get("report") or {}).get("masterData") or {}).get("abilities") or []
              if a.get("gameID") is not None}
+    # Лог на английском — и не нажатые кулдауны называем по-английски, чтобы в плане не было смеси языков
+    latin = sum(1 for n in names.values() if n and n.isascii()) > len(names) / 2
     pressed = defaultdict(list)
     for c in (R.get("extras") or {}).get("raid_cds") or []:
         if c.get("pid") is not None and c.get("id") is not None:
@@ -87,7 +89,7 @@ def roster_cds(raw: dict, R: dict, talent_data=None) -> list[dict]:
     out = []
     for p in players:
         tk = taken.get(p["id"]) if taken is not None else None
-        for sid, name_ru, cd, core in candidates(p["cls"], p["spec"]):
+        for sid, name_ru, cd, core, name_en in candidates(p["cls"], p["spec"]):
             ts = sorted(pressed.get((p["id"], sid), []))
             if ts:
                 source = f"нажимал в бою: {len(ts)}"
@@ -105,9 +107,9 @@ def roster_cds(raw: dict, R: dict, talent_data=None) -> list[dict]:
             else:
                 continue
             gaps = [b - a for a, b in zip(ts, ts[1:])]
-            real_cd = min([cd] + [g for g in gaps if g > 20]) if gaps else cd
+            real_cd = round(min([cd] + [g for g in gaps if g > 20]) if gaps else cd, 1)
             out.append({"pid": p["id"], "player": p["name"], "role": p["role"], "cls": p["cls"], "spec": p["spec"],
-                        "id": sid, "name": names.get(sid) or name_ru, "cd": real_cd, "used": len(ts),
+                        "id": sid, "name": names.get(sid) or (name_en if latin else name_ru), "cd": real_cd, "used": len(ts),
                         "max_uses": int(dur // real_cd) + 1 if dur else None, "source": source})
     out.sort(key=lambda c: (c["role"] != "Лекарь", c["player"], -c["cd"]))
     return out

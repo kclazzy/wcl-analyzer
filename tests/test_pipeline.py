@@ -1201,6 +1201,24 @@ def test_guide_buster_weak_hits():
     print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
 
 
+def test_potions_zero_details():
+    """Warcraft Logs отдаёт ноль зелий у всех (новые зелья не считает) — зелья берутся из кастов."""
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    for r in ("tanks", "healers", "dps"):
+        for p in raw["details"].get(r) or []:
+            p["potionUse"] = 0
+    pid = int(raw["details"]["dps"][0]["id"])
+    raw["report"]["masterData"]["abilities"].append({"gameID": 999101, "name": "Potion of Recklessness"})
+    raw["casts"] = list(raw["casts"]) + [{"type": "cast", "timestamp": float(raw["fight"]["startTime"]) + 5000,
+                                          "sourceID": pid, "abilityGameID": 999101}]
+    c = analyze_raid(raw)["extras"]["consumables"]
+    name = raw["details"]["dps"][0]["name"]
+    assert name not in c["no_potion"] and c["potion_source"] == "касты", c
+    print("OK зелья: ноль в playerDetails — считаем по кастам")
+
+
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
@@ -1221,6 +1239,7 @@ if __name__ == "__main__":
     test_game_versions()
     test_spikes_dense_damage()
     test_guide_buster_weak_hits()
+    test_potions_zero_details()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()
@@ -1345,6 +1364,24 @@ def test_guide_buster_weak_hits():
     assert "Weak Slam" in names, names
     assert "Rotting Bite" not in names, names
     print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
+
+
+def test_potions_zero_details():
+    """Warcraft Logs отдаёт ноль зелий у всех (новые зелья не считает) — зелья берутся из кастов."""
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    for r in ("tanks", "healers", "dps"):
+        for p in raw["details"].get(r) or []:
+            p["potionUse"] = 0
+    pid = int(raw["details"]["dps"][0]["id"])
+    raw["report"]["masterData"]["abilities"].append({"gameID": 999101, "name": "Potion of Recklessness"})
+    raw["casts"] = list(raw["casts"]) + [{"type": "cast", "timestamp": float(raw["fight"]["startTime"]) + 5000,
+                                          "sourceID": pid, "abilityGameID": 999101}]
+    c = analyze_raid(raw)["extras"]["consumables"]
+    name = raw["details"]["dps"][0]["name"]
+    assert name not in c["no_potion"] and c["potion_source"] == "касты", c
+    print("OK зелья: ноль в playerDetails — считаем по кастам")
 
 
 if __name__ == "__main__":
@@ -1498,6 +1535,24 @@ def test_guide_buster_weak_hits():
     print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
 
 
+def test_potions_zero_details():
+    """Warcraft Logs отдаёт ноль зелий у всех (новые зелья не считает) — зелья берутся из кастов."""
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    for r in ("tanks", "healers", "dps"):
+        for p in raw["details"].get(r) or []:
+            p["potionUse"] = 0
+    pid = int(raw["details"]["dps"][0]["id"])
+    raw["report"]["masterData"]["abilities"].append({"gameID": 999101, "name": "Potion of Recklessness"})
+    raw["casts"] = list(raw["casts"]) + [{"type": "cast", "timestamp": float(raw["fight"]["startTime"]) + 5000,
+                                          "sourceID": pid, "abilityGameID": 999101}]
+    c = analyze_raid(raw)["extras"]["consumables"]
+    name = raw["details"]["dps"][0]["name"]
+    assert name not in c["no_potion"] and c["potion_source"] == "касты", c
+    print("OK зелья: ноль в playerDetails — считаем по кастам")
+
+
 if __name__ == "__main__":
     test_analysis_quality()
 
@@ -1593,6 +1648,24 @@ def test_guide_buster_weak_hits():
     assert "Weak Slam" in names, names
     assert "Rotting Bite" not in names, names
     print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
+
+
+def test_potions_zero_details():
+    """Warcraft Logs отдаёт ноль зелий у всех (новые зелья не считает) — зелья берутся из кастов."""
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    for r in ("tanks", "healers", "dps"):
+        for p in raw["details"].get(r) or []:
+            p["potionUse"] = 0
+    pid = int(raw["details"]["dps"][0]["id"])
+    raw["report"]["masterData"]["abilities"].append({"gameID": 999101, "name": "Potion of Recklessness"})
+    raw["casts"] = list(raw["casts"]) + [{"type": "cast", "timestamp": float(raw["fight"]["startTime"]) + 5000,
+                                          "sourceID": pid, "abilityGameID": 999101}]
+    c = analyze_raid(raw)["extras"]["consumables"]
+    name = raw["details"]["dps"][0]["name"]
+    assert name not in c["no_potion"] and c["potion_source"] == "касты", c
+    print("OK зелья: ноль в playerDetails — считаем по кастам")
 
 
 if __name__ == "__main__":
@@ -2128,6 +2201,24 @@ def test_guide_buster_weak_hits():
     assert "Weak Slam" in names, names
     assert "Rotting Bite" not in names, names
     print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
+
+
+def test_potions_zero_details():
+    """Warcraft Logs отдаёт ноль зелий у всех (новые зелья не считает) — зелья берутся из кастов."""
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    for r in ("tanks", "healers", "dps"):
+        for p in raw["details"].get(r) or []:
+            p["potionUse"] = 0
+    pid = int(raw["details"]["dps"][0]["id"])
+    raw["report"]["masterData"]["abilities"].append({"gameID": 999101, "name": "Potion of Recklessness"})
+    raw["casts"] = list(raw["casts"]) + [{"type": "cast", "timestamp": float(raw["fight"]["startTime"]) + 5000,
+                                          "sourceID": pid, "abilityGameID": 999101}]
+    c = analyze_raid(raw)["extras"]["consumables"]
+    name = raw["details"]["dps"][0]["name"]
+    assert name not in c["no_potion"] and c["potion_source"] == "касты", c
+    print("OK зелья: ноль в playerDetails — считаем по кастам")
 
 
 if __name__ == "__main__":

@@ -1163,6 +1163,44 @@ def test_spikes_dense_damage():
     print("OK пики при плотном уроне; сейвы лекаря известного спека — только из таблицы")
 
 
+def test_guide_buster_weak_hits():
+    """Механика танков из гайда бьёт в 1–2 удара ближнего боя (как на эпохальном) — это танкбастер;
+    та же механика тиками каждые 2 с — нет."""
+    from wcl_analyzer import raid_tank as rt
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient, MELEE
+    from wcl_analyzer.stats import median
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    tanks = [int(p["id"]) for p in raw["details"]["tanks"]]
+    mel = [e for e in raw["taken"] if e.get("type") == "damage" and int(e.get("abilityGameID", 0)) == MELEE
+           and int(e.get("targetID", -1)) in tanks]
+    assert mel, "в демо нет ближнего боя по танкам"
+    base, boss = median([float(e["amount"]) for e in mel]), int(mel[0]["sourceID"])
+    f0, f1 = float(raw["fight"]["startTime"]), float(raw["fight"]["endTime"])
+    raw["report"]["masterData"]["abilities"] += [{"gameID": 900061, "name": "Weak Slam", "type": 1},
+                                                 {"gameID": 900062, "name": "Rotting Bite", "type": 1}]
+    t, k = f0 + 20_000, 0
+    while t < f1 - 5_000:
+        raw["taken"].append({"type": "damage", "timestamp": t, "sourceID": boss, "targetID": tanks[k % 2],
+                             "abilityGameID": 900061, "amount": base * 1.2})
+        t, k = t + 30_000, k + 1
+    t = f0 + 5_000
+    while t < f1 - 5_000:
+        raw["taken"].append({"type": "damage", "timestamp": t, "sourceID": boss, "targetID": tanks[0],
+                             "abilityGameID": 900062, "amount": base * 1.2})
+        t += 2_000
+    raw["taken"].sort(key=lambda e: e["timestamp"])
+    orig = rt._guide_busters
+    rt._guide_busters = lambda boss: [{"id": None, "name": rt._key("Weak Slam")}, {"id": None, "name": rt._key("Rotting Bite")}]
+    try:
+        names = {b["name"] for b in analyze_raid(raw)["extras"]["tank"]["busters"]}
+    finally:
+        rt._guide_busters = orig
+    assert "Weak Slam" in names, names
+    assert "Rotting Bite" not in names, names
+    print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
+
+
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
@@ -1182,6 +1220,7 @@ if __name__ == "__main__":
     test_tank_analysis()
     test_game_versions()
     test_spikes_dense_damage()
+    test_guide_buster_weak_hits()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()
@@ -1268,6 +1307,44 @@ def test_spikes_dense_damage():
     R2 = analyze_raid(raw2)
     assert not any(c["id"] == 999002 for c in R2["extras"]["raid_cds"]), "тринкет лекаря попал в сейвы"
     print("OK пики при плотном уроне; сейвы лекаря известного спека — только из таблицы")
+
+
+def test_guide_buster_weak_hits():
+    """Механика танков из гайда бьёт в 1–2 удара ближнего боя (как на эпохальном) — это танкбастер;
+    та же механика тиками каждые 2 с — нет."""
+    from wcl_analyzer import raid_tank as rt
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient, MELEE
+    from wcl_analyzer.stats import median
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    tanks = [int(p["id"]) for p in raw["details"]["tanks"]]
+    mel = [e for e in raw["taken"] if e.get("type") == "damage" and int(e.get("abilityGameID", 0)) == MELEE
+           and int(e.get("targetID", -1)) in tanks]
+    assert mel, "в демо нет ближнего боя по танкам"
+    base, boss = median([float(e["amount"]) for e in mel]), int(mel[0]["sourceID"])
+    f0, f1 = float(raw["fight"]["startTime"]), float(raw["fight"]["endTime"])
+    raw["report"]["masterData"]["abilities"] += [{"gameID": 900061, "name": "Weak Slam", "type": 1},
+                                                 {"gameID": 900062, "name": "Rotting Bite", "type": 1}]
+    t, k = f0 + 20_000, 0
+    while t < f1 - 5_000:
+        raw["taken"].append({"type": "damage", "timestamp": t, "sourceID": boss, "targetID": tanks[k % 2],
+                             "abilityGameID": 900061, "amount": base * 1.2})
+        t, k = t + 30_000, k + 1
+    t = f0 + 5_000
+    while t < f1 - 5_000:
+        raw["taken"].append({"type": "damage", "timestamp": t, "sourceID": boss, "targetID": tanks[0],
+                             "abilityGameID": 900062, "amount": base * 1.2})
+        t += 2_000
+    raw["taken"].sort(key=lambda e: e["timestamp"])
+    orig = rt._guide_busters
+    rt._guide_busters = lambda boss: [{"id": None, "name": rt._key("Weak Slam")}, {"id": None, "name": rt._key("Rotting Bite")}]
+    try:
+        names = {b["name"] for b in analyze_raid(raw)["extras"]["tank"]["busters"]}
+    finally:
+        rt._guide_busters = orig
+    assert "Weak Slam" in names, names
+    assert "Rotting Bite" not in names, names
+    print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
 
 
 if __name__ == "__main__":
@@ -1383,6 +1460,44 @@ def test_spikes_dense_damage():
     print("OK пики при плотном уроне; сейвы лекаря известного спека — только из таблицы")
 
 
+def test_guide_buster_weak_hits():
+    """Механика танков из гайда бьёт в 1–2 удара ближнего боя (как на эпохальном) — это танкбастер;
+    та же механика тиками каждые 2 с — нет."""
+    from wcl_analyzer import raid_tank as rt
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient, MELEE
+    from wcl_analyzer.stats import median
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    tanks = [int(p["id"]) for p in raw["details"]["tanks"]]
+    mel = [e for e in raw["taken"] if e.get("type") == "damage" and int(e.get("abilityGameID", 0)) == MELEE
+           and int(e.get("targetID", -1)) in tanks]
+    assert mel, "в демо нет ближнего боя по танкам"
+    base, boss = median([float(e["amount"]) for e in mel]), int(mel[0]["sourceID"])
+    f0, f1 = float(raw["fight"]["startTime"]), float(raw["fight"]["endTime"])
+    raw["report"]["masterData"]["abilities"] += [{"gameID": 900061, "name": "Weak Slam", "type": 1},
+                                                 {"gameID": 900062, "name": "Rotting Bite", "type": 1}]
+    t, k = f0 + 20_000, 0
+    while t < f1 - 5_000:
+        raw["taken"].append({"type": "damage", "timestamp": t, "sourceID": boss, "targetID": tanks[k % 2],
+                             "abilityGameID": 900061, "amount": base * 1.2})
+        t, k = t + 30_000, k + 1
+    t = f0 + 5_000
+    while t < f1 - 5_000:
+        raw["taken"].append({"type": "damage", "timestamp": t, "sourceID": boss, "targetID": tanks[0],
+                             "abilityGameID": 900062, "amount": base * 1.2})
+        t += 2_000
+    raw["taken"].sort(key=lambda e: e["timestamp"])
+    orig = rt._guide_busters
+    rt._guide_busters = lambda boss: [{"id": None, "name": rt._key("Weak Slam")}, {"id": None, "name": rt._key("Rotting Bite")}]
+    try:
+        names = {b["name"] for b in analyze_raid(raw)["extras"]["tank"]["busters"]}
+    finally:
+        rt._guide_busters = orig
+    assert "Weak Slam" in names, names
+    assert "Rotting Bite" not in names, names
+    print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
+
+
 if __name__ == "__main__":
     test_analysis_quality()
 
@@ -1440,6 +1555,44 @@ def test_spikes_dense_damage():
     R2 = analyze_raid(raw2)
     assert not any(c["id"] == 999002 for c in R2["extras"]["raid_cds"]), "тринкет лекаря попал в сейвы"
     print("OK пики при плотном уроне; сейвы лекаря известного спека — только из таблицы")
+
+
+def test_guide_buster_weak_hits():
+    """Механика танков из гайда бьёт в 1–2 удара ближнего боя (как на эпохальном) — это танкбастер;
+    та же механика тиками каждые 2 с — нет."""
+    from wcl_analyzer import raid_tank as rt
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient, MELEE
+    from wcl_analyzer.stats import median
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    tanks = [int(p["id"]) for p in raw["details"]["tanks"]]
+    mel = [e for e in raw["taken"] if e.get("type") == "damage" and int(e.get("abilityGameID", 0)) == MELEE
+           and int(e.get("targetID", -1)) in tanks]
+    assert mel, "в демо нет ближнего боя по танкам"
+    base, boss = median([float(e["amount"]) for e in mel]), int(mel[0]["sourceID"])
+    f0, f1 = float(raw["fight"]["startTime"]), float(raw["fight"]["endTime"])
+    raw["report"]["masterData"]["abilities"] += [{"gameID": 900061, "name": "Weak Slam", "type": 1},
+                                                 {"gameID": 900062, "name": "Rotting Bite", "type": 1}]
+    t, k = f0 + 20_000, 0
+    while t < f1 - 5_000:
+        raw["taken"].append({"type": "damage", "timestamp": t, "sourceID": boss, "targetID": tanks[k % 2],
+                             "abilityGameID": 900061, "amount": base * 1.2})
+        t, k = t + 30_000, k + 1
+    t = f0 + 5_000
+    while t < f1 - 5_000:
+        raw["taken"].append({"type": "damage", "timestamp": t, "sourceID": boss, "targetID": tanks[0],
+                             "abilityGameID": 900062, "amount": base * 1.2})
+        t += 2_000
+    raw["taken"].sort(key=lambda e: e["timestamp"])
+    orig = rt._guide_busters
+    rt._guide_busters = lambda boss: [{"id": None, "name": rt._key("Weak Slam")}, {"id": None, "name": rt._key("Rotting Bite")}]
+    try:
+        names = {b["name"] for b in analyze_raid(raw)["extras"]["tank"]["busters"]}
+    finally:
+        rt._guide_busters = orig
+    assert "Weak Slam" in names, names
+    assert "Rotting Bite" not in names, names
+    print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
 
 
 if __name__ == "__main__":
@@ -1937,6 +2090,44 @@ def test_spikes_dense_damage():
     R2 = analyze_raid(raw2)
     assert not any(c["id"] == 999002 for c in R2["extras"]["raid_cds"]), "тринкет лекаря попал в сейвы"
     print("OK пики при плотном уроне; сейвы лекаря известного спека — только из таблицы")
+
+
+def test_guide_buster_weak_hits():
+    """Механика танков из гайда бьёт в 1–2 удара ближнего боя (как на эпохальном) — это танкбастер;
+    та же механика тиками каждые 2 с — нет."""
+    from wcl_analyzer import raid_tank as rt
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient, MELEE
+    from wcl_analyzer.stats import median
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    tanks = [int(p["id"]) for p in raw["details"]["tanks"]]
+    mel = [e for e in raw["taken"] if e.get("type") == "damage" and int(e.get("abilityGameID", 0)) == MELEE
+           and int(e.get("targetID", -1)) in tanks]
+    assert mel, "в демо нет ближнего боя по танкам"
+    base, boss = median([float(e["amount"]) for e in mel]), int(mel[0]["sourceID"])
+    f0, f1 = float(raw["fight"]["startTime"]), float(raw["fight"]["endTime"])
+    raw["report"]["masterData"]["abilities"] += [{"gameID": 900061, "name": "Weak Slam", "type": 1},
+                                                 {"gameID": 900062, "name": "Rotting Bite", "type": 1}]
+    t, k = f0 + 20_000, 0
+    while t < f1 - 5_000:
+        raw["taken"].append({"type": "damage", "timestamp": t, "sourceID": boss, "targetID": tanks[k % 2],
+                             "abilityGameID": 900061, "amount": base * 1.2})
+        t, k = t + 30_000, k + 1
+    t = f0 + 5_000
+    while t < f1 - 5_000:
+        raw["taken"].append({"type": "damage", "timestamp": t, "sourceID": boss, "targetID": tanks[0],
+                             "abilityGameID": 900062, "amount": base * 1.2})
+        t += 2_000
+    raw["taken"].sort(key=lambda e: e["timestamp"])
+    orig = rt._guide_busters
+    rt._guide_busters = lambda boss: [{"id": None, "name": rt._key("Weak Slam")}, {"id": None, "name": rt._key("Rotting Bite")}]
+    try:
+        names = {b["name"] for b in analyze_raid(raw)["extras"]["tank"]["busters"]}
+    finally:
+        rt._guide_busters = orig
+    assert "Weak Slam" in names, names
+    assert "Rotting Bite" not in names, names
+    print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
 
 
 if __name__ == "__main__":

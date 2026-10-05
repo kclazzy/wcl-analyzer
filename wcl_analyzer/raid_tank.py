@@ -22,7 +22,7 @@ from .raid_burst import _dead_at, _dead_spans, _fits, _key, _phase_label
 CLUSTER_S = 3.0        # удары одной способности по танку в первые 3 с от первого — одно применение (комбо)
 DEATH_S = 4.0          # танк умер в первые 4 с после удара — «умер от удара»
 BUSTER_X = 4.0         # самый крупный удар в 4 раза больше ближнего боя босса — танкбастер
-GUIDE_X = 2.0          # механика из гайда — хотя бы вдвое больше
+GUIDE_X = 0.8          # механика из гайда — серия ударов не слабее удара ближнего боя (и не чаще раза в 8 с)
 MIN_MELEE = 20         # меньше 20 ударов ближнего боя босса — база по всем ударам босса по танкам
 MAJOR_CD = 60          # «был откатан» — только кулдауны от минуты
 PRESS_LEAD_S = 1.5     # в заметке MRT — нажать за 1,5 с до удара
@@ -161,14 +161,19 @@ def tank_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, phases: 
                     cl.append([h])
             for c in cl:
                 size = max((x[3] if use_un and x[3] else x[2]) for x in c)
+                series = sum((x[3] if use_un and x[3] else x[2]) for x in c)   # серия ударов механики целиком
                 dmg = sum(x[2] for x in c)
                 un = sum(x[3] for x in c) if all(x[3] for x in c) else None
                 occ.append({"t": round(c[0][0], 1), "t_end": round(c[-1][0], 1), "pid": pid, "damage": round(dmg),
                             "unmitigated": round(un) if un else None, "absorbed": round(sum(x[4] for x in c)),
-                            "size": size, "hits": len(c)})
+                            "size": size, "series": series, "hits": len(c)})
         med = median(o["size"] for o in occ)
         if sure:
-            ok = not base or med >= GUIDE_X * base
+            # механика из гайда: серия ударов не слабее одного удара ближнего боя и не чаще раза в 8 с —
+            # на эпохальном танкбастер бьёт в 1–2 удара ближнего боя, и порог «вдвое больше» его пропускал
+            # (проверено на настоящем логе); частые тики (доты) отсекает частота
+            med = median(o["series"] for o in occ)
+            ok = len(occ) <= max(2, dur / 8) and (not base or med >= GUIDE_X * base)
         else:
             ok = bool(base) and med >= BUSTER_X * base and len(occ) <= max(1, dur / 8)
         last_candidates.append({"name": name, "sure": sure, "ratio": round(med / base, 2) if base else None,

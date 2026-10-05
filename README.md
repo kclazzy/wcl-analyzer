@@ -10,6 +10,8 @@ short_description: Сравнение лога Warcraft Logs с лучшими �
 
 # Сравнение ротации WCL
 
+**Новым пользователям:** [руководство — как пользоваться программой](docs/guide.md). Скачать: [для компьютера (Windows)](https://github.com/kclazzy/wcl-analyzer/releases/latest/download/WCL-Analyzer.exe) · [для телефона (Android)](https://github.com/kclazzy/wcl-analyzer/releases/latest/download/WCL-Analyzer.apk).
+
 Программа сравнивает ваш бой из Warcraft Logs с медианой Top 25 игроков того же спека на том же боссе. Результат — Excel-отчёт с графиками: чем ваш лог отличается от повторяющегося паттерна топа, насколько это надёжно и что тренировать первым.
 
 ## Две версии: для ПК и для телефона

@@ -466,7 +466,7 @@ dialog label.check input{width:auto;margin:0}
       <button class="btn alt" id="importBtn" type="button">Загрузить из файла</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
       <label class="check"><input type="checkbox" id="exportKey"> Включить в файл ключ API</label>
-      <span class="hint" id="importAndroidHint" hidden style="margin:0">Чтобы перенести данные с ПК, вставьте ссылку переноса в окне «Подключить ключ API».</span>
+      <span class="hint" id="importAndroidHint" hidden style="margin:0">«Загрузить из файла» покажет резервные копии из «Загрузок» телефона. Данные с ПК удобнее перенести ссылкой переноса в окне «Подключить ключ API».</span>
       <button class="linkbtn" id="wipeBtn" type="button" style="margin-left:auto">Удалить все мои данные</button>
     </div>
   </section>
@@ -497,6 +497,15 @@ dialog label.check input{width:auto;margin:0}
     <button class="btn alt" id="phoneToggle" type="button"></button>
     <button class="btn" id="phoneClose" type="button">Готово</button>
   </div>
+</dialog>
+
+<dialog id="bkDlg" aria-labelledby="bkTitle">
+  <form method="dialog">
+    <h3 id="bkTitle">Загрузить из файла</h3>
+    <p class="hint" style="margin-top:0">Резервные копии в «Загрузках» телефона, новые сверху. Вернутся ключ API (если он был в файле), эталоны, настройки и история разборов.</p>
+    <div id="bkList" style="display:grid;gap:8px;max-height:60vh;overflow:auto"></div>
+    <div class="row"><button class="btn alt" value="cancel" type="submit">Отмена</button></div>
+  </form>
 </dialog>
 
 <dialog id="keyDlg" aria-labelledby="keyTitle">
@@ -642,7 +651,7 @@ async function refreshKey(){
   const has_key = !!KEY || STATUS.server_key;
   STATUS.has_key = has_key;
   $("#phonePill").hidden = !(STATUS.public || STATUS.local) || STATUS.app === "android";
-  $("#importBtn").hidden = STATUS.app === "android";
+  $("#importBtn").hidden = false;   // на Android — список резервных копий из «Загрузок»
   $("#importAndroidHint").hidden = STATUS.app !== "android";
   $("#keyForget").hidden = !KEY;
   const p = $("#keyPill"); p.classList.toggle("ok", has_key);
@@ -2161,11 +2170,16 @@ $("#exportBtn").onclick = async () => {
     history: await Promise.all(items.map(async it => ({...it, blob: it.blob ? await blobToB64(it.blob) : null})))};
   saveBlob(new Blob([JSON.stringify(data)], {type:"application/json"}), `wcl-analyzer-данные-${new Date().toISOString().slice(0,10)}.json`);
 };
-$("#importBtn").onclick = () => $("#importFile").click();
+$("#importBtn").onclick = () => STATUS.app === "android" ? androidImport() : $("#importFile").click();
 $("#importFile").onchange = async () => {
   const f = $("#importFile").files[0]; if (!f) return;
+  await importBackupText(await f.text());
+  $("#importFile").value = "";
+};
+/* Резервная копия (текст файла «Сохранить в файл») → ключ, эталоны, настройки, история */
+async function importBackupText(text){
   try {
-    const d = JSON.parse(await f.text());
+    const d = JSON.parse(text);
     if (d.app !== "wcl-analyzer") throw new Error("Это не файл данных программы.");
     if (d.key && typeof d.key.id === "string" && typeof d.key.s === "string"
         && (!KEY || (KEY.id === d.key.id && KEY.s === d.key.s) || confirm("Заменить ваш ключ Warcraft Logs ключом из файла?"))) {
@@ -2182,8 +2196,26 @@ $("#importFile").onchange = async () => {
     await trimHistory(); await refreshKey(); renderRefs(); renderHistory();
     showOk(`Загружено: ${good.length} ${plural(good.length,"разбор","разбора","разборов")}, ${(d.refs||[]).length} эталонов${d.key && KEY && KEY.id === d.key.id ? ", ключ API" : ""}.`);
   } catch(e){ showErr("Не удалось загрузить файл: " + e.message); }
-  $("#importFile").value = "";
-};
+}
+/* Android-приложение: окно выбора файла в нём не открывается — программа сама показывает резервные копии
+   из «Загрузок» телефона (те, что сохранила кнопка «Сохранить в файл»), и вы выбираете нужную */
+async function androidImport(){
+  try {
+    const {files} = await api("/api/android/backups", {});
+    if (!files.length) return showErr("В «Загрузках» телефона нет резервных копий программы. Android показывает приложению только файлы, "
+      + "которые оно сохранило само: копию, сделанную до переустановки или на другом устройстве, перенесите ссылкой переноса (окно «Подключить ключ API»).");
+    const dlg = $("#bkDlg");
+    $("#bkList").innerHTML = files.map((f, i) => `<button type="button" class="ref" data-bk="${i}" style="width:100%;text-align:left;cursor:pointer;display:block;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px 12px;font:inherit;color:inherit">
+      <span class="what"><b>${esc(f.name)}</b><span>${esc(new Date(f.date * 1000).toLocaleString("ru-RU", {day:"numeric", month:"long", year:"numeric", hour:"2-digit", minute:"2-digit"}))}
+        · ${num(Math.max(1, Math.round(f.size / 1024)))} КБ${f.where ? " · " + esc(f.where) : ""}</span></span></button>`).join("");
+    $("#bkList").querySelectorAll("[data-bk]").forEach(b => b.onclick = async () => {
+      dlg.close();
+      try { const {text} = await api("/api/android/backup", {id: files[+b.dataset.bk].id}, 120); await importBackupText(text); }
+      catch(e){ showErr("Не удалось прочитать файл: " + e.message); }
+    });
+    dlg.showModal();
+  } catch(e){ showErr("Не удалось найти резервные копии: " + e.message); }
+}
 $("#wipeBtn").onclick = async () => {
   if (!confirm("Удалить из этого браузера ключ API, эталоны, настройки и историю разборов?")) return;
   ["wclKey","wclRefs","wclPrefs"].forEach(k => store.del(k)); KEY = null;

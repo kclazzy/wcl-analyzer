@@ -79,6 +79,9 @@ def main():
     st, _, _ = req(port, "POST", "/api/zones", {}, headers={"Origin": f"http://127.0.0.1:{port}"})
     assert st != 403, st
 
+    # резервные копии из «Загрузок» — только в Android-приложении
+    st, _, _ = req(port, "POST", "/api/android/backups", {}, headers={"Origin": f"http://127.0.0.1:{port}"})
+    assert st == 403, st
     # обновление во время разбора — отказ
     web.JOBS["busy"] = {"id": "busy", "state": "running", "progress": 0.1, "log": [], "created": time.time()}
     try:

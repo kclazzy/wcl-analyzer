@@ -43,6 +43,8 @@ _JAVA = {
     "Environment": "android.os.Environment",
     "Intent": "android.content.Intent",
     "Uri": "android.net.Uri",
+    "ContentUris": "android.content.ContentUris",
+    "Scanner": "java.util.Scanner",
 }
 
 
@@ -68,6 +70,59 @@ def _j(key: str):
         raise OSError(f"Android: класс {_JAVA.get(key, _JAVA['PythonActivity'] if key == 'activity' else key)} "
                       "недоступен — перезапустите приложение")
     return _J[key]
+
+
+BACKUP_PREFIX = "wcl-analyzer"   # резервные копии: «wcl-analyzer-данные-ГГГГ-ММ-ДД.json»
+
+
+def android_list_backups(limit: int = 30) -> list[dict]:
+    """Резервные копии программы в «Загрузках» телефона (в любой подпапке), новые сверху:
+    [{id, name, where, size, date}]. Android 10+ показывает приложению только файлы, которые оно
+    сохранило само (до переустановки) — другие файлы так не найти."""
+    Build = _j("Build")
+    out = []
+    if Build.SDK_INT >= 29:
+        MediaStore = _j("MediaStore")
+        resolver = _j("activity").getContentResolver()
+        cur = resolver.query(MediaStore.EXTERNAL_CONTENT_URI,
+                             ["_id", "_display_name", "relative_path", "_size", "date_modified"],
+                             "_display_name LIKE ?", [BACKUP_PREFIX + "%.json"], "date_modified DESC")
+        if cur is None:
+            return []
+        try:
+            while cur.moveToNext() and len(out) < limit:
+                out.append({"id": int(cur.getLong(0)), "name": cur.getString(1), "where": cur.getString(2) or "",
+                            "size": int(cur.getLong(3)), "date": int(cur.getLong(4))})
+        finally:
+            cur.close()
+        return out
+    Environment = _j("Environment")   # Android 7–9: личная папка приложения
+    folder = Path(_j("activity").getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath())
+    for f in sorted(folder.glob(BACKUP_PREFIX + "*.json"), key=lambda x: x.stat().st_mtime, reverse=True)[:limit]:
+        out.append({"id": f.name, "name": f.name, "where": str(folder), "size": f.stat().st_size,
+                    "date": int(f.stat().st_mtime)})
+    return out
+
+
+def android_read_backup(file_id) -> str:
+    """Текст резервной копии из «Загрузок» (id из android_list_backups)."""
+    Build = _j("Build")
+    if Build.SDK_INT >= 29:
+        uri = _j("ContentUris").withAppendedId(_j("MediaStore").EXTERNAL_CONTENT_URI, int(file_id))
+        stream = _j("activity").getContentResolver().openInputStream(uri)
+        if stream is None:
+            raise OSError("Android не дал прочитать файл")
+        try:   # весь файл одной строкой: разделитель «\A» — начало текста, второго такого нет
+            sc = _j("Scanner")(stream, "UTF-8").useDelimiter("\\A")
+            return sc.next() if sc.hasNext() else ""
+        finally:
+            stream.close()
+    Environment = _j("Environment")
+    folder = Path(_j("activity").getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath())
+    name = Path(str(file_id)).name   # только имя: из этой папки и никуда больше
+    if not name.startswith(BACKUP_PREFIX):
+        raise OSError("Это не резервная копия программы")
+    return (folder / name).read_text(encoding="utf-8")
 
 
 def android_save_download(name: str, data: bytes, mime: str, sub: str = "") -> str:

@@ -1477,6 +1477,18 @@ class Handler(BaseHTTPRequestHandler):
                 folder.mkdir(parents=True, exist_ok=True)
                 (folder / name).write_bytes(base64.b64decode(body.get("data") or ""))
                 return self._json({"saved": str(folder / name)})
+            if path in ("/api/android/backups", "/api/android/backup"):
+                # Android-приложение: окно выбора файла в нём не открывается — список резервных копий
+                # из «Загрузок» даёт сама программа, и она же читает выбранную
+                from .platform_support import android_list_backups, android_read_backup, app_mode
+                if SERVER["public"] or not self._is_local() or app_mode() != "android":
+                    return self._json({"error": "Доступно только в Android-приложении"}, 403)
+                if path == "/api/android/backups":
+                    return self._json({"files": android_list_backups()})
+                text = android_read_backup(body.get("id"))
+                if len(text) > MAX_BODY:
+                    raise ValueError("Файл слишком большой")
+                return self._json({"text": text})
             if path in ("/api/save", "/api/open"):
                 # Только Android-приложение: встроенное окно не умеет скачивать файлы и открывать ссылки
                 from .platform_support import android_open_url, android_save_download, app_mode

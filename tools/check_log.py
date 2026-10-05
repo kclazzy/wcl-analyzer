@@ -43,7 +43,11 @@ def potion_diag(raw):
             ab = int(ev.get("abilityGameID", 0)); who[ab].add(src); cnt[ab] += 1
     common = sorted(((names.get(ab, ab), ab, len(w), len({cls[x] for x in w}), cnt[ab]) for ab, w in who.items()
                      if len({cls[x] for x in w}) >= 4), key=lambda x: -x[2])[:25]
-    return {"potionUse": pu[:40], "common_casts": common}
+    au = Counter()
+    for ev in raw.get("combatant") or []:
+        for a in {(x.get("name") or names.get(int(x.get("ability") or 0)) or str(x.get("ability"))) for x in ev.get("auras") or []}:
+            au[a] += 1
+    return {"potionUse": pu[:40], "common_casts": common, "auras": au.most_common(40)}
 
 for c in pick_fights(rep, difficulties=None):
     f = c["fight"]

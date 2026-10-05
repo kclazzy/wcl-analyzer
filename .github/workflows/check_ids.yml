@@ -24,7 +24,8 @@ jobs:
                       tip = html.unescape(re.sub(r"<[^>]+>", " ", d.get("tooltip", "")))
                       cd = re.search(r"(\d+(?:\.\d+)?)\s*(min|sec)\s*(?:recharge|cooldown)", tip) or re.search(r"(?:Восстановление|Перезарядка):?\s*(\d+(?:[.,]\d+)?)\s*(мин|сек)", tip)
                       ch = re.search(r"(\d)\s*Charges", tip)
-                      out.append(f"{i}\t{loc}\t{d.get('name')}\t{cd.group(0) if cd else '-'}\t{ch.group(0) if ch else ''}")
+                      du = re.search(r"(?:for|на|в течение)\s+(\d+(?:[.,]\d+)?)\s*(sec|сек|min|мин)", tip)
+                      out.append(f"{i}\t{loc}\t{d.get('name')}\t{cd.group(0) if cd else '-'}\t{ch.group(0) if ch else ''}\tdur={du.group(0) if du else '-'}")
                   except Exception as e:
                       out.append(f"{i}\t{loc}\tERR {e}")
           for n in open("debug_names.txt").read().splitlines():

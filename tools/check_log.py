@@ -15,9 +15,40 @@ out = {"report": {"title": rep.get("title"), "zone": (rep.get("zone") or {}).get
                   "fights": [(f["id"], f["name"], f.get("difficulty"), f.get("kill"), round((f["endTime"] - f["startTime"]) / 1000))
                              for f in rep["fights"]]}, "bosses": []}
 log = []
+import wcl_analyzer.raid as _raid, wcl_analyzer.raid_tank as _rt
+from collections import Counter, defaultdict
+CAP = {}
+_orig_ta, _orig_fr = _rt.tank_analysis, _raid.fetch_raid_raw
+def _ta(*a, **k):
+    r = _orig_ta(*a, **k)
+    CAP.setdefault("cand", list(_rt.last_candidates))
+    return r
+def _fr(*a, **k):
+    r = _orig_fr(*a, **k)
+    CAP.setdefault("raw", r)
+    return r
+_rt.tank_analysis, _raid.fetch_raid_raw = _ta, _fr
+
+def potion_diag(raw):
+    det = raw.get("details") or {}
+    pu = [(p.get("name"), p.get("potionUse"), p.get("healthstoneUse")) for r in ("tanks", "healers", "dps") for p in det.get(r) or []]
+    names = {int(a["gameID"]): a["name"] for a in raw["report"]["masterData"]["abilities"]}
+    cls = {int(p["id"]): p.get("type") for r in ("tanks", "healers", "dps") for p in det.get(r) or []}
+    who, cnt = defaultdict(set), Counter()
+    for ev in raw.get("casts") or []:
+        if ev.get("type") != "cast":
+            continue
+        src = int(ev.get("sourceID", -1))
+        if src in cls:
+            ab = int(ev.get("abilityGameID", 0)); who[ab].add(src); cnt[ab] += 1
+    common = sorted(((names.get(ab, ab), ab, len(w), len({cls[x] for x in w}), cnt[ab]) for ab, w in who.items()
+                     if len({cls[x] for x in w}) >= 4), key=lambda x: -x[2])[:25]
+    return {"potionUse": pu[:40], "common_casts": common}
+
 for c in pick_fights(rep, difficulties=None):
     f = c["fight"]
     t0, r0 = time.time(), cl.requests_made
+    CAP.clear()
     item = {"fight": f["id"], "boss": f["name"], "difficulty": f.get("difficulty"), "kill": f.get("kill")}
     try:
         R = run_raid(cl, url, int(f["id"]), log=lambda m: log.append(m), talent_data=[], save_talents=False, mythic=False)
@@ -40,7 +71,9 @@ for c in pick_fights(rep, difficulties=None):
             "tank": {"hints": T.get("hints"), "busters": T.get("busters"), "error": T.get("error"),
                      "events": [(e["time"], e["ability"], e["tank"], e["damage"], e.get("mitigated"), [x["name"] for x in e["own"]], [x["name"] for x in e["ext"]], e["ready"], e.get("held"), e["bare"], e["died"]) for e in T.get("events") or []],
                      "cds": [(c_["tank"], c_["name"], c_["time"], c_["used"], c_["max_uses"]) for c_ in T.get("cds") or []],
-                     "mrt": T.get("mrt"), "cand": sorted(list(__import__("wcl_analyzer.raid_tank", fromlist=["x"]).last_candidates), key=lambda c: ("base" not in c, -(c.get("total") or 0)))[:15]},
+                     "mrt": T.get("mrt"), "cand": sorted(CAP.get("cand") or [], key=lambda c: ("base" not in c, -(c.get("total") or 0)))[:15]},
+            "potions": potion_diag(CAP["raw"]) if CAP.get("raw") else None,
+            "consumables": X.get("consumables"),
             "deaths": [(d["time"], d["player"], d["ability"], d.get("wipe_tail")) for d in R.get("deaths") or []],
             "top": {"n": (X.get("vs_top") or {}).get("n")},
         })

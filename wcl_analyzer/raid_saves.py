@@ -92,7 +92,7 @@ def run_raid_saves(client, url: str, log=print, progress=lambda x: None, talent_
         raise LookupError("Не удалось составить план ни для одного босса: " + "; ".join(s["reason"] for s in skipped))
     return {"mode": "saves",
             "info": {"code": code, "title": report.get("title", ""), "zone": (report.get("zone") or {}).get("name", ""),
-                     "url": f"{SITE_URL}/reports/{code}", "bosses": len(bosses),
+                     "url": f"{report.get('_site_url') or SITE_URL}/reports/{code}", "bosses": len(bosses),
                      "boss": (report.get("zone") or {}).get("name") or report.get("title", ""),
                      "difficulty": ", ".join(dict.fromkeys(b["difficulty"] for b in bosses)),
                      "demo": code.startswith("DEMO")},

@@ -132,13 +132,27 @@ def _cleanup() -> None:
             JOBS.pop(jid, None)
 
 
+def job_site(params: dict) -> str:
+    """Версия игры для разбора: выбрана в списке («Топ прогресса» без лога, план по составу) или по ссылке на отчёт."""
+    from .config import SITES, site_of_url
+    if params.get("site") in SITES:
+        return params["site"]
+    return site_of_url(params.get("url"))
+
+
+def _site_url(client) -> str:
+    from .config import SITE_URL
+    return getattr(client, "site_url", None) or SITE_URL
+
+
 def start_job(creds, params: dict) -> str:
     _cleanup()
     with JOBS_LOCK:
         if sum(1 for j in JOBS.values() if j["state"] == "running") >= MAX_JOBS + MAX_QUEUE:
             raise ValueError("Сервер сейчас загружен — попробуйте через пару минут.")
         jid = uuid.uuid4().hex  # 128 бит: знает только браузер, запустивший разбор
-        job = {"id": jid, "state": "running", "progress": 0.02, "log": [], "created": time.time()}
+        job = {"id": jid, "state": "running", "progress": 0.02, "log": [], "created": time.time(),
+               "site": job_site(params)}
         JOBS[jid] = job
     threading.Thread(target=_run_job, args=(job, params, creds), daemon=True).start()
     return jid
@@ -195,6 +209,8 @@ def _client(creds, job: dict, log, wait: bool = False):
     (уже скачанное остаётся в кэше). wait=True — ждать сброса лимита (галочка «ждать сброса лимита»).
     Настройки ожидания — свои у каждого разбора: общий клиент ключа не меняется."""
     client = CLIENT_FACTORY(creds)
+    if job.get("site") and hasattr(client, "for_site"):   # Classic, Season of Discovery… — свой сайт и API
+        client = client.for_site(job["site"])
 
     def on_wait(seconds: float) -> None:
         job["wait_until"] = time.time() + seconds
@@ -442,7 +458,8 @@ def _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titl
     order[0:0] = keys   # вкладки боссов, затем ротация
     queued[:] = keys + ([second] if second else [])
     zone = (report.get("zone") or {}).get("name", "")
-    info_box.update({"code": code, "title": report.get("title", ""), "zone": zone, "url": f"{SITE_URL}/reports/{code}",
+    info_box.update({"code": code, "title": report.get("title", ""), "zone": zone,
+                     "url": f"{report.get('_site_url') or SITE_URL}/reports/{code}",
                      "boss": zone or report.get("title", ""), "bosses": len(chosen),
                      "difficulty": ", ".join(dict.fromkeys(DIFFICULTY_NAMES.get(int(c["fight"].get("difficulty") or 0), "")
                                                            for c in chosen)), "demo": code.startswith("DEMO")})
@@ -609,7 +626,7 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
     R = {"mode": "playerall", "everyone": everyone,
          "info": {"name": "Все игроки" if everyone else first.get("name", ""),
                   "cls": "" if everyone else first.get("cls", ""), "spec": "" if everyone else first.get("spec", ""),
-                  "title": report.get("title", ""), "code": code, "url": f"https://www.warcraftlogs.com/reports/{code}",
+                  "title": report.get("title", ""), "code": code, "url": f"{report.get('_site_url') or 'https://www.warcraftlogs.com'}/reports/{code}",
                   "demo": False},
          "bosses": rows, "skipped": skipped,
          "pending": [{"fight_id": fid, "actor": aid, "boss": fights[fid].get("name", ""),
@@ -820,21 +837,23 @@ def _progress_cands(client, enc: int, diff: int) -> list[dict]:
     """Чей бой показывать. Эпохальная — рейтинг WCL по прогрессу (первые киллы в мире). Для героической и
     обычной сложности такого рейтинга нет — берём самый ранний килл по дате среди FIRST_KILL_PAGES страниц
     рейтинга киллов (basis="first_kill"); дат в ответе нет — самый быстрый килл (basis="fastest")."""
-    from .config import SITE_URL
+    base = _site_url(client)
 
     def cand(rk, place, basis):
         rep, g, srv = rk.get("report") or {}, rk.get("guild") or {}, rk.get("server") or {}
-        return {"url": f"{SITE_URL}/reports/{rep['code']}", "fight": int(rep.get("fightID") or rep.get("fightId") or 0),
+        return {"url": f"{base}/reports/{rep['code']}", "fight": int(rep.get("fightID") or rep.get("fightId") or 0),
                 "guild": g.get("name") or rk.get("name") or rep["code"], "rank": place, "basis": basis,
                 "server": srv.get("name"), "region": srv.get("region"), "start": _kill_time(rk)}
 
-    ranks = [] if int(diff or 0) != 5 else [r for r in client.fight_rankings(enc, diff, "progress") if (r.get("report") or {}).get("code")]
+    # Рейтинг — свежий при каждом запуске (не старше 10 минут): топ прогресса меняется, пока идёт гонка
+    ranks = [] if int(diff or 0) != 5 else [r for r in client.fight_rankings(enc, diff, "progress", max_age_s=600)
+                                           if (r.get("report") or {}).get("code")]
     if ranks:
         return [cand(rk, i + 1, "progress") for i, rk in enumerate(ranks[:10])]
     pool = []
     for page in range(1, FIRST_KILL_PAGES + 1):
         try:
-            got = client.fight_rankings(enc, diff, "speed", page=page)
+            got = client.fight_rankings(enc, diff, "speed", page=page, max_age_s=600)
         except Exception:  # noqa: BLE001 — следующая страница не обязательна
             break
         pool += [r for r in got if (r.get("report") or {}).get("code")]
@@ -913,7 +932,8 @@ def _run_top_progress(job: dict, params: dict, creds, log) -> None:
         return
     client = _client(creds, job, log, wait=bool(params.get("wait")))
     if params.get("zone"):  # без лога: рейд, сложность и босс выбраны в списке
-        zone = next((z for z in client.raid_zones() if str(z["id"]) == str(params["zone"])), None)
+        zone = next((z for z in client.raid_zones(max_age_s=86400, all_expansions=True)
+                     if str(z["id"]) == str(params["zone"])), None)
         if not zone:
             raise LookupError("Рейд не найден в Warcraft Logs — обновите страницу и выберите снова")
         diff = int(params.get("difficulty") or 5)
@@ -1447,9 +1467,18 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/key":
                 CHECK_KEY(str(body.get("client_id", "")).strip(), str(body.get("client_secret", "")).strip())
                 return self._json({"ok": True})
-            if path == "/api/zones":  # рейды текущего дополнения — для «Топ прогресса» без лога
-                cl = _limited(CLIENT_FACTORY(creds), 0)
-                return self._json({"zones": cl.raid_zones()})
+            if path == "/api/zones":  # рейды выбранной версии игры — для «Топ прогресса» без лога и плана по составу
+                from .config import SITES
+                site = body.get("site") if body.get("site") in SITES else "www"
+                cl = CLIENT_FACTORY(creds)
+                if hasattr(cl, "for_site"):
+                    cl = cl.for_site(site)
+                cl = _limited(cl, 0)
+                try:   # список — свежий с Warcraft Logs при каждом открытии; нет связи или лимит — из кэша
+                    zones = cl.raid_zones(max_age_s=0, all_expansions=True)
+                except Exception:  # noqa: BLE001
+                    zones = cl.raid_zones(max_age_s=30 * 86400, all_expansions=True)
+                return self._json({"zones": zones, "site": site, "fetched": time.time()})
             if path == "/api/spell":  # краткое описание способности с Wowhead (по нажатию «i», если в разборе его не было)
                 from . import wowhead
                 try:
@@ -1464,12 +1493,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"name": w.get("name"), "desc": w.get("desc"), "url": wowhead.page_url(sid)})
             if path == "/api/inspect":
                 from .collect import inspect_report
-                cl = _limited(CLIENT_FACTORY(creds), 0)  # поиск боя не ждёт сброса лимита: сразу объясняем, что случилось
+                from .config import site_of_url
+                cl = CLIENT_FACTORY(creds)
+                if hasattr(cl, "for_site"):   # ссылка на Classic / SoD / … — свой сайт Warcraft Logs
+                    cl = cl.for_site(site_of_url(body.get("url")))
+                cl = _limited(cl, 0)  # поиск боя не ждёт сброса лимита: сразу объясняем, что случилось
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "units", "prev", "wait",
                                                    "zone", "encounter", "difficulty", "roster", "minutes",
-                                                   "refresh", "max_age_days", "pick", "mythic")}
+                                                   "refresh", "max_age_days", "pick", "mythic", "site")}
                 if params["mode"] not in (None, "fight", "progress", "raid", "raidrot", "saves", "allbosses", "rosterplan"):
                     params["mode"] = None
                 return self._json({"job": start_job(creds, params)})

@@ -690,7 +690,7 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
             "difficulty": DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), str(f.get("difficulty"))),
             "kill": kill, "duration_s": _r(dur), "duration": _fmt_t(dur), "fight_id": fid,
             "boss_pct": None if kill else next((p["boss_pct"] for p in pulls if p["selected"]), None),
-            "url": f"{SITE_URL}/reports/{code}#fight={fid}", "size": len(rows),
+            "url": f"{report.get('_site_url') or SITE_URL}/reports/{code}#fight={fid}", "size": len(rows),
             "tanks": comp.get("tank", 0), "healers": comp.get("healer", 0), "dps": comp.get("dps", 0),
             "demo": code.startswith("DEMO"), "has_parse": bool(ranks)}
     for x in rows:

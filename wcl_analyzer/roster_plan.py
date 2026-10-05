@@ -277,6 +277,7 @@ def run_roster_plan(client, encounter_id: int, difficulty: int, minutes: float, 
     for c in cds:
         names[c["id"]] = c["name"]
     events = plan_events(R)
+    base = getattr(client, "site_url", None) or SITE_URL   # сайт той версии игры (Classic, SoD…)
     X = {"roster_cds": cds, "spikes": events}
     plan = make_plan(X, _aggregate(kills), [], names, phases, _aggregate(kills, by_phase=True))
     boss = R["info"]["boss"]
@@ -289,9 +290,9 @@ def run_roster_plan(client, encounter_id: int, difficulty: int, minutes: float, 
                  "target": _fmt_t(target), "phases": phases, "guild": meta.get("guild") or "",
                  "roster_source": meta["source"], "players": len(players), "healers": heal,
                  "base": {"guild": bk["guild"], "duration": _fmt_t(bk["duration"]),
-                          "url": f"{SITE_URL}/reports/{bk['code']}#fight={bk['fight']}"}},
+                          "url": f"{base}/reports/{bk['code']}#fight={bk['fight']}"}},
         "kills": [{"guild": k["guild"], "duration": _fmt_t(k["duration"]),
-                   "url": f"{SITE_URL}/reports/{k['code']}#fight={k['fight']}"} for k in kills],
+                   "url": f"{base}/reports/{k['code']}#fight={k['fight']}"} for k in kills],
         "players": players, "roster_cds": cds, "plan": plan, "mrt": note,
         "heaviest": sorted(R["extras"].get("heaviest") or [], key=lambda h: h["t"]),
         "unknown": [p["name"] for p in players if not any(c["player"] == p["name"] for c in cds)

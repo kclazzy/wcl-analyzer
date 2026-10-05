@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import os
 import json
+import re
 import sqlite3
 import threading
 import time
@@ -17,7 +18,7 @@ from typing import Any
 
 import requests
 
-from .config import API_URL, TOKEN_URL
+from .config import API_URL, TOKEN_URL, api_url, site_key, site_url, token_url
 
 
 class WCLError(RuntimeError):
@@ -198,6 +199,33 @@ class MemoryCache:
                 self._drop(next(iter(self.data)))
 
 
+_NOT_RAID = re.compile(r"dungeon|mythic\+|delve|torghast|challenge|arena|battleground|подземел|арена|поле бо|"
+                       r"world boss|мировые боссы|\\b(?:beta|бета|ptr|test)\\b", re.I)
+
+
+def pick_raid_zones(zones: list[dict], all_expansions: bool = False) -> list[dict]:
+    """Рейдовые зоны из worldData.zones: есть боссы, нет сложности М+ (10) и это не подземелья/арены."""
+    raids = []
+    for z in zones or []:
+        diffs = [d for d in z.get("difficulties") or [] if d.get("id") is not None]
+        ids = {int(d["id"]) for d in diffs}
+        if not z.get("encounters") or 10 in ids or _NOT_RAID.search(z.get("name") or ""):
+            continue
+        keep = [d for d in diffs if int(d["id"]) in (3, 4, 5)] or [d for d in diffs if int(d["id"]) != 2] or diffs
+        raids.append({**z, "difficulties": keep})
+    if not raids:
+        return []
+    exp_id = lambda z: int((z.get("expansion") or {}).get("id") or 0)  # noqa: E731
+    if not all_expansions:
+        last = max(exp_id(z) for z in raids)
+        raids = [z for z in raids if exp_id(z) == last]
+    raids.sort(key=lambda z: (-exp_id(z), bool(z.get("frozen")), -int(z["id"])))
+    return [{"id": z["id"], "name": z["name"], "frozen": bool(z.get("frozen")),
+             "expansion": (z.get("expansion") or {}).get("name"), "expansion_id": exp_id(z),
+             "difficulties": [{"id": int(d["id"]), "name": d.get("name")} for d in z["difficulties"]],
+             "encounters": [{"id": e["id"], "name": e["name"]} for e in z.get("encounters") or []]} for z in raids]
+
+
 class WCLClient:
     def __init__(self, client_id: str, client_secret: str, cache: Cache,
                  verbose: bool = True):
@@ -218,6 +246,27 @@ class WCLClient:
         # Сколько секунд можно ждать сброса лимита. Для быстрых действий (поиск боя) — 0:
         # сразу сказать пользователю, а не «висеть» до часа.
         self.max_wait_s: float | None = None
+        self.site = "www"            # версия игры: www (основная), classic, fresh, sod, vanilla
+        self._tokens: dict = {}      # сайт → (токен, когда истекает); общий у копий for_site/with_limits
+
+    @property
+    def api_url(self) -> str:
+        return API_URL if self.site == "www" else api_url(self.site)
+
+    @property
+    def site_url(self) -> str:
+        return site_url(self.site)
+
+    def for_site(self, site: str | None) -> "WCLClient":
+        """Тот же клиент (ключ, кэш, соединение, лимит параллельных запросов) для другой версии игры:
+        у Classic, Season of Discovery и т. п. — свой сайт Warcraft Logs и свой API."""
+        import copy
+        site = site_key(site)
+        if site == self.site:
+            return self
+        c = copy.copy(self)
+        c.site = site
+        return c
 
     # ------------------------------------------------------------------ auth
     def token(self) -> str:
@@ -225,26 +274,36 @@ class WCLClient:
             return self._token_locked()
 
     def _token_locked(self) -> str:
-        if self._token and time.time() < self._token_exp - 60:
-            return self._token
-        r = self.session.post(
-            TOKEN_URL,
-            data={"grant_type": "client_credentials"},
-            auth=(self.client_id, self.client_secret),
-            timeout=30,
-        )
-        if r.status_code != 200:
-            raise WCLError(f"Не удалось получить токен WCL: {r.status_code} {r.text[:200]}")
+        tok, exp = self._tokens.get(self.site, (None, 0.0))
+        if self.site == "www" and self._token:   # совместимость: токен, заданный напрямую
+            tok, exp = self._token, self._token_exp
+        if tok and time.time() < exp - 60:
+            return tok
+        r = None
+        for url in dict.fromkeys([TOKEN_URL if self.site == "www" else token_url(self.site), TOKEN_URL]):
+            r = self.session.post(url, data={"grant_type": "client_credentials"},
+                                  auth=(self.client_id, self.client_secret), timeout=30)
+            if r.status_code == 200:
+                break
+        if r is None or r.status_code != 200:
+            raise WCLError(f"Не удалось получить токен WCL: {r.status_code if r is not None else '—'} "
+                           f"{r.text[:200] if r is not None else ''}")
         data = r.json()
-        self._token = data["access_token"]
-        self._token_exp = time.time() + float(data.get("expires_in", 3600))
-        return self._token
+        tok, exp = data["access_token"], time.time() + float(data.get("expires_in", 3600))
+        self._tokens[self.site] = (tok, exp)
+        if self.site == "www":
+            self._token, self._token_exp = tok, exp
+        return tok
+
+    def _key(self, query: str, variables: dict) -> str:
+        """Ключ кэша: у другой версии игры — свой (те же номера отчётов и боссов значат другое)."""
+        return Cache.key(query, variables if self.site == "www" else {**variables, "_site": self.site})
 
     # ----------------------------------------------------------------- query
     def query(self, query: str, variables: dict | None = None,
               use_cache: bool = True, max_age_s: float | None = None) -> dict:
         variables = variables or {}
-        key = Cache.key(query, variables)
+        key = self._key(query, variables)
         if use_cache:
             hit = self.cache.get(key, max_age_s)
             if hit is not None:
@@ -292,7 +351,7 @@ class WCLClient:
 
     def _post(self, query: str, variables: dict):
         r = self.session.post(
-            API_URL,
+            self.api_url,
             json={"query": query, "variables": variables},
             headers={"Authorization": f"Bearer {self.token()}"},
             timeout=60,
@@ -327,7 +386,7 @@ class WCLClient:
         q = "query { rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn } }"
         # Один прямой запрос: мимо семафора (его делают потоки, ждущие сброса внутри своего слота)
         # и без повторов при 429 — иначе при исчерпанном лимите он вызывал бы сам себя бесконечно.
-        r = self.session.post(API_URL, json={"query": q}, headers={"Authorization": f"Bearer {self.token()}"},
+        r = self.session.post(self.api_url, json={"query": q}, headers={"Authorization": f"Bearer {self.token()}"},
                               timeout=30)
         if r.status_code != 200:
             raise WCLError(f"WCL API вернул {r.status_code}")
@@ -361,6 +420,7 @@ class WCLClient:
         rep = self.query(q, {"code": code})["reportData"]["report"]
         if rep is None:
             raise WCLError(f"Отчёт {code} не найден или закрыт")
+        rep["_site_url"] = self.site_url   # ссылки на бои — на сайт той версии игры, откуда отчёт
         return rep
 
     def report_phases(self, code: str) -> list[dict]:
@@ -449,7 +509,7 @@ class WCLClient:
         variables = {"enc": encounter_id, "cls": class_name, "spec": spec_name, "diff": difficulty, "page": page}
         enc = self.query(q, variables, max_age_s=0 if force else max_age_s)["worldData"]["encounter"]
         enc = dict(enc or {})
-        enc["_fetched_at"] = self.cache.fetched_at(Cache.key(q, variables)) or time.time()
+        enc["_fetched_at"] = self.cache.fetched_at(self._key(q, variables)) or time.time()
         return enc
 
 
@@ -461,24 +521,15 @@ class WCLClient:
         except Exception:  # noqa: BLE001
             return None
 
-    def raid_zones(self, max_age_s: float = 3 * 86400) -> list[dict]:
-        """Рейды текущего дополнения для «Топ прогресса» без лога: [{id, name, frozen, difficulties, encounters}].
-        Подземелья М+ (сложность 10) и прочее без рейдовых сложностей отбрасываются; новые — первыми."""
+    def raid_zones(self, max_age_s: float = 3 * 86400, all_expansions: bool = False) -> list[dict]:
+        """Рейды для «Топ прогресса» без лога и плана по составу: [{id, name, frozen, expansion, expansion_id,
+        difficulties: [{id, name}], encounters}]. Подземелья М+ (сложность 10) и прочие не-рейды отбрасываются.
+        all_expansions=False — только последнее дополнение сайта; True — все, новые дополнения первыми.
+        Список — с сайта Warcraft Logs той версии игры, что у клиента (основная, Classic, SoD…)."""
         q = """query { worldData { zones { id name frozen expansion { id name }
                  difficulties { id name } encounters { id name } } } }"""
         zones = (self.query(q, {}, max_age_s=max_age_s).get("worldData") or {}).get("zones") or []
-        raids = [z for z in zones if z.get("encounters")
-                 and {d.get("id") for d in z.get("difficulties") or []} & {3, 4, 5}
-                 and 10 not in {d.get("id") for d in z.get("difficulties") or []}]
-        if not raids:
-            return []
-        last = max(int((z.get("expansion") or {}).get("id") or 0) for z in raids)
-        cur = [z for z in raids if int((z.get("expansion") or {}).get("id") or 0) == last]
-        cur.sort(key=lambda z: (bool(z.get("frozen")), -int(z["id"])))
-        return [{"id": z["id"], "name": z["name"], "frozen": bool(z.get("frozen")),
-                 "expansion": (z.get("expansion") or {}).get("name"),
-                 "difficulties": [d for d in z.get("difficulties") or [] if d.get("id") in (3, 4, 5)],
-                 "encounters": [{"id": e["id"], "name": e["name"]} for e in z.get("encounters") or []]} for z in cur]
+        return pick_raid_zones(zones, all_expansions)
 
     def fight_rankings(self, encounter_id: int, difficulty: int, metric: str = "speed",
                        page: int = 1, max_age_s: float = 3 * 86400) -> list[dict]:

@@ -8,6 +8,44 @@ API_URL = "https://www.warcraftlogs.com/api/v2/client"
 TOKEN_URL = "https://www.warcraftlogs.com/oauth/token"
 SITE_URL = "https://www.warcraftlogs.com"
 
+# Версии игры: у каждой — свой сайт Warcraft Logs со своим API (ключ — общий, от warcraftlogs.com).
+# Порядок — как в списке «Версия игры».
+SITES = {
+    "www": "Retail — основная игра",
+    "classic": "Classic — прогрессия (classic.warcraftlogs.com)",
+    "fresh": "Classic Anniversary / Fresh (fresh.warcraftlogs.com)",
+    "sod": "Season of Discovery (sod.warcraftlogs.com)",
+    "vanilla": "Classic Era / Hardcore (vanilla.warcraftlogs.com)",
+}
+
+
+def site_key(site: str | None) -> str:
+    return site if site in SITES else "www"
+
+
+def site_url(site: str | None = None) -> str:
+    return f"https://{site_key(site)}.warcraftlogs.com"
+
+
+def api_url(site: str | None = None) -> str:
+    return f"{site_url(site)}/api/v2/client"
+
+
+def token_url(site: str | None = None) -> str:
+    return f"{site_url(site)}/oauth/token"
+
+
+def site_of_url(url: str | None) -> str:
+    """Версия игры по ссылке на отчёт: classic./fresh./sod./vanilla. (и их языковые варианты вроде
+    ru.classic.) — свой сайт; www., ru., de. и т. п. — основная игра."""
+    import re
+    m = re.search(r"(?:https?://)?([a-z0-9.-]+)\.warcraftlogs\.com", (url or "").lower())
+    if not m:
+        return "www"
+    parts = m.group(1).split(".")
+    return next((p for p in parts if p in SITES and p != "www"), "www")
+
+
 # Сложности WCL: 3 = Normal, 4 = Heroic, 5 = Mythic
 DIFFICULTY_NAMES = {1: "поиск рейда", 3: "обычный", 4: "героический", 5: "эпохальный"}
 

@@ -812,8 +812,11 @@ def test_top_progress():
     assert [z["name"] for z in zs] == ["The Venomous Abyss", "Прошлый сезон"], zs     # М+ и прошлое дополнение — нет
     assert [d["id"] for d in zs[0]["difficulties"]] == [3, 4, 5] and len(zs[0]["encounters"]) == 2
 
+    zs_all = WCLClient.raid_zones(fake, all_expansions=True)
+    assert [z["name"] for z in zs_all] == ["The Venomous Abyss", "Прошлый сезон", "Старый рейд"], zs_all   # все дополнения
+
     class C3(C):
-        def raid_zones(self):
+        def raid_zones(self, **k):
             return zs
     cl3 = C3()
     web.CLIENT_FACTORY = lambda creds: cl3
@@ -831,6 +834,52 @@ def test_top_progress():
     assert allz["titles"] == {"b0": "Sszorak", "b1": "Ula'tek"} and allz["params"]["zone"] == 61
     print("OK топ прогресса: первый килл по рейтингу прогресса, закрытый лог — следующая гильдия, без сравнения; "
           "все боссы — вкладка на босса; заметка MRT по тяжёлым моментам")
+
+
+def test_game_versions():
+    """Любая версия игры: Classic, Classic Anniversary, SoD, Classic Era — свой сайт и API Warcraft Logs, ключ общий;
+    версия — по ссылке на отчёт или из списка; кэш у версий свой; ссылки на бои — на сайт версии;
+    список рейдов — свежий с Warcraft Logs (без кэша) и со всеми дополнениями."""
+    from wcl_analyzer import web
+    from wcl_analyzer.api import Cache, WCLClient
+    from wcl_analyzer.config import site_of_url
+    assert site_of_url("https://classic.warcraftlogs.com/reports/AbCdEfGh1234") == "classic"
+    assert site_of_url("https://ru.classic.warcraftlogs.com/reports/AbCdEfGh1234") == "classic"
+    assert site_of_url("https://sod.warcraftlogs.com/reports/x") == "sod" and site_of_url("https://ru.warcraftlogs.com/reports/x") == "www"
+    assert web.job_site({"site": "vanilla"}) == "vanilla" and web.job_site({"url": "https://fresh.warcraftlogs.com/reports/X"}) == "fresh"
+    assert web.job_site({"site": "evil.example"}) == "www"
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        cl = WCLClient("id", "secret", Cache(Path(d) / "c.sqlite"), verbose=False)
+        sod = cl.for_site("sod")
+        assert sod.api_url == "https://sod.warcraftlogs.com/api/v2/client" and cl.api_url == "https://www.warcraftlogs.com/api/v2/client"
+        assert sod._key("q", {"a": 1}) != cl._key("q", {"a": 1}), "у версий игры — свой кэш"
+        assert cl.for_site("www") is cl and sod._tokens is cl._tokens
+        posted = []
+
+        class R:
+            status_code = 200
+            headers = {}
+            def json(self):
+                return {"access_token": "T", "expires_in": 3600, "data": {"reportData": {"report": {"code": "X", "fights": []}}}}
+        sod.session = type("S", (), {"post": lambda self, url, **k: posted.append(url) or R()})()
+        rep = sod.report("X")
+        assert rep["_site_url"] == "https://sod.warcraftlogs.com", rep
+        assert posted == ["https://sod.warcraftlogs.com/oauth/token", "https://sod.warcraftlogs.com/api/v2/client"], posted
+        # «Топ прогресса» на Classic: ссылки на бои — на сайт версии
+        calls = []
+
+        class Q:
+            site_url = "https://classic.warcraftlogs.com"
+            def fight_rankings(self, enc, diff, metric="speed", page=1, max_age_s=None):
+                calls.append(max_age_s)
+                return [{"report": {"code": "CLASSIC00001", "fightID": 2}, "guild": {"name": "G"}}]
+        c = web._progress_cands(Q(), 1, 4)
+        assert c[0]["url"].startswith("https://classic.warcraftlogs.com/reports/") and all(a == 600 for a in calls), (c, calls)
+    html = (Path(__file__).resolve().parents[1] / "wcl_analyzer" / "web" / "index.html").read_text(encoding="utf-8")
+    assert 'id="tpSite"' in html and 'id="rpSite"' in html and 'api("/api/zones", {site})' in html
+    print("OK версии игры: Classic, SoD и др. — свой сайт и API, ключ общий, свежий список рейдов")
 
 
 def test_player_all_bosses():
@@ -1023,6 +1072,7 @@ if __name__ == "__main__":
     test_burst_analysis()
     test_burst_rules()
     test_tank_analysis()
+    test_game_versions()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()

@@ -79,6 +79,7 @@ class PlayerLog:
     target_seq: list[tuple[float, int]] = field(default_factory=list)               # (t, цель каста)
     actor_names: dict[int, str] = field(default_factory=dict)                       # id → имя (враги, игроки)
     map_id: int | None = None
+    site_url: str | None = None   # сайт версии игры (Classic, SoD…); None — основной
 
     @property
     def difficulty_name(self) -> str:
@@ -86,7 +87,7 @@ class PlayerLog:
 
     @property
     def url(self) -> str:
-        return (f"{SITE_URL}/reports/{self.report_code}"
+        return (f"{self.site_url or SITE_URL}/reports/{self.report_code}"
                 f"#fight={self.fight_id}&type=casts&source={self.actor_id}")
 
     def link_at(self, t: float) -> str:
@@ -225,6 +226,7 @@ def build_player_log(report: dict, fight: dict, actor: dict, raw: dict,
         encounter_name=fight.get("name", ""), difficulty=int(fight.get("difficulty") or 0),
         kill=bool(fight.get("kill")), duration=duration,
         report_start=float(report.get("startTime") or 0), rank=rank, names=names, icons=icons,
+        site_url=report.get("_site_url"),
     )
 
     # Касты: begincast даёт начало произнесения, cast — момент применения

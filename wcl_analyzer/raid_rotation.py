@@ -262,7 +262,7 @@ def run_raid_rotation(client, url: str, fight=None, top_n: int = 10, log=print, 
             "info": {"boss": m.encounter_name if m else "", "difficulty": m.difficulty_name if m else "",
                      "duration": _fmt_t(m.duration) if m else "", "kill": m.kill if m else None,
                      "fight_id": insp["fight"], "code": insp["code"], "top_n": top_n,
-                     "url": f"https://www.warcraftlogs.com/reports/{insp['code']}#fight={insp['fight']}",
+                     "url": f"{getattr(client, 'site_url', None) or 'https://www.warcraftlogs.com'}/reports/{insp['code']}#fight={insp['fight']}",
                      "demo": False}}
 
 

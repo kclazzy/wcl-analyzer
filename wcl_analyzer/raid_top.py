@@ -76,6 +76,7 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
             guild = (rk.get("guild") or {}).get("name") or rk.get("name") or code
             B = R["extras"].get("burst") or {}
             return {"guild": guild, "duration": R["info"]["duration_s"], "code": code, "fight": fid,
+                    "site_url": getattr(client, "site_url", None),
                     "spikes": R["extras"]["spikes"], "cds": R["extras"]["raid_cds"],
                     "burst": {"lust": B.get("lust"), "waves": B.get("waves") or [], "uses": B.get("uses") or []},
                     "tank": (R["extras"].get("tank") or {}).get("light") or []}
@@ -252,7 +253,8 @@ def compare_with_top(R: dict, kills: list[dict]) -> dict | None:
     marks = [{"t": median(r["times"]), "name": ", ".join(names.get(i, f"#{i}") for i, _ in r["cds"].most_common(2))}
              for r in ref.values() if r["kills"] and r["covered"] / r["kills"] >= 0.5]
     return {"kills": [{"guild": k["guild"], "duration": _fmt_t(k["duration"]),
-                       "url": f"https://www.warcraftlogs.com/reports/{k['code']}#fight={k['fight']}"} for k in kills],
+                       "url": f"{k.get('site_url') or 'https://www.warcraftlogs.com'}/reports/{k['code']}#fight={k['fight']}"}
+                      for k in kills],
             "n": len(kills), "rows": [{kk: v for kk, v in r.items() if not kk.startswith("_")}
                                       for r in sorted(rows, key=lambda r: r["t"])],
             "my_cover": my_cover, "top_cover": top_cover, "plan": plan,

@@ -172,7 +172,7 @@ td .imp{font-size:13.5px}
 .tp-skip{margin:0 0 10px;font-size:14px;color:#F5C26B}
 .tpbox{margin-top:18px;border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 16px;background:var(--soft)}
 .tpbox summary{cursor:pointer;font-weight:600}
-.tpgrid{display:grid;grid-template-columns:1.4fr 1fr 1.4fr auto;gap:12px;align-items:end;margin-top:12px}
+.tpgrid{display:grid;grid-template-columns:1.3fr 1.4fr 1fr 1.4fr auto;gap:12px;align-items:end;margin-top:12px}
 @media (max-width:720px){.tpgrid{grid-template-columns:1fr}}
 .ftabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
 .ftabs button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:10px 18px;font-weight:600;font-size:15px;color:var(--muted);cursor:pointer}
@@ -348,23 +348,26 @@ dialog label.check input{width:auto;margin:0}
     <h2 id="startTitle">Чем ваш бой отличается от лучших игроков вашего спека</h2>
     <p class="lead">Вставьте ссылку на свой отчёт. Программа найдёт бой, сравнит его с лучшими игроками того же спека на том же боссе и покажет, что тренировать в первую очередь.</p>
     <form class="urlrow" id="findForm">
-      <input id="url" type="text" inputmode="url" placeholder="https://www.warcraftlogs.com/reports/…" aria-label="Ссылка на отчёт Warcraft Logs" autocomplete="off">
+      <input id="url" type="text" inputmode="url" placeholder="https://www.warcraftlogs.com/reports/… (или classic., sod., fresh., vanilla.)" aria-label="Ссылка на отчёт Warcraft Logs" autocomplete="off">
       <button class="btn" id="findBtn" type="submit">Найти бой</button>
     </form>
     <div class="hint">Нет ключа или лога под рукой? Посмотрите на демо-данных: <button class="linkbtn" id="demoRaidBtn" type="button">разбор боя</button> или <button class="linkbtn" id="demoBtn" type="button">разбор игрока</button>.</div>
     <details class="tpbox" id="tpBox">
-      <summary>Топ прогресса без лога — выбрать рейд и сложность</summary>
+      <summary>Топ прогресса без лога — выбрать версию игры, рейд и сложность</summary>
       <div class="tpgrid">
+        <div><label for="tpSite">Версия игры</label><select id="tpSite" class="siteSel"></select></div>
         <div><label for="tpZone">Рейд</label><select id="tpZone"><option value="">Загружаю список…</option></select></div>
         <div><label for="tpDiff">Сложность</label><select id="tpDiff"></select></div>
         <div><label for="tpBoss">Босс</label><select id="tpBoss"></select></div>
         <div><button class="btn" id="tpRun" type="button">Разобрать топ прогресса</button></div>
       </div>
-      <p class="hint" id="tpInfo" style="margin:10px 0 0">Бой первой гильдии, которая убила босса на этой сложности и выложила открытый лог убийства в Warcraft Logs. В нём урон, сейвы и кто какие кулдауны жал, смерти, состав, заметка MRT. Без сравнения и без вашего лога, нужен только ключ Warcraft Logs. «Все боссы» — вкладка на каждого босса. На эпохальной сложности гильдии берутся по рейтингу прогресса (первые убийства в мире). Если лог закрыт, программа возьмёт следующее место (до 6-го) и напишет, чьи логи недоступны. На героической и обычной сложности такого рейтинга нет — берётся самый ранний по дате открытый килл среди 300 лучших в рейтинге WCL.</p>
+      <p class="hint" id="tpInfo" style="margin:10px 0 0">Бой первой гильдии, которая убила босса на этой сложности и выложила открытый лог убийства в Warcraft Logs. В нём урон, сейвы и кто какие кулдауны жал, смерти, состав, заметка MRT. Без сравнения и без вашего лога, нужен только ключ Warcraft Logs. «Все боссы» — вкладка на каждого босса. На эпохальной сложности гильдии берутся по рейтингу прогресса (первые убийства в мире). Если лог закрыт, программа возьмёт следующее место (до 6-го) и напишет, чьи логи недоступны. На героической и обычной сложности такого рейтинга нет — берётся самый ранний по дате открытый килл среди 300 лучших в рейтинге WCL. Версия игры — основная (Retail) или Classic, Classic Anniversary, Season of Discovery, Classic Era: у каждой свой сайт Warcraft Logs, ключ подходит ко всем. Список рейдов и рейтинг берутся с Warcraft Logs заново при каждом открытии.</p>
+      <p class="hint" id="tpFresh" style="margin:6px 0 0"></p>
     </details>
     <details class="tpbox" id="rpBox">
       <summary>План сейвов по составу — состав из игры и длительность боя</summary>
       <div class="tpgrid">
+        <div><label for="rpSite">Версия игры</label><select id="rpSite" class="siteSel"></select></div>
         <div><label for="rpZone">Рейд</label><select id="rpZone"><option value="">Загружаю список…</option></select></div>
         <div><label for="rpDiff">Сложность</label><select id="rpDiff"></select></div>
         <div><label for="rpBoss">Босс</label><select id="rpBoss"></select></div>
@@ -672,7 +675,7 @@ async function refreshKey(){
   p.querySelector("span").innerHTML = has_key ? 'Ключ API<span class="long"> подключён</span><span class="short"> ✓</span>' : "Подключить ключ API";
   renderSaveDir().catch(()=>{});
   /* ключ появился — списки рейдов (если блок открыт и список не загрузился) загружаем сразу */
-  if (has_key && !TP_ZONES && ($("#tpBox").open || $("#rpBox").open)) loadZones();
+  if (has_key && !ZONES_FRESH[SITE] && ($("#tpBox").open || $("#rpBox").open)) loadZones();
   /* публичный сервис в обычном браузере телефона: выбирать нечего — раздел не показываем */
   $("#savedir").hidden = STATUS.public && STATUS.app !== "android" && typeof window.showDirectoryPicker !== "function";
   refreshLimit();
@@ -805,31 +808,62 @@ $("#ref").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
 const RUN_BTNS = ["#runBtn", "#progBtn", "#tpRun", "#rpRun"];
 
-/* ---------- «Топ прогресса» без лога: рейд, сложность, босс из Warcraft Logs ---------- */
-const TP_DIFF = {5: "Эпохальный", 4: "Героический", 3: "Обычный"};
-let TP_ZONES = null;
-async function loadZones(){
-  if (TP_ZONES) return;
-  try { const c = JSON.parse(localStorage.getItem("wclZones") || "null");
-        if (c && Date.now() - c.at < 3 * 86400e3 && c.zones.length) TP_ZONES = c.zones; } catch(e){}
-  if (!TP_ZONES) {
-    try { TP_ZONES = (await api("/api/zones", {})).zones || []; }
-    catch(e){ ["#tpZone", "#rpZone"].forEach(z => $(z).innerHTML = `<option value="">${e.needKey ? "Нужен ключ Warcraft Logs" : "Список не загрузился"}</option>`);
-              showErr(e.message); if (e.needKey) $("#keyDlg").showModal(); return; }
-    try { localStorage.setItem("wclZones", JSON.stringify({at: Date.now(), zones: TP_ZONES})); } catch(e){}
+/* ---------- «Топ прогресса» без лога: версия игры, рейд, сложность, босс — с Warcraft Logs ---------- */
+const TP_DIFF = {5: "Эпохальный", 4: "Героический", 3: "Обычный", 1: "Поиск рейда"};
+const SITES = [["www", "Retail — основная игра"], ["classic", "Classic — прогрессия"], ["fresh", "Classic Anniversary / Fresh"],
+               ["sod", "Season of Discovery"], ["vanilla", "Classic Era / Hardcore"]];
+const ZONES = {};          // версия игры → список рейдов
+const ZONES_FRESH = {};    // версия игры → список уже обновлён с Warcraft Logs при этом открытии страницы
+let TP_ZONES = null;       // список выбранной версии (совместимость)
+let SITE = "www";
+try { SITE = localStorage.getItem("wclSite") || "www"; } catch(e){}
+if (!SITES.some(([k]) => k === SITE)) SITE = "www";
+document.querySelectorAll(".siteSel").forEach(sel => {
+  sel.innerHTML = SITES.map(([k, n]) => `<option value="${k}" ${k === SITE ? "selected" : ""}>${esc(n)}</option>`).join("");
+  sel.onchange = () => { SITE = sel.value; try { localStorage.setItem("wclSite", SITE); } catch(e){}
+    document.querySelectorAll(".siteSel").forEach(o => o.value = SITE); loadZones(true); };
+});
+function zoneOptions(zs){
+  const groups = new Map();
+  zs.forEach(z => { const g = z.expansion || ""; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(z); });
+  return [...groups].map(([g, list]) => { const opts = list.map(z => `<option value="${z.id}">${esc(z.name)}${z.frozen ? " (рейтинг заморожен)" : ""}</option>`).join("");
+    return groups.size > 1 && g ? `<optgroup label="${esc(g)}">${opts}</optgroup>` : opts; }).join("");
+}
+function showZones(){
+  const zs = ZONES[SITE] || []; TP_ZONES = zs;
+  if (!zs.length) { ["#tpZone", "#rpZone"].forEach(z => $(z).innerHTML = '<option value="">Рейды не найдены</option>'); return; }
+  ["tp", "rp"].forEach(k => { const prev = $(`#${k}Zone`).value;
+    $(`#${k}Zone`).innerHTML = zoneOptions(zs);
+    if (zs.some(z => String(z.id) === prev)) $(`#${k}Zone`).value = prev;
+    zoneChanged(k); });
+}
+/* Список рейдов — с Warcraft Logs при каждом открытии (раз за открытие страницы на версию игры); пока грузится —
+   прошлый список с этого устройства. Нет связи — остаётся прошлый. */
+async function loadZones(force){
+  const site = SITE;
+  if (ZONES_FRESH[site] && !force) return showZones();
+  if (!ZONES[site]) { try { const c = JSON.parse(localStorage.getItem("wclZones_" + site) || "null");
+                            if (c && c.zones && c.zones.length) ZONES[site] = c.zones; } catch(e){} }
+  if (ZONES[site]) showZones();
+  else ["#tpZone", "#rpZone"].forEach(z => $(z).innerHTML = '<option value="">Загружаю список…</option>');
+  $("#tpFresh").textContent = "Обновляю список рейдов с Warcraft Logs…";
+  try {
+    const r = await api("/api/zones", {site});
+    ZONES[site] = r.zones || []; ZONES_FRESH[site] = true;
+    try { localStorage.setItem("wclZones_" + site, JSON.stringify({at: Date.now(), zones: ZONES[site]})); } catch(e){}
+    if (SITE === site) { showZones(); $("#tpFresh").textContent = `Список рейдов обновлён с Warcraft Logs в ${new Date().toLocaleTimeString("ru-RU", {hour: "2-digit", minute: "2-digit"})}.`; }
+  } catch(e){
+    $("#tpFresh").textContent = ZONES[site] ? "Не удалось обновить список с Warcraft Logs — показан прошлый." : "";
+    if (!ZONES[site]) { ["#tpZone", "#rpZone"].forEach(z => $(z).innerHTML = `<option value="">${e.needKey ? "Нужен ключ Warcraft Logs" : "Список не загрузился"}</option>`);
+      showErr(e.message); if (e.needKey) $("#keyDlg").showModal(); }
   }
-  if (!TP_ZONES.length) { ["#tpZone", "#rpZone"].forEach(z => $(z).innerHTML = '<option value="">Рейды не найдены</option>'); return; }
-  ["tp", "rp"].forEach(k => {
-    $(`#${k}Zone`).innerHTML = TP_ZONES.map(z => `<option value="${z.id}">${esc(z.name)}${z.frozen ? " (прошлый сезон)" : ""}</option>`).join("");
-    zoneChanged(k);
-  });
 }
 /* k: tp — «Топ прогресса» (есть «Все боссы»), rp — план по составу (один босс) */
 function zoneChanged(k){
   const z = (TP_ZONES || []).find(z => String(z.id) === $(`#${k}Zone`).value); if (!z) return;
   const prev = $(`#${k}Diff`).value || "5";
-  const ds = z.difficulties.map(d => d.id).sort((a, b) => b - a);
-  $(`#${k}Diff`).innerHTML = ds.map(d => `<option value="${d}" ${String(d) === prev ? "selected" : ""}>${TP_DIFF[d] || d}</option>`).join("");
+  const ds = [...z.difficulties].sort((a, b) => b.id - a.id);
+  $(`#${k}Diff`).innerHTML = ds.map(d => `<option value="${d.id}" ${String(d.id) === prev ? "selected" : ""}>${esc(TP_DIFF[d.id] || d.name || d.id)}</option>`).join("");
   $(`#${k}Boss`).innerHTML = (k === "tp" ? '<option value="all">Все боссы</option>' : "") + z.encounters.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join("");
 }
 const tpZoneChanged = () => zoneChanged("tp");
@@ -851,12 +885,12 @@ $("#rpRun").onclick = () => {
   if (!$("#rpBoss").value) return showErr("Сначала выберите рейд и босса.");
   if (!$("#rpRoster").value.trim()) return showErr("Вставьте состав: в игре /wugx (аддон WoWUtils Group Export) → Ctrl+C → сюда.");
   try { localStorage.setItem("wclRosterMin", $("#rpMin").value); } catch(e){}
-  run({mode: "rosterplan", encounter: $("#rpBoss").value, difficulty: $("#rpDiff").value, minutes: $("#rpMin").value,
+  run({mode: "rosterplan", site: SITE, encounter: $("#rpBoss").value, difficulty: $("#rpDiff").value, minutes: $("#rpMin").value,
        roster: $("#rpRoster").value, wait: $("#waitLimit").checked});
 };
 $("#tpRun").onclick = () => {
   if (!$("#tpZone").value) return showErr("Сначала выберите рейд.");
-  run({mode: "progress", zone: $("#tpZone").value, difficulty: $("#tpDiff").value, encounter: $("#tpBoss").value, wait: $("#waitLimit").checked});
+  run({mode: "progress", site: SITE, zone: $("#tpZone").value, difficulty: $("#tpDiff").value, encounter: $("#tpBoss").value, wait: $("#waitLimit").checked});
 };
 
 /* ---------- анализ ---------- */

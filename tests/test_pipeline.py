@@ -450,6 +450,66 @@ def test_burst_rules():
     print("OK правила бурстов: смерти, заряды, «сам», два героизма, окна на боссе, волны и героизм топа, «Главное»")
 
 
+def test_tank_analysis():
+    """Танки: танкбастер найден (не ближний бой), прикрыт ли кулдауном танка или внешним сейвом, удар без кулдауна
+    при откатанном кулдауне, сравнение с лучшими киллами, план и заметка MRT, лист Excel, строка в «Главном»;
+    смерть танка от удара, бафф без каста, внешний сейв по баффу, ближний бой — не танкбастер."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    from wcl_analyzer import raid_tank as rt
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    T = R["extras"]["tank"]
+    assert [b["name"] for b in T["busters"]] == ["Сокрушение"], T["busters"]
+    b = T["busters"][0]
+    assert (b["n"], b["covered"]) == (8, 5), b
+    bare = [e for e in T["events"] if not e["covered"]]
+    assert [(e["time"], e["tank"]) for e in bare] == [("1:45", "Гронвальд"), ("3:45", "Сайрена"), ("4:25", "Гронвальд")], bare
+    assert bare[0]["ready"] == ["Ни шагу назад"], bare[0]
+    gs = next(e for e in T["events"] if e["time"] == "5:05")
+    assert gs["covered"] and gs["ext"][0]["from"] == "Элария", gs
+    assert T["top"]["abilities"]["900001"]["share"] == 1.0
+    hints = " | ".join(T["hints"])
+    assert "у лучших киллов — 100%" in hints and "1:45 «Сокрушение», Гронвальд — Ни шагу назад" in hints, hints
+    assert any("вкладке «Танки»" in x for x in R["brief"]), R["brief"]
+    assert all(r["pick"] for r in T["plan"]) and "{spell:871}" in T["mrt"] and "→" in T["mrt"], T["mrt"]
+    assert not any(c["id"] in (871, 55233, 47788) for c in R["extras"]["raid_cds"]), "кулдауны танков — не рейдовые сейвы"
+    with tempfile.TemporaryDirectory() as d:
+        wb = load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx"))
+        assert "Танки" in wb.sheetnames
+
+    # Смерть танка от удара; кулдаун по баффу без каста; внешний сейв по баффу; ближний бой — не танкбастер
+    ms = lambda t: int(t * 1000)
+    players = {1: {"name": "Tank", "role": "tank", "cls": "Warrior", "spec": "Protection"},
+               2: {"name": "Tank2", "role": "tank", "cls": "Paladin", "spec": "Protection"},
+               3: {"name": "Disc", "role": "healer", "cls": "Priest", "spec": "Discipline"},
+               4: {"name": "Dps", "role": "dps", "cls": "Mage", "spec": "Fire"}}
+    hit = lambda t, tgt, ab, a: {"timestamp": ms(t), "type": "damage", "sourceID": 100, "targetID": tgt, "abilityGameID": ab, "amount": a}
+    taken = [hit(t, 1, 1, 100_000) for t in range(0, 300, 2)]
+    taken += [hit(30, 1, 5000, 900_000), hit(90, 2, 5000, 900_000), hit(150, 1, 5000, 900_000)]
+    raw = {"fight": {"name": "X"}, "taken": taken,
+           "casts": [{"timestamp": ms(149), "type": "cast", "sourceID": 2, "targetID": 2, "abilityGameID": 31850}],
+           "tank_buffs": [{"timestamp": ms(29), "type": "applybuff", "sourceID": 1, "targetID": 1, "abilityGameID": 871},
+                          {"timestamp": ms(37), "type": "removebuff", "sourceID": 1, "targetID": 1, "abilityGameID": 871},
+                          {"timestamp": ms(89), "type": "applybuff", "sourceID": 3, "targetID": 2, "abilityGameID": 33206},
+                          {"timestamp": ms(97), "type": "removebuff", "sourceID": 3, "targetID": 2, "abilityGameID": 33206}],
+           "deaths": [{"timestamp": ms(151), "type": "death", "targetID": 1}]}
+    deaths = [{"id": 1, "t": 151.0}]
+    names = {1: "Melee", 5000: "Big Smash", 871: "Shield Wall", 33206: "Pain Suppression"}
+    T = rt.tank_analysis(raw, players, lambda x: x, lambda ev: ev["timestamp"] / 1000, lambda ab: names.get(ab, f"Spell {ab}"),
+                         300.0, [], deaths)
+    assert [b["id"] for b in T["busters"]] == [5000], T["busters"]
+    ev = {e["time"]: e for e in T["events"]}
+    assert ev["0:30"]["covered"] and ev["0:30"]["own"][0]["id"] == 871
+    assert ev["1:30"]["ext"] and ev["1:30"]["ext"][0]["from"] == "Disc"
+    assert ev["2:30"]["died"] and not ev["2:30"]["covered"] and "Ни шагу назад" in ev["2:30"]["ready"], ev["2:30"]
+    assert T["key"] and T["key"].startswith("Танк Tank умер от «Big Smash»"), T["key"]
+    print("OK танки: танкбастеры, прикрыт ли удар, смерть от удара, лучшие киллы, план и заметка MRT, лист Excel")
+
+
 def test_save_dir_full_path():
     """«Куда сохранять файлы» на компьютере: «Загрузки» — полным путём, выбранная папка — полным путём."""
     from pathlib import Path
@@ -962,6 +1022,7 @@ if __name__ == "__main__":
     test_save_dir_full_path()
     test_burst_analysis()
     test_burst_rules()
+    test_tank_analysis()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()

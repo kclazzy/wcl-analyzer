@@ -29,7 +29,8 @@ def light_raid(client, code: str, fid: int, report: dict | None = None, difficul
     from . import game_data
     from .raid import analyze_raid
     # рейдовые кулдауны, героизм и бурсты DPS — всё в одной выборке кастов
-    ids = ", ".join(str(x) for x in sorted(game_data.cd_ids() | game_data.lust_ids() | game_data.dps_cd_ids()))
+    ids = ", ".join(str(x) for x in sorted(game_data.cd_ids() | game_data.lust_ids() | game_data.dps_cd_ids()
+                                         | game_data.tank_cd_ids()))
     report = report or client.report(code)
     f = next(x for x in report["fights"] if int(x["id"]) == int(fid))
     if difficulty and int(f.get("difficulty") or 0) and int(f["difficulty"]) != int(difficulty):
@@ -76,7 +77,8 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
             B = R["extras"].get("burst") or {}
             return {"guild": guild, "duration": R["info"]["duration_s"], "code": code, "fight": fid,
                     "spikes": R["extras"]["spikes"], "cds": R["extras"]["raid_cds"],
-                    "burst": {"lust": B.get("lust"), "waves": B.get("waves") or [], "uses": B.get("uses") or []}}
+                    "burst": {"lust": B.get("lust"), "waves": B.get("waves") or [], "uses": B.get("uses") or []},
+                    "tank": (R["extras"].get("tank") or {}).get("light") or []}
         except (WCLError, StopIteration, KeyError, LookupError) as ex:
             log(f"  пропущен килл {code}: {ex}")
             return None

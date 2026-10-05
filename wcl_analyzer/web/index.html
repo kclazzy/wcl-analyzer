@@ -1854,11 +1854,44 @@ function renderBurst(B, el){
       + table(["Гильдия","Волны бурстов рейда"], (T.waves||[]).map(w => [esc(w.guild), esc((w.times||[]).join(", ") || "—")]))) : ""}`;
 }
 
+/* Танки: танкбастеры, чем танк был прикрыт, кулдауны танков, лучшие киллы и заметка MRT для танков */
+function renderTank(T, el){
+  if (!el) return;
+  if (!T || T.error || !T.tanks) { el.innerHTML = '<p class="empty">Нет данных о танках: разбор из прежней версии — разберите бой заново.</p>'; return; }
+  const res = e => e.died ? `<span class="worse">смерть</span>${e.covered ? "" : " — без кулдауна"}`
+    : e.covered ? "прикрыт" : `<span class="worse">без кулдауна</span>`;
+  const ready = e => e.covered ? "" : [e.ready.length ? "откатан: " + e.ready.join(", ") : "",
+    e.ready_ext.length ? "свободны внешние: " + e.ready_ext.join(", ") : ""].filter(Boolean).join("; ");
+  const prot = e => [...e.own.map(x => x.name), ...e.ext.map(x => `${x.name} (${x.from})`)].join(", ") || "—";
+  const top = (T.top || {}).abilities || {};
+  const mrt = T.mrt ? `<div class="mrt" style="margin-top:12px">
+    <button type="button" class="mini mrtbtn" data-mrt data-label="Скопировать для MRT (танки)">Скопировать для MRT (танки)</button>
+    <span class="hint" style="margin-left:8px">На каждый танкбастер — кулдаун танка или внешний сейв лекаря (→ кому), с учётом отката: сначала то, что сработало в этом бою, затем — что жмут лучшие киллы. В игре: /mrt → Заметки → вставить → Отправить.</span>
+    <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:13.5px">Текст заметки</summary>
+      <textarea readonly rows="${Math.min(14, T.mrt.split("\n").length + 1)}" style="width:100%;margin-top:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;box-sizing:border-box">${esc(T.mrt)}</textarea></details></div>` : "";
+  el.innerHTML = `
+    ${(T.hints||[]).length ? `<div class="box brief"><h3>Главное по танкам</h3><ul class="lines">${T.hints.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
+    ${box("Танкбастеры", "Крупные удары босса по танку (не ближний бой): чем танк был прикрыт в момент удара — своим защитным кулдауном или внешним сейвом. «Снижено» — насколько удар меньше, чем без защиты (броня, кулдауны, активная защита). Активная защита (Ironfur, Shield Block и т. п.) висит почти всё время и здесь не оценивается.",
+      table(["Когда","Фаза","Удар","Танк","Урон","Защита","Итог","Был готов"], (T.events||[]).map(e => [esc(e.time), esc(e.phase_label||""),
+        esc(e.ability), esc(e.tank), `${(e.damage/1e6).toFixed(2).replace(".", ",")} млн${e.mitigated!=null ? ` <span style="color:var(--muted);font-size:13px">снижено ${Math.round(e.mitigated*100)}%</span>` : ""}`,
+        esc(prot(e)), res(e), esc(ready(e))]),
+        {empty: "Танкбастеров не найдено.", flag: (() => { const f = (T.events||[]).map(e => !e.covered || e.died); return i => f[i]; })()}))}
+    ${box("Защитные кулдауны танков", "Когда нажаты, сколько раз из возможных (пока танк был жив) и сколько нажатий пришлось на танкбастер.",
+      table(["Танк","Кулдаун","Нажат в","Нажато / можно","На удары"], (T.cds||[]).map(c => [esc(c.tank), c.id ? esc(c.name) : '<span style="color:var(--muted)">кулдаунов из таблицы не нажато</span>',
+        esc(c.time), c.id ? `${c.used} / ${c.max_uses}` : "", c.id ? `${c.on_hit} из ${c.used}` : ""])))}
+    ${(T.plan||[]).length ? box("План на следующий пулл", "Кто и что жмёт на каждый танкбастер.",
+      table(["Когда","Удар","Танк","Кулдаун","Почему"], T.plan.map(r => [esc(r.time) + (r.phase_label ? ` <span style="color:var(--muted);font-size:13px">${esc(r.phase_label)}</span>` : ""),
+        esc(r.ability), esc(r.tank), r.pick ? esc(r.pick.name + (r.pick.external ? ` (${r.pick.player})` : "")) : '<span class="worse">нет свободного кулдауна</span>', esc(r.why||"")])) + mrt) : ""}
+    ${Object.keys(top).length ? box("Лучшие киллы", `Какая доля ударов прикрыта кулдауном у гильдий с лучшими киллами этого босса (${T.top.kills}).`,
+      table(["Удар","У вас","У лучших","Чем прикрывают чаще всего"], (T.busters||[]).filter(b => top[b.id]).map(b => [esc(b.name), `${b.covered} из ${b.n}`,
+        `${Math.round(top[b.id].share*100)}%`, esc((top[b.id].names||[]).join(", "))]))) : ""}`;
+}
+
 function renderRaid(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, S = R.summary, fd = S.first_death;
   const outcome = I.kill ? "килл" : (I.boss_pct!=null ? `вайп на ${num(I.boss_pct,1)}% здоровья босса` : "вайп");
-  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-dmg","Нанесение урона"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
+  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-dmg","Нанесение урона"],["r-tank","Танки"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
   const el = resEl();
   el.innerHTML = `
     ${I.demo?'<div class="demo-flag">Демо: синтетический рейд, не реальный лог</div>':""}
@@ -1939,6 +1972,7 @@ function renderRaid(R){
   if (X.damage_timeline) savesTab(false);
   else $("#p-r-cd").innerHTML = '<p class="empty">Нет данных об уроне по рейду.</p>';
   renderBurst(X.burst, $("#p-r-dmg"));
+  renderTank(X.tank, $("#p-r-tank"));
   if (Object.keys(X).length) $("#p-r-sum").insertAdjacentHTML("beforeend", `<div class="grid2">
     <div>
       ${box("Прерывания", "Каст прошёл, хотя эту способность в бою прерывали.",

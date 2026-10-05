@@ -68,10 +68,21 @@ BURSTS = {"Торвин": 1719, "Мирель": 19574, "Кассия": 190319, "
 LATE_BURST = ("Лиана",)                     # бурст не под героизм
 PI, CORE = 10060, 900050                    # Придание сил; «Уязвимое ядро» — босс уязвим
 
+# Танки (вкладка «Танки»): сокрушение в 0:25, 1:05, 1:45… поочерёдно по Гронвальду и Сайрене.
+# У вас 1:45, 4:25 (Гронвальд) и 3:45 (Сайрена) — без кулдауна, хотя кулдаун откатан; у топа прикрыто всё.
+SW, LS, VB, IBF, GS, IB = 871, 12975, 55233, 48792, 47788, 102342
+TANK_CDS = [("Гронвальд", 25, SW, None), ("Сайрена", 65, VB, None), ("Сайрена", 145, IBF, None),
+            ("Гронвальд", 185, LS, None), ("Элария", 305, GS, "Сайрена")]
+TANK_CDS_TOP = [("Гронвальд", 25, SW, None), ("Сайрена", 65, VB, None), ("Гронвальд", 105, LS, None),
+                ("Сайрена", 145, IBF, None), ("Вейла", 185, IB, "Гронвальд"), ("Сайрена", 225, VB, None),
+                ("Гронвальд", 265, SW, None), ("Сайрена", 305, IBF, None)]
+
 ABILITIES = {
     MELEE: "Ближний бой", CRUSH: "Сокрушение", WAVE: "Ледяная волна", SHARDS: "Осколки льда",
     POOL: "Лужа холода", BEAM: "Ледяной луч", ENRAGE: "Ярость босса", WHISPER: "Ледяной шёпот",
     FROST: "Обморожение", LUST: "Bloodlust", PI: "Придание сил", CORE: "Уязвимое ядро",
+    SW: "Глухая оборона", LS: "Ни шагу назад", VB: "Кровь вампира", IBF: "Незыблемость льда",
+    GS: "Оберегающий дух", IB: "Железная кора",
     1719: "Безрассудство", 19574: "Звериный гнев", 190319: "Возгорание", 228260: "Облик Бездны",
     191427: "Метаморфоза", 31884: "Гнев карателя", 194223: "Парад планет", 198067: "Элементаль огня",
     375087: "Ярость дракона", 42650: "Войско мертвых", POT: "Зелье мощи", HS: "Камень здоровья",
@@ -224,11 +235,12 @@ class FakeRaidClient:
 
         taken, deaths, casts, boss_casts, interrupts, dispels = [], [], [], [], [], []
 
-        def hit(t, name, ab, amount):
+        def hit(t, name, ab, amount, unmit=None):
             if not alive(name, t) or t > dur:
                 return
             taken.append({"timestamp": ts(t), "type": "damage", "sourceID": BOSS, "targetID": PID[name],
-                          "abilityGameID": ab, "amount": int(amount), "absorbed": 0, "fight": fid})
+                          "abilityGameID": ab, "amount": int(amount), "absorbed": 0, "fight": fid,
+                          **({"unmitigatedAmount": int(unmit)} if unmit else {})})
 
         def cast(t, name, ab, src=None, target=BOSS):
             if t <= dur and (src is not None or alive(name, t)):
@@ -267,13 +279,18 @@ class FakeRaidClient:
                 cast(tw + 2.0, "Квелл", HS)
                 cast(tw + 2.5, "Дорн", HS)
 
-        # Танки: сокрушение и ближний бой
+        # Танки: сокрушение и ближний бой; защитные кулдауны танков — на часть сокрушений (у топа — на все)
+        tank_cds = TANK_CDS_TOP if top else TANK_CDS
+        covered = {tc for _, tc, *_ in tank_cds}
         k = 0
         for tc in [25 + 40 * i for i in range(int(dur // 40) + 1)]:
             if tc < dur:
                 boss(tc - 2, CRUSH)
-                hit(tc, tanks[k % 2], CRUSH, 1_400_000 * rng.uniform(0.9, 1.1))
+                amount = 1_400_000 * rng.uniform(0.9, 1.1)
+                hit(tc, tanks[k % 2], CRUSH, amount, amount / (0.6 if tc in covered else 0.85))
                 k += 1
+        for who, tc, ab, target in tank_cds:
+            cast(tc - 1.0, who, ab, target=PID[target] if target else PID[who])
         t = 1.0
         while t < dur:
             hit(t, tanks[int(t // 80) % 2], MELEE, 180_000 * rng.uniform(0.8, 1.2))

@@ -33,6 +33,7 @@ def write_raid_workbook(R: dict, path: str | Path, wb=None) -> Path:
     _damage(wb, R, demo)
     _vs_top(wb, R, demo)
     _burst(wb, R, demo)
+    _tank(wb, R, demo)
     _overview(wb, R, demo)
     _players(wb, R, demo)
     _mechanics(wb, R, demo)
@@ -85,6 +86,46 @@ def _burst(wb, R, demo):
                    + f" — у {T['lust']['n']} из {T['lust']['of']}")
             s.row += 1
         s.table(["Гильдия", "Волны бурстов"], [[w["guild"], ", ".join(w["times"]) or "—"] for w in T.get("waves") or []])
+
+
+def _tank(wb, R, demo):
+    T = (R.get("extras") or {}).get("tank") or {}
+    if not T or T.get("error") or not T.get("tanks"):
+        return
+    s = Sheet(wb, "Танки", demo, {"A": 10, "B": 18, "C": 24, "D": 16, "E": 14, "F": 34, "G": 20, "H": 40})
+    s.title("Танки: танкбастеры и защитные кулдауны",
+            "Крупные удары босса по танку и чем танк был прикрыт: свой кулдаун или внешний сейв. "
+            "Активная защита (Ironfur, Shield Block) не оценивается.")
+    if T.get("hints"):
+        s.section("Главное")
+        for line in T["hints"]:
+            s.cell(s.row, 1, "• " + line)
+            s.row += 1
+        s.row += 1
+    s.section("Танкбастеры")
+    rows = []
+    for e in T.get("events") or []:
+        prot = ", ".join([x["name"] for x in e["own"]] + [f"{x['name']} ({x['from']})" for x in e["ext"]]) or "—"
+        res = ("смерть" + ("" if e["covered"] else " — без кулдауна")) if e["died"] else ("прикрыт" if e["covered"] else "без кулдауна")
+        ready = "" if e["covered"] else "; ".join(x for x in (("откатан: " + ", ".join(e["ready"])) if e["ready"] else "",
+                                                              ("свободны внешние: " + ", ".join(e["ready_ext"])) if e["ready_ext"] else "") if x)
+        rows.append([e["time"], e.get("phase_label") or "", e["ability"], e["tank"], round(e["damage"] / 1e6, 2), prot, res, ready])
+    s.table(["Когда", "Фаза", "Удар", "Танк", "Урон, млн", "Защита", "Итог", "Был готов"], rows)
+    s.section("Защитные кулдауны танков")
+    s.table(["Танк", "Кулдаун", "Нажат в", "Нажато / можно", "На удары"],
+            [[c["tank"], c["name"] or "— не нажато", c["time"], f"{c['used']} / {c['max_uses']}" if c["id"] else "",
+              f"{c['on_hit']} из {c['used']}" if c["id"] else ""] for c in T.get("cds") or []])
+    if T.get("plan"):
+        s.section("План на следующий пулл")
+        s.table(["Когда", "Фаза", "Удар", "Танк", "Кулдаун", "Почему"],
+                [[r["time"], r.get("phase_label") or "", r["ability"], r["tank"],
+                  (r["pick"]["name"] + (f" ({r['pick']['player']})" if r["pick"]["external"] else "")) if r["pick"] else "нет свободного кулдауна",
+                  r.get("why") or ""] for r in T["plan"]])
+    if T.get("mrt"):
+        s.section("Заметка MRT для танков")
+        for line in T["mrt"].split("\n"):
+            s.cell(s.row, 1, line)
+            s.row += 1
 
 
 # --------------------------------------------------------------- Выжимка

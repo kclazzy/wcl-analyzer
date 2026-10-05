@@ -193,6 +193,15 @@ def dps_cd_ids() -> set[int]:
     return _IDS_CACHE["ids"]
 
 
+def tank_cds() -> list[dict]:
+    """Защитные кулдауны танков и внешние сейвы на танка — вкладка «Танки»."""
+    return _section("tank_cds")
+
+
+def tank_cd_ids() -> set[int]:
+    return {int(c["id"]) for c in tank_cds()}
+
+
 def amp_windows() -> list[dict]:
     """Механики босса, под которые жмут бурсты (уязвимость, снятый щит…): id и/или название."""
     return _section("amp_windows")

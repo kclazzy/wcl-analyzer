@@ -91,6 +91,7 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
     batched = None
     from . import game_data as _gdb
     burst_ids = ", ".join(str(c["id"]) for c in _gdb.dps_cds() if c.get("kind") == "burst")
+    tank_buff_ids = ", ".join(sorted({str(c["buff"]) for c in _gdb.tank_cds() if c.get("buff")}))
     if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
         from .api import WCLError
         log("Урон, лечение, касты, смерти всех пуллов — одним запросом…")
@@ -104,6 +105,8 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
             specs[f"boss_buffs_{i}"] = {"data_type": "Buffs", "target_id": bid, "hostility": "Enemies"}
         if burst_ids:   # бурсты, которые включаются сами (бафф без каста)
             specs["burst_buffs"] = {"data_type": "Buffs", "filter_expression": f"ability.id in ({burst_ids})"}
+        if tank_buff_ids:   # защитные кулдауны и внешние сейвы на танках
+            specs["tank_buffs"] = {"data_type": "Buffs", "filter_expression": f"ability.id in ({tank_buff_ids})"}
         for x in pulls:
             if int(x["id"]) != fid:
                 specs[f"pull_{x['id']}"] = {"data_type": "Deaths", "fight_id": int(x["id"]),
@@ -120,6 +123,7 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
         raw["boss_debuffs"] = [ev for i in range(len(bosses)) for ev in batched[f"boss_debuffs_{i}"]]
         raw["boss_buffs"] = [ev for i in range(len(bosses)) for ev in batched.get(f"boss_buffs_{i}") or []]
         raw["burst_buffs"] = batched.get("burst_buffs") or []
+        raw["tank_buffs"] = batched.get("tank_buffs") or []
     else:
         raw["dmg_table"] = client.raid_table(code, fid, "DamageDone")
         raw["heal_table"] = client.raid_table(code, fid, "Healing")
@@ -136,18 +140,19 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
             raw["combatant"] = client.events(code, fid, s, s + 1000, "CombatantInfo")
         except Exception:  # noqa: BLE001
             raw["combatant"] = []
-        raw["boss_debuffs"], raw["boss_buffs"], raw["burst_buffs"] = [], [], []
+        raw["boss_debuffs"], raw["boss_buffs"], raw["burst_buffs"], raw["tank_buffs"] = [], [], [], []
         for bid in boss_actor_ids(report, f)[:2]:
             try:
                 raw["boss_debuffs"] += client.events(code, fid, s, e, "Debuffs", target_id=bid, hostility="Enemies")
                 raw["boss_buffs"] += client.events(code, fid, s, e, "Buffs", target_id=bid, hostility="Enemies")
             except Exception:  # noqa: BLE001
                 pass
-        if burst_ids:
-            try:
-                raw["burst_buffs"] = client.events(code, fid, s, e, "Buffs", filter_expression=f"ability.id in ({burst_ids})")
-            except Exception:  # noqa: BLE001 — бурсты без нажатия необязательны
-                pass
+        for key, ids in (("burst_buffs", burst_ids), ("tank_buffs", tank_buff_ids)):
+            if ids:
+                try:
+                    raw[key] = client.events(code, fid, s, e, "Buffs", filter_expression=f"ability.id in ({ids})")
+                except Exception:  # noqa: BLE001 — баффы необязательны
+                    pass
     try:
         raw["rankings"] = client.report_rankings(code, fid) if f.get("kill") else None
     except Exception as ex:  # noqa: BLE001 — parse не обязателен
@@ -672,6 +677,11 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
         extras["burst"] = burst_analysis(raw, players, owner, rel, nm, dur, phases)
     except Exception as e:  # noqa: BLE001 — дополнительная вкладка не должна ронять разбор
         extras["burst"] = {"error": str(e)}
+    try:  # танки: танкбастеры и чем танк был прикрыт
+        from .raid_tank import tank_analysis
+        extras["tank"] = tank_analysis(raw, players, owner, rel, nm, dur, phases, deaths)
+    except Exception as e:  # noqa: BLE001
+        extras["tank"] = {"error": str(e)}
     for sp in extras.get("spikes", []):  # фаза пика и время от её начала: следующая фаза может прийти раньше или позже
         ph = phase_at(phases, sp["t"])
         sp["phase"] = ph["n"] if ph else None
@@ -810,6 +820,15 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
                 refresh(B)
         except Exception as e:  # noqa: BLE001
             log(f"Бурсты лучших киллов не сопоставлены: {e}")
+        try:  # танки: как прикрывают танкбастеры лучшие киллы; план — с их кулдаунами
+            from .raid_tank import plan_tank, refresh as tank_refresh, top_summary as tank_top
+            TK = R["extras"].get("tank") or {}
+            if "error" not in TK and TK.get("events") is not None:
+                TK["top"] = tank_top(kills)
+                plan_tank(TK, {x["id"]: x for x in R["players"]}, R["info"].get("phases"))
+                tank_refresh(TK)
+        except Exception as e:  # noqa: BLE001
+            log(f"Танки лучших киллов не сопоставлены: {e}")
         if extra:  # строка «Пики урона по рейду…» дублирует сравнение с топом
             R["brief"] = [x for x in R["brief"] if not x.startswith("Пики урона по рейду")]
             # Сразу после строки про самый тяжёлый момент
@@ -827,6 +846,9 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
     key = B.get("key")
     if key:   # главное по нанесению урона — после строк про урон и сейвы, подробно во вкладке
         _brief_insert(R["brief"], key + " (подробно — во вкладке «Нанесение урона»)", 5)
+    key = (R["extras"].get("tank") or {}).get("key")
+    if key:
+        _brief_insert(R["brief"], key + " (подробно — во вкладке «Танки»)", 4)
     trend = R["extras"].get("pull_trend") or {}
     if trend.get("line") and len(R["brief"]) < 7:
         R["brief"].append(trend["line"])

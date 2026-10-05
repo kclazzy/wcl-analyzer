@@ -1756,7 +1756,7 @@ def test_real_talent_data():
         assert t and len(t["nodes"]) > 30, (cls, spec)
         n_specs += 1
         spells = {e[1] for n in t["nodes"].values() for e in n["entries"].values() if e[1]}
-        for sid, name, _cd, core in candidates(cls, spec):
+        for sid, name, _cd, core, _en in candidates(cls, spec):
             if sid in spells:
                 found_cd += 1
     for cls, spec in (("Mage", "Frost"), ("Priest", "Holy"), ("Evoker", "Preservation")):

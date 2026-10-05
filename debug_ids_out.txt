@@ -1,0 +1,132 @@
+107574	0	Avatar	1.5 min cooldown
+107574	7	Аватара	Восстановление: 1.5 мин
+1719	0	Recklessness	1.5 min cooldown
+1719	7	Безрассудство	Восстановление: 1.5 мин
+227847	0	Bladestorm	1.5 min cooldown
+227847	7	Вихрь клинков	Восстановление: 1.5 мин
+384318	0	Thunderous Roar	1.5 min cooldown
+384318	7	Громогласный рык	Восстановление: 1.5 мин
+31884	0	Avenging Wrath	2 min cooldown
+31884	7	Гнев карателя	Восстановление: 2 мин
+231895	0	Avenging Wrath	2 min cooldown
+231895	7	Гнев карателя	Восстановление: 2 мин
+343721	0	Final Reckoning	1 min cooldown
+343721	7	Последний расчет	Восстановление: 1 мин
+19574	0	Bestial Wrath	1.5 min cooldown
+19574	7	Звериный гнев	Восстановление: 1.5 мин
+359844	0	Call of the Wild	2 min cooldown
+359844	7	Зов дикой природы	Восстановление: 2 мин
+288613	0	Trueshot	2 min cooldown
+288613	7	Меткий выстрел	Восстановление: 2 мин
+360952	0	Coordinated Assault	2 min cooldown
+360952	7	Согласованная атака	Восстановление: 2 мин
+121471	0	Shadow Blades	1.5 min cooldown
+121471	7	Теневые клинки	Восстановление: 1.5 мин
+13750	0	Adrenaline Rush	3 min cooldown
+13750	7	Выброс адреналина	Восстановление: 3 мин
+360194	0	Deathmark	2 min cooldown
+360194	7	Знак смерти	Восстановление: 2 мин
+385627	0	Kingsbane	1 min cooldown
+385627	7	Погибель королей	Восстановление: 1 мин
+228260	0	Voidform	2 min cooldown
+228260	7	Облик Бездны	Восстановление: 2 мин
+391109	0	Dark Ascension	1 min cooldown
+391109	7	Темное вознесение	Восстановление: 1 мин
+10060	0	Power Infusion	2 min cooldown
+10060	7	Придание сил	Восстановление: 2 мин
+200174	0	Mindbender	1 min cooldown
+200174	7	Подчинитель разума	Восстановление: 1 мин
+34433	0	Shadowfiend	-
+34433	7	Исчадие Тьмы	-
+51271	0	Pillar of Frost	45 sec cooldown
+51271	7	Ледяной столп	Восстановление: 45 сек
+47568	0	Empower Rune Weapon	-
+47568	7	Усиление рунического оружия	-
+152279	0	Breath of Sindragosa	2 min cooldown
+152279	7	Дыхание Синдрагосы	Восстановление: 2 мин
+42650	0	Army of the Dead	1.5 min cooldown
+42650	7	Войско мертвых	Восстановление: 1.5 мин
+207289	0	Unholy Assault	1.5 min cooldown
+207289	7	Нечестивый натиск	Восстановление: 1.5 мин
+275699	0	Apocalypse	45 sec cooldown
+275699	7	Апокалипсис	Восстановление: 45 сек
+49206	0	Summon Gargoyle	-
+49206	7	Призыв горгульи	-
+63560	0	Dark Transformation	-
+63560	7	Темное превращение	-
+114050	0	Ascendance	3 min cooldown
+114050	7	Перерождение	Восстановление: 3 мин
+114051	0	Ascendance	3 min cooldown
+114051	7	Перерождение	Восстановление: 3 мин
+191634	0	Stormkeeper	1 min cooldown
+191634	7	Хранитель бурь	Восстановление: 1 мин
+51533	0	Feral Spirit	1.5 min cooldown
+51533	7	Дух дикого зверя	Восстановление: 1.5 мин
+384352	0	Doom Winds	1 min cooldown
+384352	7	Ветра рока	Восстановление: 1 мин
+198067	0	Fire Elemental	2 min cooldown
+198067	7	Элементаль огня	Восстановление: 2 мин
+192249	0	Storm Elemental	2 min cooldown
+192249	7	Элементаль бури	Восстановление: 2 мин
+190319	0	Combustion	2 min cooldown
+190319	7	Возгорание	Восстановление: 2 мин
+12472	0	Icy Veins	2 min cooldown
+12472	7	Стылая кровь	Восстановление: 2 мин
+365350	0	Arcane Surge	1.5 min cooldown
+365350	7	Чародейский выброс	Восстановление: 1.5 мин
+321507	0	Touch of the Magi	45 sec cooldown
+321507	7	Касание мага	Восстановление: 45 сек
+205180	0	Summon Darkglare	2 min cooldown
+205180	7	Призыв созерцателя тьмы	Восстановление: 2 мин
+265187	0	Summon Demonic Tyrant	1 min cooldown
+265187	7	Призыв демонического тирана	Восстановление: 1 мин
+1122	0	Summon Infernal	2 min cooldown
+1122	7	Призыв инфернала	Восстановление: 2 мин
+111898	0	Grimoire: Felguard	2 min cooldown
+111898	7	Гримуар: страж Скверны	Восстановление: 2 мин
+137639	0	Storm, Earth, and Fire	-
+137639	7	Буря, земля и огонь	-
+123904	0	Invoke Xuen, the White Tiger	2 min cooldown
+123904	7	Призыв Сюэня, Белого Тигра	Восстановление: 2 мин
+443028	0	Celestial Conduit	1.5 min cooldown
+443028	7	Небесный проводник	Восстановление: 1.5 мин
+194223	0	Celestial Alignment	3 min cooldown
+194223	7	Парад планет	Восстановление: 3 мин
+102560	0	Incarnation: Chosen of Elune	3 min cooldown
+102560	7	Воплощение: избранный Элуны	Восстановление: 3 мин
+106951	0	Berserk	3 min cooldown
+106951	7	Берсерк	Восстановление: 3 мин
+102543	0	Incarnation: Avatar of Ashamane	3 min cooldown
+102543	7	Воплощение: аватара Пеплошкурой	Восстановление: 3 мин
+391528	0	Convoke the Spirits	2 min cooldown
+391528	7	Созыв духов	Восстановление: 2 мин
+191427	0	Metamorphosis	2 min cooldown
+191427	7	Метаморфоза	Восстановление: 2 мин
+370965	0	The Hunt	1.5 min cooldown
+370965	7	Охота	Восстановление: 1.5 мин
+375087	0	Dragonrage	2 min cooldown
+375087	7	Ярость дракона	Восстановление: 2 мин
+403631	0	Breath of Eons	2 min cooldown
+403631	7	Дыхание эпох	Восстановление: 2 мин
+395152	0	Ebon Might	30 sec cooldown
+395152	7	Черная мощь	Восстановление: 30 сек
+409311	0	Prescience	-
+409311	7	Предвидение	-
+2825	0	Bloodlust	5 min cooldown
+2825	7	Жажда крови	Восстановление: 5 мин
+32182	0	Heroism	5 min cooldown
+32182	7	Героизм	Восстановление: 5 мин
+80353	0	Time Warp	5 min cooldown
+80353	7	Искажение времени	Восстановление: 5 мин
+390386	0	Fury of the Aspects	5 min cooldown
+390386	7	Ярость Аспектов	Восстановление: 5 мин
+264667	0	Primal Rage	6 min cooldown
+264667	7	Исступление	Восстановление: 6 мин
+26297	0	Berserking	3 min cooldown
+26297	7	Берсерк	Восстановление: 3 мин
+33702	0	Blood Fury	2 min cooldown
+33702	7	Кровавое неистовство	Восстановление: 2 мин
+20572	0	Blood Fury	2 min cooldown
+20572	7	Кровавое неистовство	Восстановление: 2 мин
+274738	0	Ancestral Call	2 min cooldown
+274738	7	Призыв предков	Восстановление: 2 мин

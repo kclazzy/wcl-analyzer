@@ -33,22 +33,15 @@ def _valid(d) -> bool:
             and all(isinstance(c, dict) and "id" in c and "cd" in c for c in d["raid_cds"]))
 
 
-def _load() -> dict:
-    bundled = json.loads(BUNDLED.read_text(encoding="utf-8"))
-    if os.environ.get("WCL_GAME_DATA") == "bundled":
-        return bundled
+def _local_path():
     try:
         from .config import data_dir
-        local = data_dir() / "game_data.json"
+        return data_dir() / "game_data.json"
     except Exception:  # noqa: BLE001
-        local = None
-    try:
-        if local and local.exists() and time.time() - local.stat().st_mtime < MAX_AGE_S:
-            d = json.loads(local.read_text(encoding="utf-8"))
-            if _valid(d):
-                return d
-    except (OSError, ValueError):
-        pass
+        return None
+
+
+def _fetch_remote() -> dict | None:
     for url in (REMOTE_URL, REMOTE_FALLBACK):
         try:
             import requests
@@ -58,6 +51,7 @@ def _load() -> dict:
         except Exception:  # noqa: BLE001
             continue
         if _valid(d):
+            local = _local_path()
             if local and SAVE["enabled"]:
                 try:
                     local.parent.mkdir(parents=True, exist_ok=True)
@@ -65,15 +59,60 @@ def _load() -> dict:
                 except OSError:
                     pass
             return d
-    return bundled  # нет сети или файла в репозитории: копия из сборки
+    return None
+
+
+def _load() -> tuple[dict, bool]:
+    """(таблица, свежая ли). Сразу — сохранённая копия (даже вчерашняя: она новее копии из сборки) или из сборки;
+    свежая из репозитория скачивается в фоне — разбор не ждёт сеть."""
+    bundled = json.loads(BUNDLED.read_text(encoding="utf-8"))
+    if os.environ.get("WCL_GAME_DATA") == "bundled":
+        return bundled, True
+    local = _local_path()
+    try:
+        if local and local.exists():
+            d = json.loads(local.read_text(encoding="utf-8"))
+            if _valid(d) and int(d.get("version") or 0) >= int(bundled.get("version") or 0):
+                return d, time.time() - local.stat().st_mtime < MAX_AGE_S
+    except (OSError, ValueError):
+        pass
+    return bundled, False
+
+
+_LOADED_AT = 0.0
+_REFRESHING = threading.Event()
+
+
+def _refresh_bg() -> None:
+    """Свежая таблица из репозитория — в фоне; пришла — подменяется целиком (кэши по id(data()) обновятся сами)."""
+    global _DATA, _LOADED_AT
+    if _REFRESHING.is_set():
+        return
+    _REFRESHING.set()
+
+    def run():
+        global _DATA, _LOADED_AT
+        try:
+            d = _fetch_remote()
+            if d is not None:
+                _DATA = d
+            _LOADED_AT = time.time()
+        finally:
+            _REFRESHING.clear()
+    threading.Thread(target=run, daemon=True).start()
 
 
 def data() -> dict:
-    global _DATA
+    global _DATA, _LOADED_AT
     if _DATA is None:
         with _LOCK:
             if _DATA is None:
-                _DATA = _load()
+                d, fresh = _load()
+                _DATA = d
+                _LOADED_AT = time.time() if fresh else 0.0
+    if time.time() - _LOADED_AT > MAX_AGE_S and os.environ.get("WCL_GAME_DATA") != "bundled":
+        _LOADED_AT = time.time()   # раз в сутки, даже если программа не закрывается
+        _refresh_bg()
     return _DATA
 
 
@@ -81,30 +120,52 @@ def raid_cds() -> list[dict]:
     return data()["raid_cds"]
 
 
+_MEMO: dict = {}
+
+
+def _memo(name: str, build):
+    """Значение, посчитанное один раз на загруженную таблицу (раньше — заново на каждое событие лога)."""
+    key = (name, id(data()))
+    if key not in _MEMO:
+        if len(_MEMO) > 64:
+            _MEMO.clear()
+        _MEMO[key] = build()
+    return _MEMO[key]
+
+
+def _index() -> dict[int, dict]:
+    """id → {cd, class, scope, power}: из таблицы, недостающие class/scope — из копии в сборке."""
+    def build():
+        out: dict[int, dict] = {}
+        for src in (raid_cds(), _bundled_cds()):
+            for c in src:
+                e = out.setdefault(int(c["id"]), {})
+                for k in ("cd", "class", "scope", "power"):
+                    if k not in e and c.get(k) not in (None, ""):
+                        if k in ("cd", "power") and src is not raid_cds():
+                            continue   # откат и сила — только из действующей таблицы, как раньше
+                        e[k] = c[k]
+        return out
+    return _memo("index", build)
+
+
 def cd_ids() -> set[int]:
-    return {int(c["id"]) for c in raid_cds()}
+    return _memo("cd_ids", lambda: frozenset(int(c["id"]) for c in raid_cds()))
 
 
 def cooldown(sid: int, default: float | None = None) -> float | None:
-    return next((float(c["cd"]) for c in raid_cds() if int(c["id"]) == int(sid)), default)
+    v = _index().get(int(sid), {}).get("cd")
+    return float(v) if v is not None else default
 
 
 def class_of(sid: int) -> str:
     """Класс по рейдовому кулдауну (из таблицы игровых данных); неизвестный — пустая строка."""
-    for src in (raid_cds(), _bundled_cds()):
-        for c in src:
-            if int(c["id"]) == int(sid) and c.get("class"):
-                return str(c["class"])
-    return ""
+    return str(_index().get(int(sid), {}).get("class") or "")
 
 
 def scope(sid: int) -> str:
     """raid — действует сразу на рейд; self — усиливает исцеление самого лекаря. Неизвестные — raid."""
-    for src in (raid_cds(), _bundled_cds()):  # в старой копии таблицы поля scope ещё нет — берём из сборки
-        for c in src:
-            if int(c["id"]) == int(sid) and c.get("scope"):
-                return str(c["scope"])
-    return "raid"
+    return str(_index().get(int(sid), {}).get("scope") or "raid")
 
 
 _BUNDLED_CDS: list | None = None
@@ -121,7 +182,8 @@ def _bundled_cds() -> list[dict]:
 
 
 def power(sid: int, default: int = 2) -> int:
-    return next((int(c.get("power", default)) for c in raid_cds() if int(c["id"]) == int(sid)), default)
+    v = _index().get(int(sid), {})
+    return int(v["power"]) if "power" in v else default
 
 
 _RE_CACHE: dict = {}
@@ -150,10 +212,14 @@ def name_known(name: str, cls: str = "", spec: str = "") -> bool:
     n = (name or "").strip().lower()
     if not n:
         return False
-    for c in raid_cds():
-        names = {x.lower() for x in [c.get("en", ""), c.get("name", ""), *(c.get("aliases") or [])] if x}
-        if n not in names:
-            continue
+
+    def build():
+        idx: dict = {}
+        for c in raid_cds():
+            for x in {x.lower() for x in [c.get("en", ""), c.get("name", ""), *(c.get("aliases") or [])] if x}:
+                idx.setdefault(x, []).append(c)
+        return idx
+    for c in _memo("names", build).get(n, []):
         if cls and c.get("class") and _key(c["class"]) != _key(cls):
             continue
         if spec and c.get("spec") and _key(c["spec"]) != _key(spec):
@@ -199,7 +265,7 @@ def tank_cds() -> list[dict]:
 
 
 def tank_cd_ids() -> set[int]:
-    return {int(c["id"]) for c in tank_cds()}
+    return _memo("tank_ids", lambda: frozenset(int(c["id"]) for c in tank_cds()))
 
 
 def amp_windows() -> list[dict]:
@@ -208,7 +274,7 @@ def amp_windows() -> list[dict]:
 
 
 def lust_ids() -> set[int]:
-    return {int(x) for x in _section("lust_ids")}
+    return _memo("lust_ids", lambda: frozenset(int(x) for x in _section("lust_ids")))
 
 
 class LazyIds:

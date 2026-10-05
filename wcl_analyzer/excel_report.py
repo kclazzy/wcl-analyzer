@@ -1,6 +1,8 @@
 """Excel-отчёт: сводка, находки, план, разделы сравнения и эталон с графиками."""
 from __future__ import annotations
 
+from functools import lru_cache
+
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -36,6 +38,21 @@ F_SIGNED_PCT = "+0.0%;-0.0%;0.0%"
 MMSS = 'IF({c}="","—",INT({c}/60)&":"&TEXT(MOD({c},60),"00.0"))'
 
 
+@lru_cache(maxsize=256)
+def _font(bold, color, size, italic):
+    return Font(name=FONT, bold=bold, color=color, size=size, italic=italic)
+
+
+@lru_cache(maxsize=64)
+def _fill(color):
+    return PatternFill("solid", fgColor=color)
+
+
+@lru_cache(maxsize=4)
+def _align(wrap):
+    return Alignment(wrap_text=wrap, vertical="top")
+
+
 class Sheet:
     def __init__(self, wb: Workbook, title: str, demo: bool, widths: dict | None = None):
         self.ws = wb.create_sheet(title)
@@ -53,12 +70,12 @@ class Sheet:
     def cell(self, r, c, v=None, fmt=None, bold=False, color=None, fill=None, wrap=False, size=10,
              italic=False):
         cell = self.ws.cell(row=r, column=c, value=v)
-        cell.font = Font(name=FONT, bold=bold, color=color, size=size, italic=italic)
+        cell.font = _font(bold, color, size, italic)   # стили — общие объекты: openpyxl не сравнивает их заново
         if fmt:
             cell.number_format = fmt
         if fill:
-            cell.fill = PatternFill("solid", fgColor=fill)
-        cell.alignment = Alignment(wrap_text=wrap, vertical="top")
+            cell.fill = _fill(fill)
+        cell.alignment = _align(wrap)
         return cell
 
     def title(self, text: str, sub: str | None = None):

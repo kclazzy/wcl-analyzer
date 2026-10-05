@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import math
+import hashlib
 import os
 import re
 import secrets
@@ -159,6 +160,30 @@ def _site_url(client) -> str:
     return getattr(client, "site_url", None) or SITE_URL
 
 
+def set_partial(job: dict, partial: dict) -> None:
+    """Готовая часть разбора для страницы. У каждой вкладки (parts) — версия, с которой она такая:
+    страница получает только новые и изменившиеся вкладки, а не все готовые заново при каждом боссе."""
+    v = job.get("partial_v", 0) + 1
+    pv = job.setdefault("part_v", {})
+    seen = job.setdefault("_part_ids", {})
+    for k, part in (partial.get("parts") or {}).items():
+        if seen.get(k) != id(part):
+            seen[k] = id(part)
+            pv[k] = v
+    job["partial"], job["partial_v"] = partial, v
+
+
+def partial_for(job: dict, have: int):
+    """Что отправить странице, у которой версия have: всё (have=0) или только новые вкладки (delta)."""
+    v, part = job.get("partial_v", 0), job.get("partial")
+    if not part or v <= have:
+        return None, v
+    if have <= 0 or not part.get("parts"):
+        return part, v
+    pv = job.get("part_v") or {}
+    return {**part, "parts": {k: p for k, p in part["parts"].items() if pv.get(k, v) > have}, "delta": True}, v
+
+
 def start_job(creds, params: dict) -> str:
     _cleanup()
     with JOBS_LOCK:
@@ -202,6 +227,10 @@ def _run_job(job: dict, params: dict, creds) -> None:
             _run_roster_plan(job, params, creds, log)
         else:
             _run_player(job, params, creds, log)
+        if job.get("result") is not None:   # готовый результат — сразу сжатым текстом: в памяти в ~20 раз меньше
+            import zlib
+            job["result_z"] = zlib.compress(json.dumps(job.pop("result"), ensure_ascii=False,
+                                                       separators=(",", ":")).encode("utf-8"), 6)
         job["progress"], job["state"] = 1.0, "done"
     except SystemExit:
         job["state"], job["error"], job["need_key"] = "error", NEED_KEY, True
@@ -371,8 +400,7 @@ def _run_fight(job: dict, params: dict, creds, log) -> None:
                 "params": {k: params.get(k) for k in ("url", "fight", "actor", "ref", "pick", "mythic", "demo")}}
 
     def publish(pending) -> None:
-        job["partial"] = combined(pending=pending)
-        job["partial_v"] = job.get("partial_v", 0) + 1
+        set_partial(job, combined(pending=pending))
 
     def run_part(key, fn, sub_params, lo, hi) -> None:
         sj = _SubJob(job, lo, hi)
@@ -481,16 +509,27 @@ def _fight_all_raid(job, params, creds, log, parts, errors, writers, order, titl
                                                            for c in chosen)), "demo": code.startswith("DEMO")})
     log(f"Боссов в отчёте: {len(chosen)}. На каждого — полный разбор боя (последний килл, без киллов — лучший пулл).")
     n = len(chosen)
+    from concurrent.futures import ThreadPoolExecutor
+    from .raid import fetch_raid_raw
+    prefetch = ThreadPoolExecutor(max_workers=1)   # пока разбирается босс — качается бой следующего (в кэш)
+
+    def warm(fid_next):
+        try:
+            fetch_raid_raw(client, url, fid_next, log=lambda m: None)
+        except Exception:  # noqa: BLE001 — не скачалось заранее — скачается в свой черёд
+            pass
     for i, (k, c) in enumerate(zip(keys, chosen)):
         f = c["fight"]
         diff = DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), "")
+        if i + 1 < n and not params.get("demo"):
+            prefetch.submit(warm, int(chosen[i + 1]["fight"]["id"]))
         publish(k)
         log(f"[{i + 1}/{n}] {f.get('name')} ({diff}): " + ("килл" if f.get("kill") else "лучший пулл"))
         base = lo + (hi - lo) * i / n
         try:
             R = run_raid(client, url, int(f["id"]), log=lambda m: log("    " + m), avoidable=avoidable,
                          talent_data=[] if params.get("demo") else None, save_talents=not SERVER["public"],
-                         mythic=params.get("mythic") is not False,
+                         mythic=params.get("mythic") is True,   # «Все боссы»: эпохальный топ — только если включён явно
                          progress=lambda x, b=base: job.__setitem__(
                              "progress", max(job["progress"], min(0.97, b + (hi - lo) * min(1.0, x) / n))))
         except SystemExit:
@@ -595,10 +634,12 @@ def _run_player_all(job: dict, params: dict, creds, log) -> None:
         log("Если лимит кончится — жду сброса и продолжаю сам.")
     rows, skipped, pending = [], [], []
     per_unit: list[float] = []
+    after = None
     for i, (fid, aid) in enumerate(units):
         f = fights[fid]
         label = f"{f.get('name')} ({DIFFICULTY_NAMES.get(int(f.get('difficulty') or 0), '')})"
-        left = client.points_left() if hasattr(client, "points_left") else None
+        # остаток лимита после прошлого разбора — он же остаток перед этим: один запрос на разбор, а не два
+        left = after if after is not None else (client.points_left() if hasattr(client, "points_left") else None)
         need = (sum(per_unit) / len(per_unit)) if per_unit else ALL_BOSSES_POINTS
         if not wait and left is not None and left < need * 1.2:
             pending = units[i:]
@@ -1030,7 +1071,7 @@ def _run_top_progress_all(job: dict, params: dict, client, bosses: list[tuple], 
                            "encounter": params.get("encounter"), "difficulty": params.get("difficulty")}}
     for i, (enc, diff, name, size) in enumerate(bosses):
         key, lo = order[i], i / len(bosses)
-        job["partial"], job["partial_v"] = combined(pending=key), job.get("partial_v", 0) + 1
+        set_partial(job, combined(pending=key))
         log(f"[{i + 1}/{len(bosses)}] {name} ({DIFFICULTY_NAMES.get(diff, '')})")
         try:
             cands = _progress_cands(client, enc, diff, size)
@@ -1117,14 +1158,66 @@ def _gear_json(g: dict) -> dict | None:
             "rows": [{k: _num(v, 2) if isinstance(v, float) else v for k, v in x.items()} for x in g["rows"]]}
 
 
+_PAGE_CACHE: dict = {}
+
+
+def _static_version() -> str:
+    """Версия файлов /static в адресе (?v=…): после обновления браузер не возьмёт старый Chart.js из своего кэша."""
+    try:
+        from ._build import BUILD
+    except Exception:  # noqa: BLE001
+        BUILD = "dev"
+    return str(os.environ.get("WCL_CODE_BUILD") or BUILD)
+
+
 def _page() -> bytes:
-    """Страница интерфейса с русскими названиями классов и спеков из names_ru.py (один словарь на всё)."""
+    """Страница интерфейса с русскими названиями классов и спеков из names_ru.py (один словарь на всё).
+    Собирается один раз за запуск (метка скриптов постоянна), пока файл страницы не изменился."""
+    try:
+        mtime = STATIC.stat().st_mtime
+    except OSError:
+        mtime = 0
+    got = _PAGE_CACHE.get("page")
+    if got and got[0] == mtime:
+        return got[1]
     from .names_ru import CLASSES, SPECS
     html = STATIC.read_text(encoding="utf-8")
     html = html.replace("/*CLASS_RU*/{}", json.dumps(CLASSES, ensure_ascii=False))
     html = html.replace("/*SPEC_RU*/{}", json.dumps({f"{c}|{s}": v for (c, s), v in SPECS.items()}, ensure_ascii=False))
     html = html.replace("<script>", f'<script nonce="{PAGE_NONCE}">')
-    return html.encode("utf-8")
+    v = _static_version()
+    for name in ("chart.umd.min.js", "qrcode.js"):
+        html = html.replace(f'src="/static/{name}"', f'src="/static/{name}?v={v}"')
+    body = html.encode("utf-8")
+    _PAGE_CACHE["page"] = (mtime, body)
+    return body
+
+
+_STATIC_CACHE: dict = {}
+
+
+def _static_bytes(name: str) -> bytes:
+    if name not in _STATIC_CACHE:
+        _STATIC_CACHE[name] = (WEB / name).read_bytes()
+    return _STATIC_CACHE[name]
+
+
+_GZ_CACHE: dict = {}
+GZIP_TYPES = ("text/", "application/json", "application/javascript", "application/manifest+json")
+
+
+def _gzip(data: bytes, keep: bool = False) -> bytes:
+    """Сжатие ответа (в 4–6 раз меньше: важно для телефона по Wi-Fi и публичного сервера).
+    keep — статичные файлы и страница: сжимаются один раз и хранятся в памяти."""
+    import gzip
+    if keep:
+        k = hashlib.sha1(data).hexdigest()
+        if k not in _GZ_CACHE:
+            if len(_GZ_CACHE) > 16:
+                _GZ_CACHE.clear()
+            _GZ_CACHE[k] = gzip.compress(data, 6, mtime=0)
+        return _GZ_CACHE[k]
+    return gzip.compress(data, 5, mtime=0)
 
 
 # Политика содержимого страницы: выполняется только код самой программы (файлы /static и встроенный скрипт
@@ -1132,8 +1225,8 @@ def _page() -> bytes:
 # со скриптом, браузер его не запустит.
 import secrets as _secrets  # noqa: E402
 PAGE_NONCE = _secrets.token_urlsafe(16)
-CSP = ("default-src 'self'; script-src 'self' 'nonce-{n}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-       "font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; "
+CSP = ("default-src 'self'; script-src 'self' 'nonce-{n}'; style-src 'self' 'unsafe-inline'; "
+       "font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; "
        "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 
 
@@ -1261,6 +1354,8 @@ WEB = STATIC.parent
 STATIC_FILES = {
     "/static/chart.umd.min.js": ("chart.umd.min.js", "application/javascript; charset=utf-8"),
     "/static/qrcode.js": ("qrcode.js", "application/javascript; charset=utf-8"),
+    "/static/onest-cyrillic.woff2": ("onest-cyrillic.woff2", "font/woff2"),
+    "/static/onest-latin.woff2": ("onest-latin.woff2", "font/woff2"),
     "/static/icon-192.png": ("icon-192.png", "image/png"),
     "/static/icon-512.png": ("icon-512.png", "image/png"),
     "/apple-touch-icon.png": ("icon-180.png", "image/png"),
@@ -1280,7 +1375,7 @@ DENIED_PAGE = """<!doctype html><html lang="ru"><meta charset="utf-8">
 <p>Откройте программу на компьютере, нажмите «На другом устройстве» и отсканируйте QR-код камерой телефона.</p>
 <p style="color:#5C6781">Если QR-код уже сканировали, а доступ пропал — ключ могли сменить или доступ с телефона выключен.</p>
 </div></body></html>"""
-MAX_BODY = 32 * 1024 * 1024  # резервная копия с историей разборов может весить несколько МБ
+MAX_BODY = 96 * 1024 * 1024  # резервная копия с историей разборов (40 разборов с Excel) — десятки МБ
 
 
 def lan_ip() -> str | None:
@@ -1314,6 +1409,9 @@ def _spell_rate_ok(ip: str) -> bool:
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "WCLAnalyzer/3.0"
+    # HTTP/1.1: соединение переиспользуется (опрос разбора не открывает новое на каждый запрос);
+    # у каждого ответа есть Content-Length
+    protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):  # сервер не ведёт журнал запросов
         pass
@@ -1375,6 +1473,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(302)
             self.send_header("Set-Cookie", f"wclk={st['token']}; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly")
             self.send_header("Location", urlparse(self.path).path or "/")
+            self.send_header("Content-Length", "0")
             self.end_headers()
             return False
         if self._cookie("wclk") == st["token"]:
@@ -1389,25 +1488,39 @@ class Handler(BaseHTTPRequestHandler):
 
     # ------------------------------------------------------ ответы
     def _json(self, data, status=200):
-        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        body = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         self._file(body, "application/json; charset=utf-8", status=status)
 
-    def _file(self, data: bytes, ctype: str, cache: str = "no-store", extra: dict | None = None, status=200):
+    def _file(self, data: bytes, ctype: str, cache: str = "no-store", extra: dict | None = None, status=200,
+              keep: bool = False):
+        gz = (len(data) > 1024 and ctype.startswith(GZIP_TYPES)
+              and "gzip" in (self.headers.get("Accept-Encoding") or "").lower())
+        if gz:
+            data = _gzip(data, keep)
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", cache)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        if gz:
+            self.send_header("Content-Encoding", "gzip")
+        if ctype.startswith(GZIP_TYPES):
+            self.send_header("Vary", "Accept-Encoding")
+        if self.command == "POST" and not getattr(self, "_body_read", True):
+            self.close_connection = True   # тело запроса не прочитано — соединение дальше не используется
+            self.send_header("Connection", "close")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
-        self.wfile.write(data)
+        if self.command != "HEAD":
+            self.wfile.write(data)
 
     def _body(self) -> dict:
         n = int(self.headers.get("Content-Length") or 0)
         if n > (1024 * 1024 if SERVER["public"] else MAX_BODY):  # публичному серверу большие запросы не нужны
             raise ValueError("Слишком большой запрос")
+        self._body_read = True
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
     # ------------------------------------------------------ GET
@@ -1417,11 +1530,22 @@ class Handler(BaseHTTPRequestHandler):
         SERVER["seen"] = True
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
-            self._file(_page(), "text/html; charset=utf-8", extra={"Content-Security-Policy": CSP.format(n=PAGE_NONCE) if not SERVER["public"]
-                                         else CSP.format(n=PAGE_NONCE).replace("; frame-ancestors 'none'", "")})
+            page = _page()
+            etag = '"' + hashlib.sha1(page).hexdigest()[:16] + '"'
+            if self.headers.get("If-None-Match") == etag:   # страница не менялась — браузер берёт свою копию
+                self.send_response(304)
+                self.send_header("ETag", etag)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self._file(page, "text/html; charset=utf-8", cache="no-cache", keep=True,
+                       extra={"ETag": etag, "Content-Security-Policy": CSP.format(n=PAGE_NONCE) if not SERVER["public"]
+                              else CSP.format(n=PAGE_NONCE).replace("; frame-ancestors 'none'", "")})
         elif path in STATIC_FILES:
             name, ctype = STATIC_FILES[path]
-            self._file((WEB / name).read_bytes(), ctype, "max-age=86400")
+            versioned = "v=" in (urlparse(self.path).query or "")
+            self._file(_static_bytes(name), ctype, "public, max-age=31536000, immutable" if versioned else "max-age=3600",
+                       keep=True)
         elif path == "/manifest.webmanifest":
             self._file(json.dumps(MANIFEST, ensure_ascii=False).encode("utf-8"), "application/manifest+json")
         elif path == "/api/version":
@@ -1464,13 +1588,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "Разбор не найден: результаты хранятся на сервере не дольше часа"}, 404)
             since = int(self.headers.get("X-Log-Since") or 0)
             pv = int(self.headers.get("X-Partial-V") or 0)  # готовая часть «Разобрать бой» — один раз на версию
-            v, part = job.get("partial_v", 0), job.get("partial")  # читаем один раз: версия и часть — пара
-            self._json({"state": job["state"], "progress": job["progress"], "log": job["log"][since:],
-                        "partial": part if v > pv else None,
-                        "partial_v": v,
-                        "wait_left": max(0.0, job.get("wait_until", 0) - time.time()),
-                        "log_total": len(job["log"]), "error": job.get("error"), "need_key": job.get("need_key", False),
-                        "result": job.get("result") if job["state"] == "done" else None})
+            part, v = partial_for(job, pv)   # только новые вкладки, если страница уже получила прошлые
+            state = job["state"]
+            base = {"state": state, "progress": job["progress"], "log": job["log"][since:],
+                    "partial": part, "partial_v": v,
+                    "wait_left": max(0.0, job.get("wait_until", 0) - time.time()),
+                    "log_total": len(job["log"]), "error": job.get("error"), "need_key": job.get("need_key", False)}
+            rz = job.get("result_z") if state == "done" else None
+            if rz is None:
+                return self._json({**base, "result": job.get("result") if state == "done" else None})
+            import zlib
+            body = json.dumps(base, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            self._file(body[:-1] + b',"result":' + zlib.decompress(rz) + b"}", "application/json; charset=utf-8")
         elif path.startswith("/api/report/"):
             parts = path[len("/api/report/"):].split("/")
             job, key = JOBS.get(parts[0]), "xlsx_alt" if parts[1:] == ["alt"] else "xlsx"
@@ -1483,6 +1612,7 @@ class Handler(BaseHTTPRequestHandler):
 
     # ------------------------------------------------------ POST
     def do_POST(self):  # noqa: N802
+        self._body_read = not int(self.headers.get("Content-Length") or 0)
         if not self._allowed():
             return
         path = urlparse(self.path).path

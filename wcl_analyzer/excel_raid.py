@@ -525,7 +525,7 @@ def _plan_text(r: dict) -> str:
     picks = r.get("picks")
     if picks is None:  # разборы старых версий
         return (r["cd"] + " — " + (r["player"] or "") + (" (как у топа)" if r["like_top"] else "")) if r["cd"] else "нет свободного кулдауна"
-    text = "; ".join(f"{p['cd']} — {p['player']}{' (как у топа)' if p['like_top'] else ''}, откат {p['cooldown']}, "
+    text = "; ".join(f"{p['cd']} — {p['player']}{' (как у топа)' if p['like_top'] else ''}{' (доп.)' if p.get('extra') else ''}, откат {p['cooldown']}, "
                      f"снова готов в {p['ready']}" for p in picks) or "нет свободного кулдауна"
     if r.get("heal_picks"):  # кулдауны лекарей на этот пик — своё время нажатия
         text += ". Лекари: " + "; ".join(f"{p['cd']} — {p['player']} в {p['at']}" for p in r["heal_picks"])

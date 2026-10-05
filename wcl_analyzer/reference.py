@@ -4,10 +4,11 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
-import numpy as np
+from . import stats as _st
 
 from .logs import PlayerLog
 from difflib import SequenceMatcher
+from functools import lru_cache
 
 from .logs import merge_intervals
 from .metrics import (COOLDOWN_CATS, LUST_IDS, POTION_RE, ProcInfo, SpellInfo, classify,
@@ -20,7 +21,7 @@ def stat(values) -> dict:
         return {"n": 0, "median": None, "p25": None, "p75": None, "mean": None,
                 "min": None, "max": None}
     return {"n": len(vals), "median": med(vals), "p25": pct(vals, 25), "p75": pct(vals, 75),
-            "mean": float(np.mean(vals)), "min": float(min(vals)), "max": float(max(vals))}
+            "mean": float(_st.mean(vals)), "min": float(min(vals)), "max": float(max(vals))}
 
 
 @dataclass
@@ -112,8 +113,18 @@ def filter_by_build(logs: list[PlayerLog], me: PlayerLog, min_keep: int = 8) -> 
     if len(close) >= min_keep:
         return close, f"Похожий билд (таланты совпадают ≥85%): {len(close)} из {len(logs)} логов"
     keep = [log for _, log in sim[:max(min_keep, int(len(sim) * 0.6))]]
-    avg = float(np.mean([sc for sc, _ in sim[:len(keep)]])) if keep else 0
+    avg = float(_st.mean([sc for sc, _ in sim[:len(keep)]])) if keep else 0
     return keep, f"Ближайшие по талантам: {len(keep)} из {len(logs)} (совпадение в среднем {avg:.0%})"
+
+
+@lru_cache(maxsize=50000)
+def _seq_dist_sorted(a: tuple, b: tuple) -> float:
+    return 1 - SequenceMatcher(None, a, b, autojunk=False).ratio()
+
+
+def _seq_dist(a: tuple, b: tuple) -> float:
+    """Расстояние между опенерами — с запоминанием: шумовой порог сравнивает одни и те же пары много раз."""
+    return _seq_dist_sorted(a, b)   # порядок пары — как был: difflib не вполне симметричен
 
 
 def aggregate(ref: Reference) -> dict:
@@ -131,7 +142,7 @@ def aggregate(ref: Reference) -> dict:
         users = [m for m in ms if m["casts"].get(ab)]
         firsts = [m["cast_times"][ab][0] for m in users]
         lasts = [m["cast_times"][ab][-1] for m in users]
-        ivs = [float(np.mean(np.diff(m["cast_times"][ab]))) for m in users
+        ivs = [float(_st.mean(_st.diff(m["cast_times"][ab]))) for m in users
                if len(m["cast_times"][ab]) > 1]
         up = [m["uptime_buff"].get(ab) for m in ms if ab in m["uptime_buff"]]
         abil[ab] = {
@@ -195,7 +206,7 @@ def aggregate(ref: Reference) -> dict:
     seqs = [m["opener_seq"] for m in ms if len(m["opener_seq"]) >= 5]
     if len(seqs) >= 3:
         def dist(a, b):
-            return 1 - SequenceMatcher(None, a, b, autojunk=False).ratio()
+            return _seq_dist(tuple(a), tuple(b))
         best = min(seqs, key=lambda a: sum(dist(a, b) for b in seqs))
         agg["opener_seq"] = {"seq": best, "dist": stat([dist(best, b) for b in seqs if b is not best])}
     else:

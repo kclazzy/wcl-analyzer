@@ -11,10 +11,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Разбор WCL">
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <script src="/static/chart.umd.min.js"></script>
 <script src="/static/qrcode.js"></script>
 <style>
+/* Шрифт Onest — в самой программе (раньше — с Google Fonts при каждом запуске; без интернета — системный) */
+@font-face{font-family:"Onest";font-style:normal;font-display:swap;font-weight:100 900;src:url(/static/onest-cyrillic.woff2) format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:"Onest";font-style:normal;font-display:swap;font-weight:100 900;src:url(/static/onest-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 :root{
   --paper:#EEF1F4; --panel:#FFFFFF; --ink:#16213A; --muted:#5C6781; --line:#D5DBE4; --soft:#F6F8FA;
   --you:#E39B2F; --you-soft:#FBEBD3; --top:#1F8A7E; --top-soft:#D5EEEA;
@@ -407,7 +409,7 @@ dialog label.check input{width:auto;margin:0}
         <button class="btn you" id="runBtn" type="button" title="Одна кнопка — весь разбор: сначала урон, сейвы и смерти (готово через несколько секунд), затем ротация — всех DPS или выбранного игрока. Вкладки результата переключаются без новой загрузки, Excel — один на всё">Разобрать бой</button>
         <button class="btn" id="progBtn" type="button" title="Бой первой гильдии, которая убила этого босса на этой сложности и выложила открытый лог убийства (рейтинг прогресса Warcraft Logs): урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения — просто посмотреть, как это сделали лучшие. С «Все боссы отчёта» — на каждого босса отчёта, вкладка на босса">Топ прогресса</button>
         <label class="chk" title="Когда часовой лимит WCL кончится, не останавливаться, а дождаться сброса и продолжить (можно оставить на ночь)"><input type="checkbox" id="waitLimit"> Кончится лимит — ждать и продолжать</label>
-        <label class="chk" title="Если бой не эпохальный, игрок дополнительно сравнивается с эпохальным топом; переключатель — в шапке результата"><input type="checkbox" id="mythicToo" checked> Также сравнить с эпохальным топом</label>
+        <label class="chk" title="Если бой не эпохальный, бой и игроки дополнительно сравниваются с эпохальным топом; переключатель — в шапке результата. Это вдвое больше загрузок топа — расходует лимит Warcraft Logs"><input type="checkbox" id="mythicToo"> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
       </div>
     </div>
@@ -553,9 +555,6 @@ dialog label.check input{width:auto;margin:0}
 </dialog>
 
 <script>
-/* Шрифт — без задержки показа страницы: без интернета страница сразу открывается системным шрифтом */
-(() => { const l = document.createElement("link"); l.rel = "stylesheet";
-  l.href = "https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap"; document.head.append(l); })();
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const nf0 = new Intl.NumberFormat("ru-RU",{maximumFractionDigits:0});
@@ -602,6 +601,21 @@ function showOk(msg){ const e=$("#okmsg"); e.textContent=msg; e.hidden=!msg; if 
 
 /* История разборов с Excel-файлами — IndexedDB этого браузера */
 const HISTORY_MAX = 40;
+const HISTORY_MB = 30;   // и не больше 30 МБ на устройстве (телефон): сверх — удаляются самые старые
+/* Результат разбора в истории — сжатым (gzip в браузере, в ~6 раз меньше); читается — разжимается */
+const CAN_GZ = typeof CompressionStream === "function" && typeof DecompressionStream === "function";
+async function gzObj(obj){
+  const s = new Blob([JSON.stringify(obj)]).stream().pipeThrough(new CompressionStream("gzip"));
+  return await new Response(s).blob();
+}
+async function ungzObj(blob){
+  const s = blob.stream().pipeThrough(new DecompressionStream("gzip"));
+  return JSON.parse(await new Response(s).text());
+}
+async function unpackItem(it){
+  if (it && it.rz && !it.result) { try { it = {...it, result: await ungzObj(it.rz)}; delete it.rz; } catch(e){ return null; } }
+  return it;
+}
 let memHistory = new Map();  // если браузер не даёт IndexedDB (приватный режим) — до закрытия вкладки
 /* Две таблицы: history — разбор целиком (результат и Excel), meta — короткая запись для списка.
    Список истории читает только meta: не нужно поднимать в память все разборы с файлами. */
@@ -634,6 +648,7 @@ function idb(){
 function metaOf(it){
   const I = (it.result && it.result.info) || {};
   return {id: it.id, created: it.created, title: it.title, mode: it.mode, hasBlob: !!it.blob,
+          size: (it.rz ? it.rz.size : 0) + (it.blob ? it.blob.size || 0 : 0) + (it.blobAlt ? it.blobAlt.size || 0 : 0),
           info: {demo: !!I.demo, name: I.name, boss: I.boss, difficulty: I.difficulty, spec: I.spec}};
 }
 async function histTx(mode, fn, stores = ["history"]){
@@ -652,13 +667,18 @@ async function histTx(mode, fn, stores = ["history"]){
 }
 const hist = {
   /* полный список с файлами — только для «Сохранить в файл» */
-  async all(){ const r = await histTx("readonly", st => st.getAll()); return (r ?? [...memHistory.values()]).sort((a,b)=>b.created-a.created); },
+  async all(){ const r = await histTx("readonly", st => st.getAll());
+    const items = await Promise.all((r ?? [...memHistory.values()]).map(unpackItem));
+    return items.filter(Boolean).sort((a,b)=>b.created-a.created); },
   /* короткий список — для истории на странице */
   async list(){ const r = await histTx("readonly", st => st.getAll(), ["meta"]);
     return (r ?? [...memHistory.values()].map(metaOf)).sort((a,b)=>b.created-a.created); },
-  async get(id){ const r = await histTx("readonly", st => st.get(id)); return r ?? memHistory.get(id); },
+  async get(id){ const r = await histTx("readonly", st => st.get(id)); return unpackItem(r ?? memHistory.get(id)); },
   async put(item){ memHistory.set(item.id, item);
-    try { await histTx("readwrite", (st, m) => { m.put(metaOf(item)); return st.put(item); }, ["history", "meta"]); }
+    let stored = item;
+    if (CAN_GZ && item.result) { try { const {result, ...rest} = item; stored = {...rest, rz: await gzObj(result)}; } catch(e){ stored = item; } }
+    const meta = {...metaOf(stored), info: metaOf(item).info};
+    try { await histTx("readwrite", (st, m) => { m.put(meta); return st.put(stored); }, ["history", "meta"]); }
     catch(e){ showErr(e.message); } },
   async del(id){ memHistory.delete(id); await histTx("readwrite", (st, m) => { m.delete(id); return st.delete(id); }, ["history", "meta"]).catch(()=>{}); },
   async clear(){ memHistory.clear(); await histTx("readwrite", (st, m) => { m.clear(); return st.clear(); }, ["history", "meta"]).catch(()=>{}); },
@@ -709,7 +729,9 @@ function drawLimit(){
   if (left <= 0) refreshLimit();
 }
 setInterval(drawLimit, 15000);
-setInterval(() => { if (!document.hidden) refreshLimit(); }, 60000);
+/* Раз в минуту — только пока идёт разбор и 10 минут после; иначе — при возврате на вкладку (раньше — весь день) */
+let LAST_ACT = Date.now();
+setInterval(() => { if (!document.hidden && (RUNNING || Date.now() - LAST_ACT < 600000)) refreshLimit(); }, 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshLimit(); });
 
 $("#keyPill").onclick = () => { if (KEY) $("#cid").value = KEY.id; $("#keyDlg").showModal(); };
@@ -771,7 +793,7 @@ function syncAllMode(){
   $("#pickBy").disabled = all || one; $("#pickMax").disabled = all || one || !$("#pickBy").value;
   updatePickInfo();
 }
-try { if (localStorage.getItem("wclMythicToo") === "0") $("#mythicToo").checked = false; } catch(e){}
+try { $("#mythicToo").checked = localStorage.getItem("wclMythicToo") === "1"; } catch(e){}   // по умолчанию выключено: вдвое больше загрузок
 $("#mythicToo").addEventListener("change", () => { try { localStorage.setItem("wclMythicToo", $("#mythicToo").checked ? "1" : "0"); } catch(e){} });
 /* Одна кнопка — весь разбор. Игрок: «Все игроки» — ротация всех DPS, один игрок — его подробный разбор */
 $("#runBtn").onclick = () => !inspected ? showErr("Сначала нажмите «Найти бой».") : run({mode:"fight", url:inspected.url, fight:$("#fight").value, actor:$("#player").value,
@@ -913,7 +935,7 @@ $("#tpRun").onclick = () => {
 };
 
 /* ---------- анализ ---------- */
-let RUNNING = false, USER_NAV = false;
+let RUNNING = false, USER_NAV = false, PARTIAL = null;
 async function run(params, path="/api/analyze"){
   /* Один разбор за раз: второй запуск (демо, «Продолжить», «Сравнить с топом»…) делил бы с первым журнал и вкладки */
   if (RUNNING) { showErr("Уже идёт разбор — дождитесь, пока он закончится."); return; }
@@ -946,9 +968,11 @@ async function run(params, path="/api/analyze"){
     const {job} = await api(path, params);
     let since = 0, limitTick = 0, pv = 0;
     FIGHT_LIVE = null;
-    let fails = 0;
+    let fails = 0, waiting = false, logLines = 0;
+    PARTIAL = null;
     while (true){
-      await new Promise(r => setTimeout(r, fails ? Math.min(10000, 1000 * 2 ** fails) : 700));
+      /* обычный опрос — 0,7 с; пока ждём сброса лимита WCL (до часа) — раз в 5 с */
+      await new Promise(r => setTimeout(r, fails ? Math.min(10000, 1000 * 2 ** fails) : waiting ? 5000 : 700));
       /* Сбой связи (телефон ушёл в фон, Wi-Fi мигнул) — не бросаем разбор: повторяем с паузой */
       let r, s;
       try { r = await fetch("/api/job/"+job, {headers:{"X-Log-Since":since, "X-Partial-V":pv}}); s = await r.json(); fails = 0; }
@@ -957,11 +981,17 @@ async function run(params, path="/api/analyze"){
         throw new Error("Связь с программой пропала. Если она запущена — откройте разбор из истории, когда он закончится, или запустите снова: скачанное лимит не тратит.");
       }
       if (s.partial) { pv = s.partial_v; FIGHT_LIVE = job;   // первая часть готова — показываем
-        if (!USER_NAV) renderFight({...s.partial, _live: job}); }
+        /* delta: сервер прислал только новые вкладки — к уже полученным */
+        PARTIAL = s.partial.delta && PARTIAL ? {...s.partial, parts: {...PARTIAL.parts, ...s.partial.parts}} : s.partial;
+        if (!USER_NAV) renderFight({...PARTIAL, _live: job}); }
       if (FIGHT_LIVE === job) fightPending(s.progress);
       if (!r.ok) { showErr(s.error || "Ошибка"); break; }
       since = s.log_total;
-      if (s.log.length){ $("#log").textContent += s.log.join("\n")+"\n"; $("#log").scrollTop = 1e9; }
+      waiting = (s.wait_left || 0) > 5;
+      if (s.log.length){   // дописываем строки, а не пересобираем весь журнал; в журнале — последние ~2000 строк
+        const el = $("#log"); el.append(document.createTextNode(s.log.join("\n")+"\n")); logLines += s.log.length;
+        if (logLines > 2500) { el.textContent = el.textContent.split("\n").slice(-2000).join("\n"); logLines = 2000; }
+        el.scrollTop = 1e9; }
       $("#barFill").style.width = Math.round(s.progress*100)+"%"; $("#barWrap").setAttribute("aria-valuenow", Math.round(s.progress*100));
       updateEta(s);
       if (++limitTick % 28 === 0) refreshLimit();  // во время разбора — примерно раз в 20 с
@@ -969,7 +999,7 @@ async function run(params, path="/api/analyze"){
       if (s.state === "error"){ showErr(s.error); if (s.need_key) $("#keyDlg").showModal(); break; }
     }
   } catch(e){ showErr(e.message); }
-  finally { RUN_BTNS.forEach(b => $(b).disabled = false); $("#eta").textContent = ""; FIGHT_LIVE = null;
+  finally { LAST_ACT = Date.now(); RUN_BTNS.forEach(b => $(b).disabled = false); $("#eta").textContent = ""; FIGHT_LIVE = null;
             RUNNING = false; CONTINUE_ALL = null; document.body.classList.remove("running"); }
 }
 
@@ -1134,7 +1164,11 @@ function fightPending(p){ FIGHT_STATE.p = p; const b = $("#fightBar"); if (b) b.
 
 async function trimHistory(){
   const all = await hist.list();
-  for (const it of all.slice(HISTORY_MAX)) await hist.del(it.id);
+  let total = 0;
+  for (const [i, it] of all.entries()) {   // по числу и по объёму: самые новые остаются
+    total += it.size || 0;
+    if (i >= HISTORY_MAX || (i > 0 && total > HISTORY_MB * 1048576)) await hist.del(it.id);
+  }
 }
 
 const REL_RU = {HIGH:"высокая", MEDIUM:"средняя", LOW:"низкая"};
@@ -1569,7 +1603,7 @@ function planRows(plan){
     return [r.time + phc + (r.after_end ? '<div><span class="tag MEDIUM">по топу</span></div>' : ""), esc(r.mechanic) + (r.heavy ? ` <span class="tag LOW">опасный: ${r.need} ${plural(r.need,"сейв","сейва","сейвов")}</span>` : "")
         + (r.top_n || r.deaths || r.beyond_top || r.after_end ? `<div style="font-size:13.5px;color:var(--muted)">${[r.after_end ? "ваш бой сюда не дошёл — время у лучших киллов, в заметку MRT не входит" : "", r.top_n ? `топ жмёт: ${r.top_n}` : "", r.deaths ? `смертей в этот пик: ${r.deaths}` : "",
             r.beyond_top ? (r.by_template ? "у лучших киллов этого повторения нет — бой у них короче; сейвы по образцу этой способности у топа" : "у лучших киллов этого пика нет — бой у них короче; сейвы по тяжести пика") : ""].filter(Boolean).join(", ")}</div>` : ""),
-      (picks.length ? picks.map(p=>`<div><b>${esc(p.cd)}</b> — ${esc(p.player)}${p.like_top?' <span class="tag HIGH">как у топа</span>':""}`
+      (picks.length ? picks.map(p=>`<div><b>${esc(p.cd)}</b> — ${esc(p.player)}${p.like_top?' <span class="tag HIGH">как у топа</span>':""}${p.extra?' <span class="tag none" title="Кулдаун свободен и иначе простоял бы весь бой">доп.</span>':""}`
           + (p.cooldown ? `<span style="color:var(--muted);font-size:13.5px"> · откат ${esc(p.cooldown)}, снова готов в ${esc(p.ready)}</span>` : "") + "</div>").join("")
         : '<span class="worse">нет свободного кулдауна</span>')
       + (!picks.some(p=>p.like_top) && r.top ? `<div style="font-size:13.5px;color:var(--muted)">у топа здесь: ${esc(r.top)}</div>` : "")
@@ -1988,8 +2022,12 @@ function renderRaid(R){
     ${tabs.map(([k],i)=>`<div class="panel ${i==0?"on":""}" role="tabpanel" id="p-${k}" aria-labelledby="t-${k}"></div>`).join("")}
     </details>`;
   el.hidden = false;
+  /* Вкладки рисуются при первом открытии (раньше — все сразу со всеми графиками): на телефоне разбор открывается быстрее */
+  const lazy = {};
+  const openLazy = id => { const fn = lazy[id]; if (fn) { delete lazy[id]; fn(); } };
   $("#more").addEventListener("toggle", () => charts.forEach(c => c.resize()));
   el.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+    openLazy(b.id.slice(2));
     el.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
     el.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "p-"+b.id.slice(2)));
     charts.forEach(c => c.resize());  // график во вкладке, которая была скрыта
@@ -2030,10 +2068,10 @@ function renderRaid(R){
     renderRaidPeaks(Pd, $("#savesBody"));
     pane.querySelectorAll(".diffsw button").forEach(b => b.onclick = () => savesTab(b.dataset.sw === "1"));
   };
-  if (X.damage_timeline) savesTab(false);
-  else $("#p-r-cd").innerHTML = '<p class="empty">Нет данных об уроне по рейду.</p>';
-  renderBurst(X.burst, $("#p-r-dmg"));
-  renderTank(X.tank, $("#p-r-tank"));
+  lazy["r-cd"] = () => { if (X.damage_timeline) savesTab(false);
+    else $("#p-r-cd").innerHTML = '<p class="empty">Нет данных об уроне по рейду.</p>'; };
+  lazy["r-dmg"] = () => renderBurst(X.burst, $("#p-r-dmg"));
+  lazy["r-tank"] = () => renderTank(X.tank, $("#p-r-tank"));
   if (Object.keys(X).length) $("#p-r-sum").insertAdjacentHTML("beforeend", `<div class="grid2">
     <div>
       ${box("Прерывания", "Каст прошёл, хотя эту способность в бою прерывали.",
@@ -2058,6 +2096,7 @@ function renderRaid(R){
   // Игроки
   const th = R.thresholds;
   const canCompare = !I.demo;
+  lazy["r-pl"] = () => {
   $("#p-r-pl").innerHTML = box("Все игроки", `Активное время — доля времени, пока игрок жив. Красным — ниже ${pct(th.active,0)}, смерти и урон от выборочных механик от ${ratio(th.select)} среднего.` +
       (canCompare ? " Кнопка «Сравнить с топом» разбирает игрока против топа его спека (размер — в списке «Ротацию сравнить с»)." : ""),
     table(["Игрок","Уровень предметов","DPS","HPS","Процентиль","Активное время","Смерти","Зелья / камни","Прерыв. / диспелы","Выборочные механики", ...(canCompare?[""]:[])],
@@ -2074,8 +2113,10 @@ function renderRaid(R){
     const ref = $("#ref").value;   // «Без ротации» и «все боссы» здесь не подходят — сравниваем с топ-3
     run({url:R.source_url, fight:I.fight_id, actor:b.dataset.actor, ref: ref === "none" ? "top3" : ref});
   });
+  };
 
   // Механики
+  lazy["r-mech"] = () => {
   const H = R.heatmap;
   const heatCell = (r, d, h) => {
     const a = r<=1 ? 0 : Math.min(1,(r-1)/2);
@@ -2091,8 +2132,10 @@ function renderRaid(R){
       table(["Способность","Тип","Урон","Доля урона","Задето игроков","Больше всех получили"], R.abilities.map(a=>[esc(a.name),
         `<span class="cat ${a.category==="Выборочно"?"sel":""}">${esc(a.category)}</span>`, num(a.total), pct(a.share_total), `${a.players_hit} из ${I.size}`,
         a.category==="По танкам"?"—":a.top.map(t=>`${esc(t.name)} ${ratio(t.ratio)}`).join(", ")]), {num:[2,3,4]}))}`;
+  };
 
   // Смерти
+  lazy["r-death"] = () => {
   const lanes = R.lanes, ly = Object.fromEntries(lanes.map((l,i)=>[l, lanes.length-i]));
   const laneColor = ["#C9423A","#D2691E","#1F8A7E","#4F7CC0","#7A4FB5","#5C6781"];
   $("#p-r-death").innerHTML = `
@@ -2107,8 +2150,10 @@ function renderRaid(R){
     options:{maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`${c.raw.e.label}: ${mmss(c.raw.e.t)}`}}},
       scales:{x:{min:0, max:I.duration_s+5, ticks:{callback:v=>mmss(v).replace(/,0$/,"")}, title:{display:true,text:"время боя"}},
         y:{min:0.4, max:lanes.length+0.6, ticks:{stepSize:1, callback:v=>lanes[lanes.length-v]||""}}}}});
+  };
 
   // Пуллы
+  lazy["r-pull"] = () => {
   $("#p-r-pull").innerHTML = `
     ${R.pulls.length>1 ? box("Прогресс по пуллам", "Здоровье босса в конце каждого пулла (0% — килл) и смерти до конца вайпа.", '<div class="chart"><canvas id="cPulls"></canvas></div>') : ""}
     ${(((R.extras||{}).pull_trend||{}).rows||[]).length ? box("От чего умирает рейд по пуллам", "Смерти до конца вайпа (последние 15 с не считаются). По столбцам — пуллы.",
@@ -2118,12 +2163,13 @@ function renderRaid(R){
     ${box("Все пуллы на этом боссе", `Смерти в последние ${th.wipe_tail} с вайпа не считаются: обычно это уже конец попытки.`,
       table(["Пулл","Итог","Длительность","Здоровье босса","Смертей до конца вайпа","Первая смерть"], R.pulls.map(p=>[
         `${p.n}${p.selected?" (этот)":""}`, p.kill?'<span class="better">килл</span>':"вайп", p.time, p.boss_pct==null?"—":num(p.boss_pct,1)+"%",
-        p.deaths_before_tail, p.first_death?`${esc(p.first_death.player)}, ${p.first_death.time} — «${esc(p.first_death.ability)}»`:"—"]), {num:[2,3,4]}))}`;
+        p.deaths_before_tail ?? '<span style="color:var(--muted)" title="Смерти загружаются по последним 40 пуллам">—</span>', p.first_death?`${esc(p.first_death.player)}, ${p.first_death.time} — «${esc(p.first_death.ability)}»`:"—"]), {num:[2,3,4]}))}`;
   if (R.pulls.length>1) chart("cPulls", {data:{labels:R.pulls.map(p=>"Пулл "+p.n), datasets:[
       {type:"line", label:"Здоровье босса, %", data:R.pulls.map(p=>p.boss_pct), borderColor:C.top, backgroundColor:C.top, tension:0, pointRadius:5, yAxisID:"y"},
       {type:"bar", label:"Смертей до конца вайпа", data:R.pulls.map(p=>p.deaths_before_tail), backgroundColor:"rgba(201,66,58,.55)", borderRadius:3, yAxisID:"y2"}]},
     options:{maintainAspectRatio:false, plugins:{legend:{position:"bottom"}},
       scales:{y:{min:0, max:100, title:{display:true,text:"Здоровье босса, %"}}, y2:{position:"right", beginAtZero:true, ticks:{stepSize:1}, grid:{display:false}, title:{display:true,text:"смертей"}}}}});
+  };
 
   el.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
 }
@@ -2339,11 +2385,18 @@ async function renderHistory(){
 const b64ToBlob = (b64, type) => { const bin = atob(b64), a = new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return new Blob([a], {type}); };
 const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 $("#exportBtn").onclick = async () => {
-  const items = await hist.all();
-  const data = {app:"wcl-analyzer", version:1, exported_at:new Date().toISOString(),
-    key: $("#exportKey").checked ? KEY : null, refs: store.get("wclRefs") || [], prefs: prefs(),
-    history: await Promise.all(items.map(async it => ({...it, blob: it.blob ? await blobToB64(it.blob) : null})))};
-  saveBlob(new Blob([JSON.stringify(data)], {type:"application/json"}), `wcl-analyzer-данные-${new Date().toISOString().slice(0,10)}.json`);
+  /* Файл собирается по частям (разбор за разбором), а не одной огромной строкой: на телефоне не кончится память */
+  const head = {app:"wcl-analyzer", version:1, exported_at:new Date().toISOString(),
+    key: $("#exportKey").checked ? KEY : null, refs: store.get("wclRefs") || [], prefs: prefs()};
+  const parts = [JSON.stringify(head).slice(0, -1) + ',"history":['];
+  const metas = await hist.list();
+  for (const [i, m] of metas.entries()) {
+    const it = await hist.get(m.id); if (!it) continue;
+    parts.push((parts.length > 1 ? "," : "") + JSON.stringify({...it, blob: it.blob ? await blobToB64(it.blob) : null,
+      blobAlt: it.blobAlt ? await blobToB64(it.blobAlt) : null}));
+  }
+  parts.push("]}");
+  saveBlob(new Blob(parts, {type:"application/json"}), `wcl-analyzer-данные-${new Date().toISOString().slice(0,10)}.json`);
 };
 $("#importBtn").onclick = () => STATUS.app === "android" ? androidImport() : $("#importFile").click();
 $("#importFile").onchange = async () => {
@@ -2367,7 +2420,8 @@ async function importBackupText(text){
       && it.result && typeof it.result === "object" && it.result.info && typeof it.result.mode === "string";
     const good = (Array.isArray(d.history) ? d.history : []).filter(okItem);
     for (const it of good)
-      await hist.put({...it, title: String(it.title || ""), blob: typeof it.blob === "string" ? b64ToBlob(it.blob, XLSX_TYPE) : null});
+      await hist.put({...it, title: String(it.title || ""), blob: typeof it.blob === "string" ? b64ToBlob(it.blob, XLSX_TYPE) : null,
+                      blobAlt: typeof it.blobAlt === "string" ? b64ToBlob(it.blobAlt, XLSX_TYPE) : null});
     await trimHistory(); await refreshKey(); renderRefs(); renderHistory();
     showOk(`Загружено: ${good.length} ${plural(good.length,"разбор","разбора","разборов")}, ${(d.refs||[]).length} эталонов${d.key && KEY && KEY.id === d.key.id ? ", ключ API" : ""}.`);
   } catch(e){ showErr("Не удалось загрузить файл: " + e.message); }

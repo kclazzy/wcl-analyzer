@@ -11,8 +11,9 @@ a = Analysis(
         (os.path.join(ROOT, "wcl_analyzer", "data"), os.path.join("wcl_analyzer", "data")),
         (os.path.join(ROOT, "spell_meta.example.json"), "."),
     ],
-    hiddenimports=["segno", "openpyxl", "numpy"],
-    excludes=["tkinter", "matplotlib", "pandas", "scipy", "PIL", "pytest"],
+    hiddenimports=["openpyxl"],
+    # numpy больше не нужен (статистика — свой модуль stats.py): десятки МБ меньше и быстрее запуск
+    excludes=["tkinter", "matplotlib", "pandas", "scipy", "PIL", "pytest", "numpy"],
 )
 pyz = PYZ(a.pure)
 exe = EXE(

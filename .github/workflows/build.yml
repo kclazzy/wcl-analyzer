@@ -17,18 +17,20 @@ permissions:
 jobs:
   tests:
     runs-on: ubuntu-22.04
+    env:
+      WCL_GAME_DATA: bundled   # тесты — на таблице из этой сборки (копия в репозитории может обновиться позже)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
+        with: {python-version: "3.12", cache: pip, cache-dependency-path: requirements.txt}
       - run: pip install -r requirements.txt
       - run: python tests/test_pipeline.py
       - run: python tests/test_web.py
       - run: python tests/test_update.py
       - run: python tests/test_local_security.py
 
+  # Сборки идут параллельно с тестами (раньше — после них): выпуск всё равно ждёт и тесты, и обе сборки
   windows:
-    needs: tests
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,19 +47,20 @@ jobs:
           echo "SHELL_ID=$SHELL_ID" >> "$GITHUB_ENV"
           cat wcl_analyzer/_build.py
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
+        with: {python-version: "3.12", cache: pip, cache-dependency-path: requirements.txt}
       - run: pip install -r requirements.txt pyinstaller
       - run: pyinstaller --noconfirm packaging/windows/wcl_analyzer.spec
       - name: Проверка запуска программы
         shell: pwsh
         run: |
           $p = Start-Process -FilePath "dist\WCL Analyzer.exe" -ArgumentList "ui","--no-browser","--port","8799" -PassThru
-          Start-Sleep -Seconds 15
-          $r = Invoke-RestMethod http://127.0.0.1:8799/api/status
-          if ($r.app -ne "exe") { throw "Программа не ответила как ожидалось" }
-          $job = (Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8799/api/analyze -ContentType "application/json" -Body '{"demo":true}').job
-          Start-Sleep -Seconds 25
-          $s = Invoke-RestMethod "http://127.0.0.1:8799/api/job/$job"
+          $r = $null
+          for ($i = 0; $i -lt 40 -and -not $r; $i++) { try { $r = Invoke-RestMethod http://127.0.0.1:8799/api/status } catch { Start-Sleep 1 } }
+          if (-not $r -or $r.app -ne "exe") { throw "Программа не ответила как ожидалось" }
+          $job = (Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8799/api/analyze -ContentType "application/json" `
+                   -Headers @{ Origin = "http://127.0.0.1:8799" } -Body '{"demo":true}').job
+          $s = $null
+          for ($i = 0; $i -lt 60; $i++) { Start-Sleep 1; $s = Invoke-RestMethod "http://127.0.0.1:8799/api/job/$job"; if ($s.state -ne "running") { break } }
           if ($s.state -ne "done") { throw "Демо-разбор не завершился: $($s.state) $($s.error)" }
           Stop-Process -Id $p.Id
       - name: Проверка обновления целиком (как у пользователей)
@@ -91,7 +94,6 @@ jobs:
           path: dist/WCL Analyzer.exe
 
   android:
-    needs: tests
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -181,7 +183,7 @@ jobs:
   # (в том числе еженедельный из «Ссылок на гайды»); два выпуска одновременно не публикуются.
   publish:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: [windows, android]
+    needs: [tests, windows, android]
     runs-on: ubuntu-22.04
     concurrency:
       group: publish-main

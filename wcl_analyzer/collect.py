@@ -148,7 +148,7 @@ def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str,
     with ThreadPoolExecutor(max_workers=workers) as pool:
         while len(logs) < top_n and pos < len(queue):
             need = top_n - len(logs)
-            batch = queue[pos:pos + need + min(2, need)]
+            batch = queue[pos:pos + need]   # запасной лог — только если какой-то не открылся (цикл докачает)
             pos += len(batch)
             for rk, (pl, err) in zip(batch, pool.map(load, batch)):
                 if pl is None:

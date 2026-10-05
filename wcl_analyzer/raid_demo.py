@@ -196,6 +196,25 @@ class FakeRaidClient:
             evs = [e for e in evs if e.get("targetID") == target_id]
         return [e for e in evs if start <= e["timestamp"] <= end]
 
+    def events_multi(self, code, fight_id, start, end, specs, tables=None, fields=None):
+        """Как WCLClient.events_multi: несколько выборок одним «запросом» (демо проходит тот же путь)."""
+        self.calls = getattr(self, "calls", 0) + 1
+        out = {}
+        for k, p in specs.items():
+            out[k] = self.events(code, int(p.get("fight_id") or fight_id), p.get("start", start), p.get("end", end),
+                                 p["data_type"], p.get("source_id"), p.get("target_id"), p.get("hostility"))
+        for k, p in (tables or {}).items():
+            out[k] = self.raid_table(code, fight_id, p["data_type"])
+        for k, f in (fields or {}).items():
+            if f.startswith("playerDetails"):
+                out[k] = {"data": {"playerDetails": self.player_details(code, fight_id)}}
+        return out
+
+    @staticmethod
+    def unwrap_details(pd):
+        from .api import WCLClient
+        return WCLClient.unwrap_details(pd)
+
     def raid_table(self, code, fight_id, data_type):
         g = self._gen(fight_id, code)
         return {"data": {"totalTime": g["dur"] * 1000,

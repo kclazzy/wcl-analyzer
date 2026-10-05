@@ -232,18 +232,20 @@ def run_roster_plan(client, encounter_id: int, difficulty: int, minutes: float, 
     if not cands:
         raise LookupError("У этого босса на этой сложности пока нет киллов в рейтинге Warcraft Logs")
     kills, base = [], None
-    for i, rk in enumerate(cands):
-        if len(kills) >= KILLS:
-            break
+
+    def load(rk):
+        """Один килл: (R, k) или (None, причина). Лимит — исключением наверх."""
         rep = rk["report"]
         code, fid = rep["code"], int(rep.get("fightID") or rep.get("fightId") or 0)
         guild = (rk.get("guild") or {}).get("name") or rk.get("name") or code
         try:
             report = client.report(code)
-            try:
-                meta_ph = client.report_phases(code) if hasattr(client, "report_phases") else None
-            except Exception:  # noqa: BLE001 — названия фаз необязательны
-                meta_ph = None
+            meta_ph = report.get("phases") if "phases" in report else None   # названия фаз — уже в отчёте
+            if meta_ph is None and hasattr(client, "report_phases"):
+                try:
+                    meta_ph = client.report_phases(code)
+                except Exception:  # noqa: BLE001 — названия фаз необязательны
+                    meta_ph = None
             R = light_raid(client, code, fid, report=report, difficulty=difficulty, encounter_id=encounter_id)
             if meta_ph:  # названия фаз, как в обычном разборе
                 from .raid import fight_phases
@@ -252,18 +254,35 @@ def run_roster_plan(client, encounter_id: int, difficulty: int, minutes: float, 
         except WCLError as e:
             if "лимит" in str(e).lower():
                 raise
-            log(f"  пропущен килл {guild}: {e}")
-            continue
+            return None, f"{guild}: {e}"
         except (LookupError, StopIteration, KeyError) as e:
-            log(f"  пропущен килл {guild}: {e}")
-            continue
-        k = {"guild": guild, "duration": R["info"]["duration_s"], "code": code, "fight": fid,
-             "spikes": R["extras"]["spikes"], "cds": R["extras"]["raid_cds"]}
-        kills.append(k)
-        if base is None:
-            base = (R, k)
-        log(f"  Килл {len(kills)}: {guild}, {_fmt_t(k['duration'])}")
-        progress(0.15 + 0.7 * len(kills) / KILLS)
+            return None, f"{guild}: {e}"
+        return (R, {"guild": guild, "duration": R["info"]["duration_s"], "code": code, "fight": fid,
+                    "spikes": R["extras"]["spikes"], "cds": R["extras"]["raid_cds"]}), None
+
+    # Киллы — параллельно (раньше по одному); запасной — только если какой-то не открылся. Порядок — как в отборе
+    from concurrent.futures import ThreadPoolExecutor
+    from .collect import parallel_workers
+    with ThreadPoolExecutor(max_workers=parallel_workers(client)) as pool:
+        futs = [pool.submit(load, rk) for rk in cands[:KILLS]]
+        nxt, i = len(futs), 0
+        while i < len(futs) and len(kills) < KILLS:
+            got, why = futs[i].result()
+            i += 1
+            if got is None:
+                log(f"  пропущен килл {why}")
+                if nxt < len(cands):
+                    futs.append(pool.submit(load, cands[nxt]))
+                    nxt += 1
+                continue
+            R_, k = got
+            kills.append(k)
+            if base is None:
+                base = (R_, k)
+            log(f"  Килл {len(kills)}: {k['guild']}, {_fmt_t(k['duration'])}")
+            progress(0.15 + 0.7 * len(kills) / KILLS)
+        for f_ in futs[i:]:
+            f_.cancel()
     if not base:
         raise LookupError("Не удалось загрузить ни одного килла из рейтинга (логи закрыты или недоступны)")
     R, bk = base

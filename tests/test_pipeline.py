@@ -160,7 +160,7 @@ def test_plan_no_duplicate_ability():
          "spikes": [{"t": 60, "peak_t": 62, "ability": "Волна", "ability_id": 5, "k": 1, "damage": 100, "deaths": 2},
                     {"t": 120, "peak_t": 122, "ability": "Волна", "ability_id": 5, "k": 2, "damage": 30}]}
     plan = make_plan(X, {}, [], {})
-    assert [p["cd"] for p in plan[0]["picks"]] == ["Божественный гимн", "Ободряющий клич"], plan[0]["picks"]
+    assert [p["cd"] for p in plan[0]["picks"] if not p.get("extra")] == ["Божественный гимн", "Ободряющий клич"], plan[0]["picks"]
     # второй клич — на следующий пик (от другого воина), а не вдогонку первому
     first_warrior = next(p["player"] for p in plan[0]["picks"] if p["cd"] == "Ободряющий клич")
     assert plan[1]["picks"][0]["cd"] == "Ободряющий клич" and plan[1]["picks"][0]["player"] != first_warrior
@@ -242,9 +242,9 @@ def test_plan_longer_phase():
     # №3 у вас ещё в 1-й фазе: образец — волны 1-й фазы (1 кулдаун), а не топовая №3 из 2-й фазы (2 кулдауна)
     assert w3["by_template"] and w3["need"] == 1, w3
     # №4 у вас — первая волна 2-й фазы: как у топа №3 — два кулдауна, гимн и тотем
-    assert not w4["beyond_top"] and w4["need"] == 2 and {p["cd"] for p in w4["picks"]} == {"Гимн", "Тотем"}, w4
+    assert not w4["beyond_top"] and w4["need"] == 2 and {p["cd"] for p in w4["picks"] if not p.get("extra")} == {"Гимн", "Тотем"}, w4
     # №6 у топа нет (их 2-я фаза короче): по образцу 2-й фазы — тоже два кулдауна
-    assert w6["by_template"] and w6["beyond_top"] and w6["need"] == 2 and len(w6["picks"]) == 2, w6
+    assert w6["by_template"] and w6["beyond_top"] and w6["need"] == 2 and len([p for p in w6["picks"] if not p.get("extra")]) == 2, w6
     print("OK план сейвов: фаза длиннее, чем у топа — сопоставление по фазе и образцу способности")
 
 
@@ -294,8 +294,8 @@ def test_cache_prune():
         c.put("new", "q", {}, big)
         assert c.get("new") == big
         # запись прежней версии: текст JSON, полный запрос
-        c.db.execute("INSERT INTO api_cache VALUES (?,?,?,?,?)", ("old_text", "query{...}", "{}", json.dumps(big), time.time()))
-        c.db.execute("INSERT INTO api_cache VALUES (?,?,?,?,?)", ("stale", "q", "{}", json.dumps(big), time.time() - 40 * 86400))
+        c.db.execute("INSERT INTO api_cache (key, query, variables, response, fetched_at) VALUES (?,?,?,?,?)", ("old_text", "query{...}", "{}", json.dumps(big), time.time()))
+        c.db.execute("INSERT INTO api_cache (key, query, variables, response, fetched_at) VALUES (?,?,?,?,?)", ("stale", "q", "{}", json.dumps(big), time.time() - 40 * 86400))
         c.db.commit()
         r = c.prune()
         assert r["removed"] == 1 and c.get("stale") is None and c.get("old_text") == big, r
@@ -305,12 +305,18 @@ def test_cache_prune():
         stored = c.db.execute("SELECT length(response) FROM api_cache WHERE key='new'").fetchone()[0]
         assert stored * 4 < raw, (stored, raw)            # сжато в разы
         for i in range(30):
-            c.db.execute("INSERT INTO api_cache VALUES (?,?,?,?,?)", (f"k{i}", "", "{}", Cache._pack({"i": i, **big}), time.time() - 100 + i))
+            c.db.execute("INSERT INTO api_cache (key, query, variables, response, fetched_at) VALUES (?,?,?,?,?)", (f"k{i}", "", "{}", Cache._pack({"i": i, **big}), time.time() - 100 + i))
         c.db.commit()
         c.prune(max_mb=stored * 10 / 1048576)              # лимит ≈ 10 записей: остаются самые свежие
         keys = {k for (k,) in c.db.execute("SELECT key FROM api_cache")}
         assert "k29" in keys and "k0" not in keys and len(keys) <= 10, keys
         assert c.db.execute("SELECT x FROM user_refs").fetchone()[0] == "мой эталон"
+        # нужная запись не удаляется, даже если скачана давно: чистка — по последнему использованию
+        c.db.execute("INSERT INTO api_cache (key, query, variables, response, fetched_at, accessed_at) VALUES (?,?,?,?,?,?)",
+                     ("used", "", "{}", "{}", time.time() - 40 * 86400, time.time()))
+        c.db.commit()
+        c.prune()
+        assert c.get("used") == {}
         c.clear()
         assert c.info()["rows"] == 0 and c.db.execute("SELECT COUNT(*) FROM user_refs").fetchone()[0] == 1
     print("OK кэш WCL: сжатие, удаление старого (3 недели) и лишнего (лимит), эталоны не трогаются")
@@ -590,7 +596,7 @@ def test_plan_press_times():
             t_line = ln[0]
             for p in r["picks"]:
                 if f"{{spell:{p['id']}}}" in ln[1]:
-                    prev = [q for rr in plan if rr is not r for q in rr["picks"] if q["id"] == p["id"]]
+                    prev = [q for rr in plan if rr["t"] < r["t"] for q in rr["picks"] if q["id"] == p["id"]]
                     for q in prev:   # к времени строки кулдаун откатан
                         mm, ss = map(int, q["ready"].split(":")[:2]) if q["ready"].count(":") == 1 else (0, 0)
                         assert t_line >= mm * 60 + ss - 1 or t_line < r["t"] - 1, (ln, q)
@@ -964,8 +970,8 @@ def test_player_all_bosses():
     f2 = {**copy.deepcopy(f1), "id": 2, "encounterID": int(f1.get("encounterID") or 1) + 1, "name": "Второй босс"}
     f3 = {**copy.deepcopy(f1), "id": 3, "encounterID": int(f1.get("encounterID") or 1) + 2, "name": "Третий босс"}
     rep["fights"] = [f1, f2, f3]
-    points = iter([1000, 960, 960, 30, 30, 30, 30])
-    client.points_left = lambda: next(points)
+    points = iter([1000])   # перед первым разбором — 1000, после него и дальше — 30: второму не хватит
+    client.points_left = lambda: next(points, 30)
     client.rate_limit = lambda: {"pointsResetIn": 1500}
     web.CLIENT_FACTORY = lambda creds: client
     # в тестовом клиенте логи топа есть только для первого босса — для остальных берём тот же эталон
@@ -1165,7 +1171,10 @@ def test_raid():
     # пик со смертью — опасный: несколько сейвов разных игроков; у каждого пика — запасные, уже откатанные
     danger = [r for r in Xs["plan"] if r["deaths"]]
     assert danger and all(len(r["picks"]) >= 2 and len({p["player"] for p in r["picks"]}) == len(r["picks"]) for r in danger)
-    assert all(r["spare"] for r in Xs["plan"]), "нет запасных вариантов"
+    assert all(r["spare"] or any(p.get("extra") for p in r["picks"]) for r in Xs["plan"]), "нет запасных вариантов"
+    used = {(p["player"], p["cd"]) for r in Xs["plan"] for p in r["picks"] + (r.get("heal_picks") or [])}
+    idle = [(c["player"], c["name"]) for c in Xs["roster_cds"] if (c["player"], c["name"]) not in used]
+    assert len(idle) <= 2, f"сейвы, которые простояли весь бой и не попали в заметку MRT: {idle}"
     for r in Xs["plan"]:  # одна и та же способность на пик не повторяется — ни в назначенных, ни в запасных
         cds_on_peak = [p["cd"] for p in r["picks"]] + [x["cd"] for x in r["spare"]]
         assert len(cds_on_peak) == len(set(cds_on_peak)), r

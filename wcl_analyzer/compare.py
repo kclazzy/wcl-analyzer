@@ -13,7 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
-import numpy as np
+from . import stats as _st
 
 from .logs import PlayerLog, merge_intervals
 from .metrics import CATEGORY_RU, compute_metrics, med, pct
@@ -748,7 +748,7 @@ def _cd_uplift(me: PlayerLog, mm: dict, main_cd: int | None) -> dict | None:
     if not main_cd or not mm.get("dps_5s") or main_cd not in mm["cast_times"]:
         return None
     windows = me.buffs.get(main_cd) or [(t, t + 20) for t in mm["cast_times"][main_cd]]
-    win_len = float(np.mean([e - s for s, e in windows])) if windows else 20.0
+    win_len = float(_st.mean([e - s for s, e in windows])) if windows else 20.0
     inside = outside = 0.0
     t_in = 0.0
     wins = merge_intervals(windows)
@@ -799,8 +799,8 @@ def _gap(r: CompareResult, my_dps: float) -> list[dict]:
             sorted(cats.items(), key=lambda kv: -kv[1])]
     ref = r.ref
     xs = [(log.ilvl, log.dps) for log in ref.logs if log.ilvl]
-    if r.me.ilvl and len(xs) >= 5 and np.std([x for x, _ in xs]) > 0.5:
-        slope = float(np.polyfit([x for x, _ in xs], [y for _, y in xs], 1)[0])
+    if r.me.ilvl and len(xs) >= 5 and _st.std([x for x, _ in xs]) > 0.5:
+        slope = _st.slope([x for x, _ in xs], [y for _, y in xs])
         est = max(0.0, slope * ((ref.agg["ilvl"]["median"] or r.me.ilvl) - r.me.ilvl))
         if est > 0:
             rows.append({"factor": "Экипировка (уровень предметов)", "dps": est, "status": "Возможная причина"})
@@ -848,7 +848,7 @@ def _reliability(me: PlayerLog, ref: Reference, mm: dict, mech_offsets: list[flo
     else:
         add("Экипировка", "—", "уровень предметов неизвестен, критерий не проверен")
     if mech_offsets:
-        mo = float(np.median(mech_offsets))
+        mo = float(_st.median(mech_offsets))
         add("Тайминги механик (тактика)", "HIGH" if mo <= 5 else "MEDIUM" if mo <= 15 else "LOW",
             f"медианное отклонение ключевых механик {_c(mo)} с")
     else:
@@ -859,7 +859,7 @@ def _reliability(me: PlayerLog, ref: Reference, mm: dict, mech_offsets: list[flo
         f"у вас {'есть' if my_lust else 'нет'}, у эталона {ref.agg['lust_share']:.0%}")
     dates = [log.report_start for log in ref.logs if log.report_start]
     if me.report_start and dates:
-        days = abs(me.report_start - float(np.median(dates))) / 86400000
+        days = abs(me.report_start - float(_st.median(dates))) / 86400000
         add("Патч / дата", "HIGH" if days <= 21 else "MEDIUM" if days <= 60 else "LOW",
             f"разница дат отчётов {days:.0f} дн.")
     a_ref = ref.agg["adds_share"]["median"]
@@ -912,8 +912,8 @@ def _summary(r: CompareResult) -> list[dict]:
     keys = [ab for ab, s in src_ref.items() if (s["median"] or 0) >= 0.15]
     if keys:
         rows.append({"metric": "Время действия ключевых эффектов", "fmt": "pct", "better": "higher",
-                     "my": float(np.mean([src_my.get(ab, 0.0) for ab in keys])),
-                     "ref": float(np.mean([src_ref[ab]["median"] for ab in keys]))})
+                     "my": float(_st.mean([src_my.get(ab, 0.0) for ab in keys])),
+                     "ref": float(_st.mean([src_ref[ab]["median"] for ab in keys]))})
     off = [ab for ab, s in r.ref.spells.items()
            if s.category in ("offensive", "racial", "trinket") and ab in agg["cd_uses"]]
     if off:

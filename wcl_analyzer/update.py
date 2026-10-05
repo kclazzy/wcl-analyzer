@@ -112,6 +112,28 @@ def _get(url: str, timeout: float = 30) -> bytes:
     return r.content
 
 
+_GET_HTTP = _get
+
+
+def _get_to_file(url: str, dest: Path, timeout: float = 300) -> tuple[int, str]:
+    """Скачать в файл по частям, сразу считая sha256: 25 МБ программы не держатся в памяти целиком.
+    Возвращает (размер, sha256)."""
+    if _get is not _GET_HTTP:   # загрузка подменена (проверки) — целиком
+        data = _get(url, timeout)
+        dest.write_bytes(data)
+        return len(data), hashlib.sha256(data).hexdigest()
+    import requests
+    h, n = hashlib.sha256(), 0
+    with requests.get(url, timeout=timeout, stream=True) as r:
+        r.raise_for_status()
+        with open(dest, "wb") as f:
+            for chunk in r.iter_content(1 << 20):
+                f.write(chunk)
+                h.update(chunk)
+                n += len(chunk)
+    return n, h.hexdigest()
+
+
 def _offline(e: Exception) -> bool:
     """Нет связи (нет интернета, адрес не найден, тайм-аут) — а не ответ сервера с ошибкой."""
     import requests
@@ -295,10 +317,14 @@ def _download_jsdelivr(info: dict, tmp: Path) -> None:
              if f["name"].startswith("/wcl_analyzer/") and "__pycache__" not in f["name"] and ".." not in f["name"]]
     if not names:
         raise UpdateError("В зеркале jsDelivr нет файлов программы для этой версии")
-    for n in names:
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(n):   # файлы — параллельно по 8 (раньше ~50 файлов по одному)
         target = tmp / n.lstrip("/")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(_get(f"{JSD_CDN}@{ver}{n}", 30))
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(one, names))
     want = info.get("code_sha256")
     if want and code_tree_hash(tmp / "wcl_analyzer") != want:
         raise ValueError("Код обновления из зеркала jsDelivr повреждён (контрольная сумма не совпала) — "
@@ -369,6 +395,10 @@ def restart_exe(new_exe: Path | None = None) -> None:
 
 
 def verify_download(info: dict, data: bytes, kind: str) -> None:
+    verify_hash(info, len(data), hashlib.sha256(data).hexdigest(), kind)
+
+
+def verify_hash(info: dict, size_got: int, sha_got: str, kind: str) -> None:
     """Скачанная программа целиком (kind: exe | apk) совпадает с той, что опубликована в выпуске.
 
     Контрольная сумма проверяется, если она известна (update.json или описание выпуска). В update.json
@@ -380,10 +410,10 @@ def verify_download(info: dict, data: bytes, kind: str) -> None:
             raise UpdateError("В данных обновления нет контрольной суммы программы — обновление отменено. "
                               "Скачайте программу со страницы выпуска вручную.")
         return
-    if size and len(data) != size:
-        raise UpdateError(f"Программа скачалась не полностью ({len(data)} из {size} байт) — "
+    if size and size_got != size:
+        raise UpdateError(f"Программа скачалась не полностью ({size_got} из {size} байт) — "
                           "обновление отменено, попробуйте ещё раз")
-    if hashlib.sha256(data).hexdigest() != want:
+    if sha_got != want:
         raise UpdateError("Скачанная программа повреждена (контрольная сумма не совпала) — "
                           "обновление отменено, попробуйте ещё раз")
 
@@ -394,10 +424,15 @@ def apply_full() -> dict:
     mode = app_mode()
     if mode == "exe":
         info = latest_info()
-        data = _get(BASE + EXE, 300)
-        verify_download(info, data, "exe")  # до записи на диск: повреждённая программа не заменит рабочую
         new = Path(sys.executable).with_name("WCL Analyzer.new.exe")
-        new.write_bytes(data)
+        part = new.with_name(new.name + ".part")
+        try:   # сначала во временный файл, по частям; повреждённая программа не заменит рабочую
+            size, sha = _get_to_file(BASE + EXE, part, 300)
+            verify_hash(info, size, sha, "exe")
+        except BaseException:
+            part.unlink(missing_ok=True)
+            raise
+        part.replace(new)
         restart_exe(new)
         return {"ok": True, "restart": "Новая версия скачана, программа перезапустится через пару секунд.",
                 "full_restart": True}

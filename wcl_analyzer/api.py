@@ -43,11 +43,19 @@ class Cache:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.lock = threading.Lock()
         self.db = sqlite3.connect(self.path, check_same_thread=False, timeout=30)
+        try:   # журнал WAL: запись втрое быстрее, чтение не ждёт записи
+            self.db.execute("PRAGMA journal_mode=WAL")
+            self.db.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.DatabaseError:
+            pass
         self.db.execute(
             "CREATE TABLE IF NOT EXISTS api_cache ("
             " key TEXT PRIMARY KEY, query TEXT, variables TEXT,"
-            " response TEXT, fetched_at REAL)"
+            " response TEXT, fetched_at REAL, accessed_at REAL)"
         )
+        cols = {r[1] for r in self.db.execute("PRAGMA table_info(api_cache)")}
+        if "accessed_at" not in cols:   # кэш прежней версии: когда запись последний раз была нужна
+            self.db.execute("ALTER TABLE api_cache ADD COLUMN accessed_at REAL")
         self.db.commit()
 
     @staticmethod
@@ -70,8 +78,11 @@ class Cache:
     def get(self, key: str, max_age_s: float | None = None) -> Any | None:
         with self.lock:
             row = self.db.execute(
-                "SELECT response, fetched_at FROM api_cache WHERE key = ?", (key,)
+                "SELECT response, fetched_at, accessed_at FROM api_cache WHERE key = ?", (key,)
             ).fetchone()
+            if row and time.time() - (row[2] or row[1] or 0) > 86400:   # раз в сутки — «нужна» (для чистки)
+                self.db.execute("UPDATE api_cache SET accessed_at = ? WHERE key = ?", (time.time(), key))
+                self.db.commit()
         if not row:
             return None
         if max_age_s is not None and time.time() - row[1] > max_age_s:
@@ -89,8 +100,9 @@ class Cache:
 
     def _put(self, key: str, query: str, variables: dict, response: Any) -> None:
         self.db.execute(
-            "INSERT OR REPLACE INTO api_cache VALUES (?, ?, ?, ?, ?)",
-            (key, "", json.dumps(variables, sort_keys=True), self._pack(response), time.time()),
+            "INSERT OR REPLACE INTO api_cache (key, query, variables, response, fetched_at, accessed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (key, "", json.dumps(variables, sort_keys=True), self._pack(response), time.time(), time.time()),
         )
         self.db.commit()
 
@@ -112,7 +124,9 @@ class Cache:
         и возвращает место на диске (VACUUM). Свои эталоны и настройки (другие таблицы) не трогает."""
         before = self.size_mb()
         with self.lock:
-            cur = self.db.execute("DELETE FROM api_cache WHERE fetched_at < ?", (time.time() - max_age_days * 86400,))
+            # по тому, когда запись была нужна, а не когда скачана: бои топа, нужные каждую неделю, не удаляются
+            cur = self.db.execute("DELETE FROM api_cache WHERE COALESCE(accessed_at, fetched_at) < ?",
+                                  (time.time() - max_age_days * 86400,))
             removed = cur.rowcount or 0
             if compress_old:  # записи прежних версий — текстом и с полным текстом запроса
                 rows = self.db.execute("SELECT key, response FROM api_cache WHERE typeof(response) = 'text' "
@@ -125,17 +139,21 @@ class Cache:
             limit = max_mb * 1048576
             if total > limit:  # сверх лимита — самые старые
                 acc, cut = 0, None
-                for k, ln, fa in self.db.execute("SELECT key, length(response), fetched_at FROM api_cache "
-                                                 "ORDER BY fetched_at DESC"):
+                for k, ln, fa in self.db.execute("SELECT key, length(response), COALESCE(accessed_at, fetched_at) "
+                                                 "FROM api_cache ORDER BY 3 DESC"):
                     acc += ln or 0
                     if acc > limit * 0.9:
                         cut = fa
                         break
                 if cut is not None:
-                    removed += self.db.execute("DELETE FROM api_cache WHERE fetched_at <= ?", (cut,)).rowcount or 0
+                    removed += self.db.execute("DELETE FROM api_cache WHERE COALESCE(accessed_at, fetched_at) <= ?",
+                                               (cut,)).rowcount or 0
             self.db.commit()
-            try:
-                self.db.execute("VACUUM")
+            try:   # сжать файл — только если освободилось заметно (VACUUM большого кэша — секунды)
+                free_ = self.db.execute("PRAGMA freelist_count").fetchone()[0]
+                pages = self.db.execute("PRAGMA page_count").fetchone()[0] or 1
+                if free_ > 0.2 * pages and free_ > 2000:
+                    self.db.execute("VACUUM")
             except sqlite3.OperationalError:
                 pass
         return {"removed": removed, "before_mb": round(before, 1), "after_mb": round(self.size_mb(), 1)}
@@ -182,7 +200,8 @@ class MemoryCache:
             if max_age_s is not None and age > max_age_s:
                 return None
             self.data.move_to_end(key)
-            return json.loads(item[0])
+            blob = item[0]
+        return json.loads(zlib.decompress(blob))
 
     def fetched_at(self, key: str) -> float | None:
         with self.lock:
@@ -190,7 +209,7 @@ class MemoryCache:
             return item[1] if item else None
 
     def put(self, key: str, query: str, variables: dict, response: Any) -> None:
-        blob = json.dumps(response)
+        blob = zlib.compress(json.dumps(response, separators=(",", ":")).encode("utf-8"), 1)   # в ~9 раз меньше
         with self.lock:
             self._drop(key)
             self.data[key] = (blob, time.time())
@@ -235,6 +254,9 @@ def size_kw(size) -> dict:
         return {}
 
 
+LIVE_REPORT_TTL_S = 600
+
+
 class WCLClient:
     def __init__(self, client_id: str, client_secret: str, cache: Cache,
                  verbose: bool = True):
@@ -256,6 +278,9 @@ class WCLClient:
         # сразу сказать пользователю, а не «висеть» до часа.
         self.max_wait_s: float | None = None
         self.site = "www"            # версия игры: www (основная), classic, fresh, sod, vanilla
+        self._inflight: dict = {}    # ключ запроса → замок: одинаковые запросы из разных потоков — один раз
+        self._inflight_lock = threading.Lock()
+        self._rl: dict = {}          # сайт → (когда, ответ rateLimitData): счётчик лимита не дёргаем чаще раза в 15 с
         self._tokens: dict = {}      # сайт → (токен, когда истекает); общий у копий for_site/with_limits
 
     @property
@@ -319,6 +344,24 @@ class WCLClient:
                 with self._count_lock:
                     self.cache_hits += 1
                 return hit
+            # Тот же запрос уже идёт в другом потоке (заранее качаемый следующий босс, параллельные игроки):
+            # ждём его и берём ответ из кэша, а не качаем второй раз
+            with self._inflight_lock:
+                lk = self._inflight.setdefault(key, threading.Lock())
+            with lk:
+                hit = self.cache.get(key, max_age_s)
+                if hit is not None:
+                    with self._count_lock:
+                        self.cache_hits += 1
+                    return hit
+                try:
+                    return self._fetch(query, variables, key, use_cache)
+                finally:
+                    with self._inflight_lock:
+                        self._inflight.pop(key, None)
+        return self._fetch(query, variables, key, use_cache)
+
+    def _fetch(self, query: str, variables: dict, key: str, use_cache: bool) -> dict:
         limited = errors_5xx = 0
         for _attempt in range(16):
             with self._sem:   # слот — только на сам запрос: ожидание сброса лимита идёт вне его
@@ -386,12 +429,17 @@ class WCLClient:
         except (TypeError, ValueError, AttributeError):
             pass
         try:
-            info = self.rate_limit()
+            info = self.rate_limit(max_age_s=0)   # после отказа по лимиту — свежий счётчик
             return float(info.get("pointsResetIn", 60)) + 5
         except Exception:  # noqa: BLE001
             return 60.0
 
-    def rate_limit(self) -> dict:
+    def rate_limit(self, max_age_s: float = 15) -> dict:
+        got = self._rl.get(self.site)
+        if got and time.time() - got[0] < max_age_s:
+            d = dict(got[1])
+            d["pointsResetIn"] = max(0.0, float(d.get("pointsResetIn") or 0) - (time.time() - got[0]))
+            return d
         q = "query { rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn } }"
         # Один прямой запрос: мимо семафора (его делают потоки, ждущие сброса внутри своего слота)
         # и без повторов при 429 — иначе при исчерпанном лимите он вызывал бы сам себя бесконечно.
@@ -402,6 +450,7 @@ class WCLClient:
         body = r.json()
         if body.get("errors") or not body.get("data"):
             raise WCLError("Нет данных о лимите")
+        self._rl[self.site] = (time.time(), body["data"]["rateLimitData"])
         return body["data"]["rateLimitData"]
 
     def _log(self, msg: str) -> None:
@@ -425,10 +474,28 @@ class WCLClient:
                    enemyNPCs { id gameID } phaseTransitions { id startTime } }
                  masterData {
                    actors { id name type subType server petOwner }
-                   abilities { gameID name type icon } } } } }"""
-        rep = self.query(q, {"code": code})["reportData"]["report"]
+                   abilities { gameID name type icon } }
+                 phases { encounterID phases { id name isIntermission } } } } }"""
+        v = {"code": code}
+        try:   # названия фаз — в том же запросе (раньше — отдельным)
+            rep = self.query(q, v)["reportData"]["report"]
+        except WCLError as e:
+            if "phase" not in str(e).lower():
+                raise
+            q = q.replace("phases { encounterID phases { id name isIntermission } }", "")
+            rep = self.query(q, v)["reportData"]["report"]
         if rep is None:
             raise WCLError(f"Отчёт {code} не найден или закрыт")
+        # Отчёт пишется прямо сейчас (закончился меньше 12 ч назад): из кэша — не старше 10 минут, иначе новых
+        # пуллов не видно, пока не очистишь кэш. Законченный отчёт не меняется — берётся из кэша
+        try:
+            live = time.time() * 1000 - float(rep.get("endTime") or 0) < 12 * 3600 * 1000
+        except (TypeError, ValueError):
+            live = False
+        if live:
+            got = self.cache.fetched_at(self._key(q, v)) if hasattr(self.cache, "fetched_at") else None
+            if got and time.time() - got > LIVE_REPORT_TTL_S:
+                rep = self.query(q, v, max_age_s=LIVE_REPORT_TTL_S)["reportData"]["report"] or rep
         rep["_site_url"] = self.site_url   # ссылки на бои — на сайт той версии игры, откуда отчёт
         return rep
 
@@ -441,6 +508,16 @@ class WCLClient:
             return (self.query(q, {"code": code})["reportData"]["report"] or {}).get("phases") or []
         except Exception:  # noqa: BLE001
             return []
+
+    @staticmethod
+    def unwrap_details(pd) -> dict:
+        """playerDetails приходит как {"data": {"playerDetails": {...}}} или сразу {...}."""
+        for _ in range(3):
+            if isinstance(pd, dict) and "data" in pd:
+                pd = pd["data"]
+            if isinstance(pd, dict) and "playerDetails" in pd:
+                pd = pd["playerDetails"]
+        return pd or {}
 
     def player_details(self, code: str, fight_id: int, combatant: bool = False) -> dict:
         """Состав боя. combatant=True — ещё и CombatantInfo каждого игрока (таланты, экипировка)."""
@@ -525,7 +602,7 @@ class WCLClient:
     def points_left(self) -> float | None:
         """Сколько очков API осталось в этом часе (None — не удалось узнать)."""
         try:
-            info = self.rate_limit()
+            info = self.rate_limit(max_age_s=0)
             return float(info["limitPerHour"]) - float(info["pointsSpentThisHour"])
         except Exception:  # noqa: BLE001
             return None
@@ -565,7 +642,8 @@ class WCLClient:
     _EVENT_ARGS = {"source_id": "sourceID", "target_id": "targetID"}
 
     def events_multi(self, code: str, fight_id: int, start: float, end: float,
-                     specs: dict[str, dict], tables: dict[str, dict] | None = None) -> dict:
+                     specs: dict[str, dict], tables: dict[str, dict] | None = None,
+                     fields: dict[str, str] | None = None) -> dict:
         """Несколько выборок событий (и таблиц) одного боя одним запросом GraphQL.
 
         specs: {имя: {"data_type": "Casts", "source_id": 7, "target_id": None, "hostility": "Enemies",
@@ -595,21 +673,36 @@ class WCLClient:
             if p.get("source_id") is not None:
                 args.append(f"sourceID: {int(p['source_id'])}")
             parts.append(f"t{i}: table({', '.join(args)})")
+        fnames = list(fields or {})   # готовые поля отчёта, например «playerDetails(fightIDs: $fid)»
+        for i, name in enumerate(fnames):
+            parts.append(f"f{i}: {fields[name]}")
         q = ("query($code: String!, $fid: [Int]) { reportData { report(code: $code) { "
              + " ".join(parts) + " } } }")
         rep = self.query(q, {"code": code, "fid": [fight_id]})["reportData"]["report"] or {}
         out: dict = {}
+        more = {}
         for i, name in enumerate(names):
-            p = specs[name]
             page = rep.get(f"e{i}") or {}
-            data = list(page.get("data") or [])
-            nxt = page.get("nextPageTimestamp")
-            if nxt:  # длинная выборка: остальные страницы — обычными запросами
-                data += self.events(code, int(p.get("fight_id") or fight_id), float(nxt), float(p.get("end", end)), p["data_type"],
-                                    source_id=p.get("source_id"), target_id=p.get("target_id"),
-                                    hostility=p.get("hostility"), include_resources=bool(p.get("include_resources")),
-                                    filter_expression=p.get("filter_expression"))
-            out[name] = data
+            out[name] = list(page.get("data") or [])
+            if page.get("nextPageTimestamp"):
+                more[name] = float(page["nextPageTimestamp"])
+
+        def rest(name):   # длинная выборка: остальные страницы — обычными запросами
+            p = specs[name]
+            return self.events(code, int(p.get("fight_id") or fight_id), more[name], float(p.get("end", end)), p["data_type"],
+                               source_id=p.get("source_id"), target_id=p.get("target_id"),
+                               hostility=p.get("hostility"), include_resources=bool(p.get("include_resources")),
+                               filter_expression=p.get("filter_expression"))
+        if len(more) > 1:   # догрузка разных выборок — параллельно (число одновременных запросов ограничивает клиент)
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=min(len(more), 4)) as pool:
+                for name, data in zip(list(more), pool.map(rest, list(more))):
+                    out[name] += data
+        elif more:
+            name = next(iter(more))
+            out[name] += rest(name)
+        for i, name in enumerate(fnames):
+            out[name] = rep.get(f"f{i}")
         for i, name in enumerate(tnames):
             t = rep.get(f"t{i}") or {}
             out[name] = t.get("data", t) if isinstance(t, dict) else {}

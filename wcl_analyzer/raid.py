@@ -5,11 +5,12 @@
 """
 from __future__ import annotations
 
+import math
 import re
 from collections import Counter, defaultdict
 from statistics import median
 
-import numpy as np
+from . import stats as _st
 
 from .collect import _pick_fight
 from .compare import _fmt_t, _n
@@ -71,60 +72,90 @@ SELECT_RATIO = 2.0           # урон от выборочных механик
 RAIDWIDE_RATIO = 1.35        # урон от общей механики ≥ 1,35× медианы рейда
 PARSE_LOW = 25               # parse ниже 25% для DPS
 WIPE_TAIL_S = 15             # смерти в последние 15 с вайпа помечаются отдельно
+MAX_PULL_DEATHS = 40         # смерти — по последним 40 пуллам на боссе (тренд «от чего умирает рейд»)
 
 
 # ------------------------------------------------------------- загрузка
-def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
+def fetch_raid_raw(client, url: str, fight=None, log=print, pull_deaths: bool = True) -> dict:
+    """Все данные боя для разбора. pull_deaths=False — без смертей других пуллов (топ прогресса: чужой отчёт,
+    часто 100+ пуллов, тренд по пуллам не нужен)."""
     code, url_fight, _ = parse_report_url(url)
     report = client.report(code)
     f = _pick_fight(report, fight if fight is not None else url_fight)
     fid, s, e = int(f["id"]), float(f["startTime"]), float(f["endTime"])
     log(f"Бой: {f['name']}, {'килл' if f.get('kill') else 'вайп'}, {_fmt_t((e - s) / 1000)}")
     raw = {"report": report, "fight": f, "site": getattr(client, "site", "www")}
-    if f.get("phaseTransitions") and hasattr(client, "report_phases"):
-        raw["phase_meta"] = client.report_phases(code)
-    log("Состав рейда, урон и лечение…")
-    raw["details"] = client.player_details(code, fid)
+    if f.get("phaseTransitions"):   # названия фаз — уже в отчёте; старый кэш отчёта без них — отдельным запросом
+        raw["phase_meta"] = report.get("phases") if "phases" in report else (
+            client.report_phases(code) if hasattr(client, "report_phases") else None)
     pulls = sorted([x for x in report["fights"]
                     if x.get("encounterID") == f.get("encounterID") and x.get("difficulty") == f.get("difficulty")],
                    key=lambda x: float(x["startTime"]))
+    other = [x for x in pulls if int(x["id"]) != fid][-MAX_PULL_DEATHS:] if pull_deaths else []
     batched = None
     from . import game_data as _gdb
     burst_ids = ", ".join(str(c["id"]) for c in _gdb.dps_cds() if c.get("kind") == "burst")
     tank_buff_ids = ", ".join(sorted({str(c["buff"]) for c in _gdb.tank_cds() if c.get("buff")}))
     if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
         from .api import WCLError
-        log("Урон, лечение, касты, смерти всех пуллов — одним запросом…")
-        specs = {"taken": {"data_type": "DamageTaken"}, "deaths": {"data_type": "Deaths"},
-                 "casts": {"data_type": "Casts"}, "boss_casts": {"data_type": "Casts", "hostility": "Enemies"},
-                 "interrupts": {"data_type": "Interrupts"}, "dispels": {"data_type": "Dispels"},
-                 "combatant": {"data_type": "CombatantInfo", "end": s + 1000}}
+        log("Состав, урон, лечение, касты, смерти — одним запросом…")
+        # Большой запрос не зависит от таблиц программы (game_data.json) и от числа пуллов: правка таблицы
+        # или новый пулл в живом отчёте не заставляют перекачивать бой. Остальное — маленькими запросами
+        # смерти, касты босса, таланты и дебаффы на боссе — тем же запросом, что у разбора ротации
+        # (logs.fetch_shared): «Разобрать бой» качает их один раз на обе части
+        from .logs import fetch_shared
+        try:
+            shared = fetch_shared(client, report, f)
+        except WCLError:
+            shared = None
+        specs = {"taken": {"data_type": "DamageTaken", "filter_expression": 'type = "damage"'},
+                 "casts": {"data_type": "Casts", "filter_expression": 'type = "cast"'},
+                 "interrupts": {"data_type": "Interrupts"}, "dispels": {"data_type": "Dispels"}}
+        if shared is None:
+            specs.update({"deaths": {"data_type": "Deaths"}, "boss_casts": {"data_type": "Casts", "hostility": "Enemies"},
+                          "combatant": {"data_type": "CombatantInfo", "end": s + 1000}})
         bosses = boss_actor_ids(report, f)[:2]
         for i, bid in enumerate(bosses):
-            specs[f"boss_debuffs_{i}"] = {"data_type": "Debuffs", "target_id": bid, "hostility": "Enemies"}
+            if shared is None:
+                specs[f"boss_debuffs_{i}"] = {"data_type": "Debuffs", "target_id": bid, "hostility": "Enemies"}
             specs[f"boss_buffs_{i}"] = {"data_type": "Buffs", "target_id": bid, "hostility": "Enemies"}
+        small = {}
         if burst_ids:   # бурсты, которые включаются сами (бафф без каста)
-            specs["burst_buffs"] = {"data_type": "Buffs", "filter_expression": f"ability.id in ({burst_ids})"}
+            small["burst_buffs"] = {"data_type": "Buffs", "filter_expression": f"ability.id in ({burst_ids})"}
         if tank_buff_ids:   # защитные кулдауны и внешние сейвы на танках
-            specs["tank_buffs"] = {"data_type": "Buffs", "filter_expression": f"ability.id in ({tank_buff_ids})"}
-        for x in pulls:
-            if int(x["id"]) != fid:
-                specs[f"pull_{x['id']}"] = {"data_type": "Deaths", "fight_id": int(x["id"]),
-                                            "start": float(x["startTime"]), "end": float(x["endTime"])}
+            small["tank_buffs"] = {"data_type": "Buffs", "filter_expression": f"ability.id in ({tank_buff_ids})"}
         try:
             batched = client.events_multi(code, fid, s, e, specs, {"dmg_table": {"data_type": "DamageDone"},
-                                                                    "heal_table": {"data_type": "Healing"}})
+                                                                    "heal_table": {"data_type": "Healing"}},
+                                          fields={"details": "playerDetails(fightIDs: $fid)"})
+            if small:
+                batched.update(client.events_multi(code, fid, s, e, small))
+            if other:
+                log(f"Смерти в других пуллах ({len(other)})…")
+                batched.update(client.events_multi(code, fid, s, e, {
+                    f"pull_{x['id']}": {"data_type": "Deaths", "fight_id": int(x["id"]),
+                                        "start": float(x["startTime"]), "end": float(x["endTime"])} for x in other}))
         except WCLError:
             client._no_batch = True
+            batched = None
+        if batched is not None and shared is not None:
+            batched.update({k: shared[k] for k in ("deaths", "boss_casts", "combatant")})
+            for i in range(len(bosses)):
+                batched[f"boss_debuffs_{i}"] = [ev for ev in shared["boss_debuffs"]
+                                                if int(ev.get("targetID", -1)) == bosses[i]]
     if batched is not None:
         for k in ("taken", "deaths", "casts", "boss_casts", "interrupts", "dispels", "combatant",
                   "dmg_table", "heal_table"):
             raw[k] = batched[k]
+        raw["details"] = client.unwrap_details(batched.get("details")) if hasattr(client, "unwrap_details") \
+            else batched.get("details")
         raw["boss_debuffs"] = [ev for i in range(len(bosses)) for ev in batched[f"boss_debuffs_{i}"]]
         raw["boss_buffs"] = [ev for i in range(len(bosses)) for ev in batched.get(f"boss_buffs_{i}") or []]
         raw["burst_buffs"] = batched.get("burst_buffs") or []
         raw["tank_buffs"] = batched.get("tank_buffs") or []
     else:
+        log("Состав рейда, урон и лечение…")
+        raw["details"] = client.player_details(code, fid)
         raw["dmg_table"] = client.raid_table(code, fid, "DamageDone")
         raw["heal_table"] = client.raid_table(code, fid, "Healing")
         log("Полученный урон и смерти…")
@@ -160,7 +191,11 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
         log(f"Парсы игроков недоступны: {ex}")
     log(f"Пуллы на этом боссе: {len(pulls)}…")
     raw["pulls"] = []
+    keep = {int(x["id"]) for x in other} | {fid}
     for x in pulls:
+        if int(x["id"]) not in keep:   # давние пуллы (больше MAX_PULL_DEATHS) и топ прогресса — смерти не качаются
+            raw["pulls"].append({"fight": x, "deaths": None})
+            continue
         if int(x["id"]) == fid:
             d = raw["deaths"]
         elif batched is not None:
@@ -577,7 +612,7 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
         if pct is not None and float(pct) > 100:
             pct = float(pct) / 100  # старый формат 0–10000
         ds = []
-        for ev in sorted(pp["deaths"], key=lambda e: e["timestamp"]):
+        for ev in sorted(pp["deaths"] or [], key=lambda e: e["timestamp"]):
             tgt = int(ev.get("targetID", -1))
             a = actors.get(tgt, {})
             if ev.get("type") != "death" or a.get("type") in ("NPC", "Pet") or not a:
@@ -591,9 +626,12 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
                       "deaths": len(ds), "deaths_before_tail": len(early),
                       "first_death": ({"t": _r(ds[0][0]), "time": _fmt_t(ds[0][0]), "player": ds[0][1],
                                        "ability": ds[0][2]} if ds else None),
-                      "selected": int(x["id"]) == fid})
+                      "selected": int(x["id"]) == fid, "deaths_known": pp["deaths"] is not None})
+        if pp["deaths"] is None:
+            pulls[-1].update({"deaths": None, "deaths_before_tail": None})
 
-    pull_trend = _pull_trend(pulls, death_abs)
+    known = [i for i, p in enumerate(pulls) if p["deaths_known"]]   # тренд — только по пуллам со смертями
+    pull_trend = _pull_trend([pulls[i] for i in known], {j: death_abs.get(i, []) for j, i in enumerate(known)})
 
     # ------------------------------------------------------------ таймлайн
     timeline = [{"lane": "Смерти", "t": d["t"], "label": f"{d['player']} — {d['ability']}"} for d in deaths]
@@ -640,9 +678,9 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
     issues.sort(key=lambda i: (-i["severity"], i["player"]))
     # Гайды Mythic Trap: способности из «Кому что поправить», у которых есть разбор, — кликабельные,
     # с роликом и кратким описанием. Нет на Mythic Trap — ссылка и описание с Wowhead (на русском).
-    try:
-        guide_info = guide_info_for({m for i in issues for m in re.findall(r"«([^»]+)»", i["text"])},
-                                    names, f, online=not code.startswith("DEMO"))
+    try:   # бои лучших киллов (raw["light"]) — только для сравнения: описания механик им не нужны
+        guide_info = {} if raw.get("light") else guide_info_for(
+            {m for i in issues for m in re.findall(r"«([^»]+)»", i["text"])}, names, f, online=not code.startswith("DEMO"))
     except Exception:  # noqa: BLE001 — ссылки на гайды необязательны
         guide_info = {}
     guide_links = {n: g["url"] for n, g in guide_info.items()}
@@ -771,7 +809,7 @@ def _pull_trend(pulls: list[dict], death_abs: dict[int, list]) -> dict:
 def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = None,
              compare_top: bool = True, progress=lambda x: None, talent_data=None,
              save_talents: bool = True, mythic: bool = True) -> dict:
-    raw = fetch_raid_raw(client, url, fight, log)
+    raw = fetch_raid_raw(client, url, fight, log, pull_deaths=compare_top)
     R = analyze_raid(raw, avoidable)
     try:  # кулдауны состава — для плана сейвов на следующий пулл
         from .raid_cds import roster_cds
@@ -856,6 +894,9 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
     trend = R["extras"].get("pull_trend") or {}
     if trend.get("line") and len(R["brief"]) < 7:
         R["brief"].append(trend["line"])
+    TK = R["extras"].get("tank") or {}
+    for k in ("_eff", "_owned", "light"):   # служебное (план и сравнение с топом) — странице не нужно
+        TK.pop(k, None)
     if hasattr(client, "points_left"):
         left = client.points_left()
         if left is not None:
@@ -906,16 +947,19 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
     win = [sum(per_s.get(i + k, 0.0) for k in range(5)) for i in range(win_end)]
     spikes = []
     if win and max(win) > 0:
-        thr = max(float(np.percentile(win, 95)), 2.5 * float(np.median([w for w in win if w > 0] or [0])),
+        thr = max(float(_st.percentile(win, 95)), 2.5 * float(_st.median([w for w in win if w > 0] or [0])),
                   0.35 * max(win))
+        sec_ab: dict = defaultdict(Counter)   # секунда → урон по способностям (не по танкам): один проход, а не на каждый пик
+        for pid, hits in last_hits.items():
+            if pid not in tanks:
+                for t, ab, a in hits:
+                    sec_ab[math.floor(t)][ab] += a
         for i, w in enumerate(win):
             hit_n = len(set().union(*[who_s.get(i + k, set()) for k in range(5)]))
             if w >= thr and w > 0 and hit_n >= 0.4 * n_nt and (not spikes or i - spikes[-1]["t"] > SPIKE_GAP_S):
                 main = Counter()
-                for pid, hits in last_hits.items():
-                    for t, ab, a in hits:
-                        if i <= t < i + 5 and pid not in tanks:
-                            main[ab] += a
+                for k in range(5):
+                    main.update(sec_ab.get(i + k) or {})
                 top_ab = main.most_common(1)[0][0] if main else None
                 spikes.append({"t": float(i), "damage": w, "ability": nm(top_ab) if main else "—", "ability_id": top_ab})
             elif spikes and i - spikes[-1]["t"] <= SPIKE_GAP_S and w > spikes[-1]["damage"]:

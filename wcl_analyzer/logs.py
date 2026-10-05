@@ -530,7 +530,8 @@ def _fetch_raw_batched(client, report: dict, fight: dict, actor_id: int, with_da
         "dmg_taken": {"data_type": "DamageTaken", "target_id": actor_id, "include_resources": True},
         "deaths": {"data_type": "Deaths"},
         "boss_casts": {"data_type": "Casts", "hostility": "Enemies", "include_resources": True},
-        "combatant": {"data_type": "CombatantInfo"},  # весь бой: событие бывает не ровно в начале
+        # весь бой (событие бывает не ровно в начале), только этого игрока: таланты и экипировка остальных 19 не нужны
+        "combatant": {"data_type": "CombatantInfo", "source_id": actor_id},
     }
     bosses = boss_actor_ids(report, fight)[:3]
     for i, bid in enumerate(bosses):

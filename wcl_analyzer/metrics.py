@@ -8,7 +8,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
+from . import stats as _st
 
 from .logs import PlayerLog, merge_intervals
 
@@ -55,7 +55,7 @@ class ProcInfo:
 # ------------------------------------------------------------ statistics
 def pct(values, q: float) -> float | None:
     vals = [v for v in values if v is not None]
-    return float(np.percentile(vals, q)) if vals else None
+    return float(_st.percentile(vals, q)) if vals else None
 
 
 def med(values) -> float | None:
@@ -108,7 +108,7 @@ def classify(logs: list[PlayerLog], overrides: dict | None = None) -> dict[int, 
         for ab, ts in seen.items():
             users[ab] += 1
             first_use[ab].append(ts[0])
-            intervals[ab].extend(np.diff(ts).tolist())
+            intervals[ab].extend(_st.diff(ts))
 
     spells: dict[int, SpellInfo] = {}
     for ab in users:
@@ -173,7 +173,7 @@ def _detect_channels(logs: list[PlayerLog], spells: dict[int, SpellInfo]) -> Non
     base = [x for x in base if x is not None]
     if not base:
         return
-    typical = float(np.median(base))
+    typical = float(_st.median(base))
     for ab, v in after.items():
         if len(v) < 10 or ab not in spells or spells[ab].channel:
             continue
@@ -296,7 +296,7 @@ def gcd_analysis(log: PlayerLog, spells: dict[int, SpellInfo],
     n_buckets = int(log.duration // 30) + 1
     return {
         "gcd": gcd_global,
-        "idle_per_action": float(np.mean(idles)) if idles else 0.0,
+        "idle_per_action": float(_st.mean(idles)) if idles else 0.0,
         "idle_total": float(sum(idles)),
         "idle_share": float(sum(idles)) / span,
         "actions": len(acts),
@@ -348,7 +348,7 @@ def cooldown_usage(times: list[float], cd: float, duration: float, charges: int 
     extra = stock + (int((end - next_ready) // cd) + 1 if cd and next_ready is not None and next_ready <= end else 0)
     return {"used": len(times), "ideal": ideal, "possible_left": extra,
             "missed": max(0, ideal - len(times)),
-            "avg_delay": float(np.mean(delays)) if delays else None,
+            "avg_delay": float(_st.mean(delays)) if delays else None,
             "max_delay": float(max(delays)) if delays else None}
 
 
@@ -424,9 +424,9 @@ def compute_metrics(log: PlayerLog, spells: dict[int, SpellInfo],
         # overcap: ресурс у предела и после следующего каста всё ещё у предела —
         # то есть прирост между ними потерян (каст-спендер на пределе не считается)
         capped = [a >= 0.95 and b >= 0.95 for a, b in zip(p, p[1:])]
-        m["resource"] = {"name": log.resource_name, "mean": float(np.mean(p)),
-                         "overcap": float(np.mean(capped)) if capped else 0.0,
-                         "starved": float(np.mean([x <= 0.05 for x in p])),
+        m["resource"] = {"name": log.resource_name, "mean": float(_st.mean(p)),
+                         "overcap": float(_st.mean(capped)) if capped else 0.0,
+                         "starved": float(_st.mean([x <= 0.05 for x in p])),
                          "before_burst": _resource_before(log, main_cd),
                          "waste": (log.res_waste / log.res_gain) if log.res_gain else None}
     elif log.res_gain:
@@ -547,7 +547,7 @@ def _resource_before(log: PlayerLog, main_cd: int | None) -> float | None:
             if prev:
                 a, mx, _ = prev[-1].res
                 vals.append(a / mx)
-    return float(np.mean(vals)) if vals else None
+    return float(_st.mean(vals)) if vals else None
 
 
 def _proc_stats(log: PlayerLog, pr: ProcInfo) -> dict:
@@ -574,4 +574,4 @@ def _proc_stats(log: PlayerLog, pr: ProcInfo) -> dict:
                 expired += 1
             last_gain = None if typ == "removebuff" else t
     return {"gained": gained, "used": used, "expired": expired, "refreshed": refreshed,
-            "reaction": float(np.median(reactions)) if reactions else None}
+            "reaction": float(_st.median(reactions)) if reactions else None}

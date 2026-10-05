@@ -41,12 +41,17 @@ def light_raid(client, code: str, fid: int, report: dict | None = None, difficul
     s, e = float(f["startTime"]), float(f["endTime"])
     got = None
     if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
-        try:  # урон по рейду и рейдовые кулдауны — одним запросом
-            specs = {"taken": {"data_type": "DamageTaken"}, "deaths": {"data_type": "Deaths"},
-                     "casts": {"data_type": "Casts", "filter_expression": f"ability.id in ({ids})"}}
+        try:
+            # Урон, смерти и состав — один запрос, не зависящий от таблиц программы: правка game_data.json
+            # не заставляет перекачивать бои топа. Касты по списку кулдаунов и защита танков — второй, маленький
+            got = client.events_multi(code, fid, s, e, {
+                "taken": {"data_type": "DamageTaken", "filter_expression": 'type = "damage"'},
+                "deaths": {"data_type": "Deaths"}}, fields={"details": "playerDetails(fightIDs: $fid)"})
+            small = {"casts": {"data_type": "Casts", "filter_expression": f'type = "cast" and ability.id in ({ids})'}}
             if tank_buffs:   # защита на танках — как у вашего боя, чтобы доля прикрытых ударов считалась одинаково
-                specs["tank_buffs"] = {"data_type": "Buffs", "filter_expression": f"ability.id in ({tank_buffs})"}
-            got = client.events_multi(code, fid, s, e, specs)
+                small["tank_buffs"] = {"data_type": "Buffs", "filter_expression": f"ability.id in ({tank_buffs})"}
+            got.update(client.events_multi(code, fid, s, e, small))
+            got["details"] = client.unwrap_details(got.get("details")) if hasattr(client, "unwrap_details") else got.get("details")
         except WCLError:
             got = None
     if got is None:
@@ -56,9 +61,10 @@ def light_raid(client, code: str, fid: int, report: dict | None = None, difficul
             casts = client.events(code, fid, s, e, "Casts")
         got = {"taken": client.events(code, fid, s, e, "DamageTaken"), "casts": casts,
                "deaths": client.events(code, fid, s, e, "Deaths")}
-    raw = {"report": report, "fight": f, "site": getattr(client, "site", "www"), "details": client.player_details(code, fid),
+    raw = {"report": report, "fight": f, "site": getattr(client, "site", "www"),
+           "details": got.get("details") or client.player_details(code, fid),
            "taken": got["taken"], "casts": got["casts"], "deaths": got.get("deaths") or [], "pulls": [],
-           "tank_buffs": got.get("tank_buffs") or []}
+           "tank_buffs": got.get("tank_buffs") or [], "light": True}
     return analyze_raid(raw)
 
 
@@ -72,7 +78,7 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
         raise LookupError("не удалось определить сложность боя")
     from .api import size_kw
     ranks = client.fight_rankings(encounter_id, difficulty, "speed", **size_kw(size))
-    cands = [r for r in ranks if (r.get("report") or {}).get("code")][: n + 3]
+    cands = [r for r in ranks if (r.get("report") or {}).get("code")][: n + 3]   # 3 — запас на закрытые логи
 
     def load(rk):
         rep = rk["report"]
@@ -90,13 +96,24 @@ def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KIL
             log(f"  пропущен килл {code}: {ex}")
             return None
 
+    # Сначала — ровно n киллов; запасной из рейтинга качается, только если какой-то не открылся (закрыт, удалён):
+    # раньше качались все n + 3 сразу, и три лишних килла тратили лимит впустую. Порядок — по рейтингу
     out = []
     with ThreadPoolExecutor(max_workers=parallel_workers(client)) as pool:
-        for i, k in enumerate(pool.map(load, cands)):
-            progress(min(1.0, (i + 1) / max(1, min(n, len(cands)))))
-            if k and len(out) < n:
+        futs = [pool.submit(load, rk) for rk in cands[:n]]
+        nxt, i = len(futs), 0
+        while i < len(futs) and len(out) < n:
+            k = futs[i].result()
+            i += 1
+            if k:
                 out.append(k)
                 log(f"  Килл {len(out)} из {n}: {k['guild']}, {_fmt_t(k['duration'])}")
+            elif nxt < len(cands):
+                futs.append(pool.submit(load, cands[nxt]))
+                nxt += 1
+            progress(min(1.0, len(out) / max(1, min(n, len(cands)))))
+        for f in futs[i:]:
+            f.cancel()
     return out
 
 
@@ -274,6 +291,8 @@ DANGER_PEAK = 1.6    # в 1,6 раза — три
 MAX_PER_PEAK = 3
 MAX_SPARE = 3        # запасных вариантов на пик
 MAX_HEAL_PER_PEAK = 2  # кулдаунов лекарей на один пик (разные лекари)
+MAX_FILL_PER_PEAK = 4  # «все сейвы в дело»: свободные кулдауны добираются на пики, но не больше 4 сейвов на пик
+MAX_HEAL_FILL = 3      # и не больше 3 кулдаунов лекарей
 
 
 def _top_phase(r: dict) -> tuple[int | None, float | None]:
@@ -383,7 +402,7 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
     raid_keys = [k for k in cds if game_data.scope(k[1]) != "self"]
     heal_keys = [k for k in cds if game_data.scope(k[1]) == "self"]
 
-    def add_one(st) -> bool:
+    def add_one(st, extra: bool = False) -> bool:
         ev, pref, picks, players = st["ev"], st["pref"], st["picks"], st["players"]
         # Сначала кулдаун, который здесь жмёт топ; затем — реже назначенный и более сильный
         order = sorted(raid_keys, key=lambda k: (pref.index(k[1]) if k[1] in pref else 99, len(assigned[k]),
@@ -399,6 +418,8 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                     assigned[k].append((at, anchor(ev, at)))
                     players.add(k[0])   # игрок — по id, а не по имени: тёзки с разных серверов — разные игроки
                     picks.append((k, at))
+                    if extra:
+                        st.setdefault("extra", set()).add(k)
                     return True
         return False
 
@@ -413,21 +434,39 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
     for st in by_weight:
         while len(st["picks"]) < st["need"] and add_one(st):
             pass
+    # Все сейвы — в дело: кулдаун, который к пику откатан и иначе простоял бы весь бой, тоже ставится —
+    # на самые тяжёлые пики первыми, по кругу, пока хоть что-то назначается (не больше MAX_FILL_PER_PEAK на пик).
+    # Пики после конца вашего боя не добираются: их нет в заметке MRT
+    real = [st for st in by_weight if not st["ev"].get("after_end")]
+    for _round in range(100):
+        moved = False
+        for st in real:
+            if len(st["picks"]) < MAX_FILL_PER_PEAK and add_one(st, extra=True):
+                moved = True
+        if not moved:
+            break
     # Кулдауны лекарей: самые тяжёлые пики первыми, на пик — до MAX_HEAL_PER_PEAK разных лекарей,
     # перезарядка и запас на смещение фазы — как у сейвов
-    for st in by_weight:
-        st["heal"] = []
+    def add_heal(st, cap) -> bool:
         for k in sorted(heal_keys, key=lambda k: (len(assigned[k]), -game_data.power(k[1]), cds[k]["cd"])):
-            if len(st["heal"]) >= MAX_HEAL_PER_PEAK:
-                break
-            if any(k[0] == h[0] or k[1] == h[1] for h, _ in st["heal"]):
+            if len(st["heal"]) >= cap:
+                return False
+            if any(k[0] == h[0][0] or k[1] == h[0][1] for h in st["heal"]):
                 continue
             for lead in range(PRESS_WINDOW_S[1], PRESS_WINDOW_S[0] - 1, -1):
                 at = press_at(st["ev"], lead)
                 if free(k, at, anchor(st["ev"], at)):
                     assigned[k].append((at, anchor(st["ev"], at)))
                     st["heal"].append((k, at))
-                    break
+                    return True
+        return False
+    for st in by_weight:
+        st["heal"] = []
+        while add_heal(st, MAX_HEAL_PER_PEAK):
+            pass
+    for _round in range(100):   # кулдауны лекарей, которые иначе простояли бы, — тоже на тяжёлые пики
+        if not any([add_heal(st, MAX_HEAL_FILL) for st in real]):
+            break
     plan = []
     for st in sorted(states, key=lambda st: st["ev"]["t"]):
         ev, r, pref, top_need, need = st["ev"], st["r"], st["pref"], st["top_need"], st["need"]
@@ -455,6 +494,7 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
                "top_n": top_need,
                "top": ", ".join(names.get(i, f"#{i}") for i in pref[:2]),
                "picks": [{"cd": cds[k]["name"], "player": cds[k]["player"], "like_top": k[1] in pref[:2],
+                          "extra": k in (st.get("extra") or ()),
                           "cooldown": _fmt_t(cds[k]["cd"]), "ready": _fmt_t(at + cds[k]["cd"]), "at": _fmt_t(at),
                           "id": cds[k]["id"], "cls": cds[k].get("cls") or game_data.class_of(cds[k]["id"])}
                          for k, at in picks]}

@@ -5,12 +5,12 @@ title = Разбор WCL
 package.name = wclanalyzer
 package.domain = org.wclanalyzer
 source.dir = .
-source.include_exts = py,html,js,png,json
+source.include_exts = py,html,js,png,json,woff2,txt
 source.exclude_dirs = bin,.buildozer,__pycache__,recipes
 version = 1.0.0
 
-# Python и библиотеки анализа; numpy, pyjnius и openssl собираются рецептами python-for-android
-requirements = python3,openssl,requests,urllib3,certifi,charset-normalizer,idna,openpyxl,et_xmlfile,numpy,segno,pyjnius
+# Python и библиотеки анализа; pyjnius и openssl собираются рецептами python-for-android (numpy больше не нужен)
+requirements = python3,openssl,requests,urllib3,certifi,charset-normalizer,idna,openpyxl,et_xmlfile,pyjnius
 
 # Встроенное окно браузера показывает интерфейс сервера, запущенного внутри приложения
 p4a.bootstrap = webview
@@ -32,7 +32,8 @@ android.ndk_api = 24
 # Релизная сборка — обычный подписанный APK (не .aab для Google Play)
 android.release_artifact = apk
 android.debug_artifact = apk
-android.archs = arm64-v8a, armeabi-v7a
+# Только 64-битные телефоны (почти все с 2017 года): APK и сборка почти вдвое меньше
+android.archs = arm64-v8a
 android.accept_sdk_license = True
 android.allow_backup = False
 

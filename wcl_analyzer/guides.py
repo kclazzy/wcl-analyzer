@@ -69,13 +69,25 @@ def _url(raid: dict, boss: dict, page: str) -> str:
     return d["base"] + raid["slug"] + "/" + boss["slug"] + d["pages"].get(page, "")
 
 
+_NAMES: dict = {}
+
+
+def _names(a: dict) -> frozenset:
+    """Нормализованные названия способности (англ., другие, русское) — считаются один раз, а не на каждый поиск."""
+    k = id(a)
+    got = _NAMES.get(k)
+    if got is None or got[0] is not a:
+        got = (a, frozenset(_norm(x) for x in [a["name"], *a.get("aka", []), spell_ru(a.get("id")).get("name") or ""] if x))
+        _NAMES[k] = got
+    return got[1]
+
+
 def _find(rb: list, spell_id, nn: str, want: str) -> dict | None:
     for raid, b in rb:
         hit = None
         for diff in (want, "mythic", "heroic", "normal"):  # сначала страница своей сложности
             for a in b.get("abilities", {}).get(diff, []):
-                if (spell_id and a.get("id") == int(spell_id)) or (nn and nn in {
-                        _norm(x) for x in [a["name"], *a.get("aka", []), spell_ru(a.get("id")).get("name") or ""] if x}):
+                if (spell_id and a.get("id") == int(spell_id)) or (nn and nn in _names(a)):
                     if hit is None:
                         sr = spell_ru(a.get("id"))
                         hit = {"url": a.get("share") or _url(raid, b, diff), "video": a.get("video"), "src": "mt",

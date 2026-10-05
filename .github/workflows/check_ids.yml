@@ -5,45 +5,43 @@ on:
 permissions:
   contents: write
 jobs:
-  ids:
-    runs-on: ubuntu-latest
+  upd88:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: fetch
+      - name: v88 full update
+        shell: pwsh
+        continue-on-error: true
         run: |
-          python3 - <<'PY'
-          import json, re, urllib.request, html, urllib.parse
-          UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124"}
-          def get(u):
-              return urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=25).read().decode("utf-8", "replace")
-          out = []
-          for i in open("debug_ids.txt").read().split():
-              for loc in ("0", "7"):
-                  try:
-                      d = json.loads(get(f"https://nether.wowhead.com/tooltip/spell/{i}?dataEnv=1&locale={loc}"))
-                      tip = html.unescape(re.sub(r"<[^>]+>", " ", d.get("tooltip", "")))
-                      cd = re.search(r"(\d+(?:\.\d+)?)\s*(min|sec)\s*(?:recharge|cooldown)", tip) or re.search(r"(?:Восстановление|Перезарядка):?\s*(\d+(?:[.,]\d+)?)\s*(мин|сек)", tip)
-                      ch = re.search(r"(\d)\s*Charges", tip)
-                      du = re.search(r"(?:for|на|в течение)\s+(\d+(?:[.,]\d+)?)\s*(sec|сек|min|мин)", tip)
-                      out.append(f"{i}\t{loc}\t{d.get('name')}\t{cd.group(0) if cd else '-'}\t{ch.group(0) if ch else ''}\tdur={du.group(0) if du else '-'}")
-                  except Exception as e:
-                      out.append(f"{i}\t{loc}\tERR {e}")
-          for n in open("debug_names.txt").read().splitlines():
-              try:
-                  for base in ("https://nether.wowhead.com/search/suggestions-template?q=", "https://www.wowhead.com/search/suggestions-template?q="):
-                      try:
-                          t = get(base + urllib.parse.quote(n))
-                          d = json.loads(t)
-                          res = [(r.get("id"), r.get("name"), r.get("typeName") or r.get("type")) for r in d.get("results", []) if str(r.get("type")) in ("6", "spell") or r.get("typeName") == "Spell"][:8]
-                          out.append(f"NAME {n} [{base[:20]}]: {res}")
-                          break
-                      except Exception as e:
-                          out.append(f"NAME {n} [{base[:20]}]: ERR {e}")
-              except Exception as e:
-                  out.append(f"NAME {n}: ERR {e}")
-          open("debug_ids_out.txt", "w").write("\n".join(out))
-          PY
+          $out = @()
+          $dir = Join-Path $env:RUNNER_TEMP "u88"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Invoke-WebRequest "https://github.com/kclazzy/wcl-analyzer/releases/download/v1.1.88/WCL-Analyzer.exe" -OutFile "$dir\WCL-Analyzer.exe"
+          $before = (Get-FileHash "$dir\WCL-Analyzer.exe").Hash
+          $out += "before=$before"
+          Start-Process -FilePath "$dir\WCL-Analyzer.exe" -ArgumentList "ui","--no-browser","--port","8798" | Out-Null
+          $v = $null
+          for ($i = 0; $i -lt 40 -and -not $v; $i++) { try { $v = Invoke-RestMethod http://127.0.0.1:8798/api/version } catch { Start-Sleep 1 } }
+          $out += "version88=" + ($v | ConvertTo-Json -Compress)
+          try { $c = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8798/api/update/check -ContentType "application/json" -Body '{}' -TimeoutSec 60; $out += "check=" + ($c | ConvertTo-Json -Compress) } catch { $out += "check ERR $_" }
+          try { $r = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8798/api/update/apply -ContentType "application/json" -Body '{"kind":"full"}' -TimeoutSec 600; $out += "apply=" + ($r | ConvertTo-Json -Compress) } catch { $out += "apply ERR $_" }
+          for ($i = 0; $i -lt 45; $i++) {
+            Start-Sleep 2
+            foreach ($port in 8765, 8798) { try { $x = Invoke-RestMethod "http://127.0.0.1:$port/api/version" -TimeoutSec 2; $out += "t=$($i*2) port=$port " + ($x | ConvertTo-Json -Compress) } catch {} }
+          }
+          $out += "after=" + (Get-FileHash "$dir\WCL-Analyzer.exe").Hash
+          $out += "files=" + ((Get-ChildItem $dir | ForEach-Object { "$($_.Name):$($_.Length)" }) -join ",")
+          $out += "procs=" + ((Get-Process | Where-Object { $_.Path -like "$dir*" } | ForEach-Object { "$($_.Id):$($_.Path)" }) -join ",")
+          $out += "mei=" + ((Get-ChildItem $env:TEMP -Directory -Filter "_MEI*" -ErrorAction SilentlyContinue | ForEach-Object Name) -join ",")
+          Get-Process | Where-Object { $_.Path -like "$dir*" } | Stop-Process -Force
+          # второй запуск вручную (как пользователь двойным щелчком)
+          Start-Process -FilePath "$dir\WCL-Analyzer.exe" -ArgumentList "ui","--no-browser","--port","8797" | Out-Null
+          $w = $null
+          for ($i = 0; $i -lt 40 -and -not $w; $i++) { try { $w = Invoke-RestMethod http://127.0.0.1:8797/api/version } catch { Start-Sleep 1 } }
+          $out += "manual_restart=" + ($w | ConvertTo-Json -Compress)
+          $out -join "`n" | Out-File -Encoding utf8 debug_ids_out.txt
       - name: commit
+        shell: bash
         run: |
           git config user.name bot; git config user.email bot@users.noreply.github.com
           git add debug_ids_out.txt && git commit -m "ids" && git push

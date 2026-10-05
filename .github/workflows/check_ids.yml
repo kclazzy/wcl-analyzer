@@ -1,0 +1,33 @@
+name: check-ids
+on:
+  push:
+    branches: [debug/ids]
+permissions:
+  contents: write
+jobs:
+  ids:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch
+        run: |
+          python3 - <<'PY'
+          import json, re, urllib.request, html
+          ids = open("debug_ids.txt").read().split()
+          out = []
+          for i in ids:
+              for loc in ("0", "7"):
+                  try:
+                      req = urllib.request.Request(f"https://nether.wowhead.com/tooltip/spell/{i}?dataEnv=1&locale={loc}", headers={"User-Agent": "Mozilla/5.0"})
+                      d = json.loads(urllib.request.urlopen(req, timeout=20).read())
+                      tip = html.unescape(re.sub(r"<[^>]+>", " ", d.get("tooltip", "")))
+                      cd = re.search(r"(\d+(?:\.\d+)?)\s*(min|sec)\s*cooldown", tip) or re.search(r"Восстановление:?\s*(\d+(?:[.,]\d+)?)\s*(мин|сек)", tip)
+                      out.append(f"{i}\t{loc}\t{d.get('name')}\t{cd.group(0) if cd else '-'}")
+                  except Exception as e:
+                      out.append(f"{i}\t{loc}\tERR {e}")
+          open("debug_ids_out.txt", "w").write("\n".join(out))
+          PY
+      - name: commit
+        run: |
+          git config user.name bot; git config user.email bot@users.noreply.github.com
+          git add debug_ids_out.txt && git commit -m "ids" && git push

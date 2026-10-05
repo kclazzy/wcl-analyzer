@@ -1,5 +1,5 @@
 {
- "version": 2,
+ "version": 3,
  "_about": "Игровые данные, которые меняются с патчами. Программа берёт этот файл из репозитория (main), если доступен, иначе — копию из сборки. Правка здесь не требует пересборки APK и .exe.",
  "raid_cds": [
   {
@@ -409,5 +409,494 @@
   381301,
   444257
  ],
- "_about_scope": "scope: raid — действует сразу на весь рейд; self — усиливает исцеление самого лекаря (бафф на себя)."
+ "_about_scope": "scope: raid — действует сразу на весь рейд; self — усиливает исцеление самого лекаря (бафф на себя).",
+ "dps_cds": [
+  {
+   "class": "Warrior",
+   "spec": null,
+   "id": 107574,
+   "name": "Аватара",
+   "en": "Avatar",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Warrior",
+   "spec": "Fury",
+   "id": 1719,
+   "name": "Безрассудство",
+   "en": "Recklessness",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Warrior",
+   "spec": "Arms",
+   "id": 227847,
+   "name": "Вихрь клинков",
+   "en": "Bladestorm",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Warrior",
+   "spec": null,
+   "id": 384318,
+   "name": "Громогласный рык",
+   "en": "Thunderous Roar",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Paladin",
+   "spec": "Retribution",
+   "id": 31884,
+   "name": "Гнев карателя",
+   "en": "Avenging Wrath",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Paladin",
+   "spec": "Retribution",
+   "id": 231895,
+   "name": "Гнев карателя (Крестовый поход)",
+   "en": "Avenging Wrath",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Paladin",
+   "spec": "Retribution",
+   "id": 343721,
+   "name": "Последний расчет",
+   "en": "Final Reckoning",
+   "cd": 60,
+   "kind": "burst"
+  },
+  {
+   "class": "Hunter",
+   "spec": "BeastMastery",
+   "id": 19574,
+   "name": "Звериный гнев",
+   "en": "Bestial Wrath",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Hunter",
+   "spec": "BeastMastery",
+   "id": 359844,
+   "name": "Зов дикой природы",
+   "en": "Call of the Wild",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Hunter",
+   "spec": "Marksmanship",
+   "id": 288613,
+   "name": "Меткий выстрел",
+   "en": "Trueshot",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Hunter",
+   "spec": "Survival",
+   "id": 360952,
+   "name": "Согласованная атака",
+   "en": "Coordinated Assault",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Rogue",
+   "spec": "Subtlety",
+   "id": 121471,
+   "name": "Теневые клинки",
+   "en": "Shadow Blades",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Rogue",
+   "spec": "Outlaw",
+   "id": 13750,
+   "name": "Выброс адреналина",
+   "en": "Adrenaline Rush",
+   "cd": 180,
+   "kind": "burst"
+  },
+  {
+   "class": "Rogue",
+   "spec": "Assassination",
+   "id": 360194,
+   "name": "Знак смерти",
+   "en": "Deathmark",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Rogue",
+   "spec": "Assassination",
+   "id": 385627,
+   "name": "Погибель королей",
+   "en": "Kingsbane",
+   "cd": 60,
+   "kind": "burst"
+  },
+  {
+   "class": "Priest",
+   "spec": "Shadow",
+   "id": 228260,
+   "name": "Облик Бездны",
+   "en": "Voidform",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Priest",
+   "spec": "Shadow",
+   "id": 391109,
+   "name": "Темное вознесение",
+   "en": "Dark Ascension",
+   "cd": 60,
+   "kind": "burst"
+  },
+  {
+   "class": "Priest",
+   "spec": "Shadow",
+   "id": 200174,
+   "name": "Подчинитель разума",
+   "en": "Mindbender",
+   "cd": 60,
+   "kind": "burst"
+  },
+  {
+   "class": "Priest",
+   "spec": "Shadow",
+   "id": 34433,
+   "name": "Исчадие Тьмы",
+   "en": "Shadowfiend",
+   "cd": 180,
+   "kind": "burst"
+  },
+  {
+   "class": "Priest",
+   "spec": null,
+   "id": 10060,
+   "name": "Придание сил",
+   "en": "Power Infusion",
+   "cd": 120,
+   "kind": "external"
+  },
+  {
+   "class": "DeathKnight",
+   "spec": "Frost",
+   "id": 51271,
+   "name": "Ледяной столп",
+   "en": "Pillar of Frost",
+   "cd": 45,
+   "kind": "burst"
+  },
+  {
+   "class": "DeathKnight",
+   "spec": "Frost",
+   "id": 47568,
+   "name": "Усиление рунического оружия",
+   "en": "Empower Rune Weapon",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "DeathKnight",
+   "spec": "Frost",
+   "id": 152279,
+   "name": "Дыхание Синдрагосы",
+   "en": "Breath of Sindragosa",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "DeathKnight",
+   "spec": "Unholy",
+   "id": 42650,
+   "name": "Войско мертвых",
+   "en": "Army of the Dead",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "DeathKnight",
+   "spec": "Unholy",
+   "id": 207289,
+   "name": "Нечестивый натиск",
+   "en": "Unholy Assault",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "DeathKnight",
+   "spec": "Unholy",
+   "id": 275699,
+   "name": "Апокалипсис",
+   "en": "Apocalypse",
+   "cd": 45,
+   "kind": "burst"
+  },
+  {
+   "class": "DeathKnight",
+   "spec": "Unholy",
+   "id": 49206,
+   "name": "Призыв горгульи",
+   "en": "Summon Gargoyle",
+   "cd": 180,
+   "kind": "burst"
+  },
+  {
+   "class": "Shaman",
+   "spec": "Elemental",
+   "id": 114050,
+   "name": "Перерождение",
+   "en": "Ascendance",
+   "cd": 180,
+   "kind": "burst"
+  },
+  {
+   "class": "Shaman",
+   "spec": "Enhancement",
+   "id": 114051,
+   "name": "Перерождение",
+   "en": "Ascendance",
+   "cd": 180,
+   "kind": "burst"
+  },
+  {
+   "class": "Shaman",
+   "spec": "Elemental",
+   "id": 191634,
+   "name": "Хранитель бурь",
+   "en": "Stormkeeper",
+   "cd": 60,
+   "kind": "burst"
+  },
+  {
+   "class": "Shaman",
+   "spec": "Enhancement",
+   "id": 51533,
+   "name": "Дух дикого зверя",
+   "en": "Feral Spirit",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Shaman",
+   "spec": "Enhancement",
+   "id": 384352,
+   "name": "Ветра рока",
+   "en": "Doom Winds",
+   "cd": 60,
+   "kind": "burst"
+  },
+  {
+   "class": "Shaman",
+   "spec": "Elemental",
+   "id": 198067,
+   "name": "Элементаль огня",
+   "en": "Fire Elemental",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Shaman",
+   "spec": "Elemental",
+   "id": 192249,
+   "name": "Элементаль бури",
+   "en": "Storm Elemental",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Mage",
+   "spec": "Fire",
+   "id": 190319,
+   "name": "Возгорание",
+   "en": "Combustion",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Mage",
+   "spec": "Frost",
+   "id": 12472,
+   "name": "Стылая кровь",
+   "en": "Icy Veins",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Mage",
+   "spec": "Arcane",
+   "id": 365350,
+   "name": "Чародейский выброс",
+   "en": "Arcane Surge",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Mage",
+   "spec": "Arcane",
+   "id": 321507,
+   "name": "Касание мага",
+   "en": "Touch of the Magi",
+   "cd": 45,
+   "kind": "burst"
+  },
+  {
+   "class": "Warlock",
+   "spec": "Affliction",
+   "id": 205180,
+   "name": "Призыв созерцателя тьмы",
+   "en": "Summon Darkglare",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Warlock",
+   "spec": "Demonology",
+   "id": 265187,
+   "name": "Призыв демонического тирана",
+   "en": "Summon Demonic Tyrant",
+   "cd": 60,
+   "kind": "burst"
+  },
+  {
+   "class": "Warlock",
+   "spec": "Destruction",
+   "id": 1122,
+   "name": "Призыв инфернала",
+   "en": "Summon Infernal",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Warlock",
+   "spec": "Demonology",
+   "id": 111898,
+   "name": "Гримуар: страж Скверны",
+   "en": "Grimoire: Felguard",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Monk",
+   "spec": "Windwalker",
+   "id": 137639,
+   "name": "Буря, земля и огонь",
+   "en": "Storm, Earth, and Fire",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Monk",
+   "spec": "Windwalker",
+   "id": 123904,
+   "name": "Призыв Сюэня, Белого Тигра",
+   "en": "Invoke Xuen, the White Tiger",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Monk",
+   "spec": "Windwalker",
+   "id": 443028,
+   "name": "Небесный проводник",
+   "en": "Celestial Conduit",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Druid",
+   "spec": "Balance",
+   "id": 194223,
+   "name": "Парад планет",
+   "en": "Celestial Alignment",
+   "cd": 180,
+   "kind": "burst"
+  },
+  {
+   "class": "Druid",
+   "spec": "Balance",
+   "id": 102560,
+   "name": "Воплощение: избранный Элуны",
+   "en": "Incarnation: Chosen of Elune",
+   "cd": 180,
+   "kind": "burst"
+  },
+  {
+   "class": "Druid",
+   "spec": "Feral",
+   "id": 106951,
+   "name": "Берсерк",
+   "en": "Berserk",
+   "cd": 180,
+   "kind": "burst"
+  },
+  {
+   "class": "Druid",
+   "spec": "Feral",
+   "id": 102543,
+   "name": "Воплощение: аватара Пеплошкурой",
+   "en": "Incarnation: Avatar of Ashamane",
+   "cd": 180,
+   "kind": "burst"
+  },
+  {
+   "class": "Druid",
+   "spec": null,
+   "id": 391528,
+   "name": "Созыв духов",
+   "en": "Convoke the Spirits",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "DemonHunter",
+   "spec": "Havoc",
+   "id": 191427,
+   "name": "Метаморфоза",
+   "en": "Metamorphosis",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "DemonHunter",
+   "spec": "Havoc",
+   "id": 370965,
+   "name": "Охота",
+   "en": "The Hunt",
+   "cd": 90,
+   "kind": "burst"
+  },
+  {
+   "class": "Evoker",
+   "spec": "Devastation",
+   "id": 375087,
+   "name": "Ярость дракона",
+   "en": "Dragonrage",
+   "cd": 120,
+   "kind": "burst"
+  },
+  {
+   "class": "Evoker",
+   "spec": "Augmentation",
+   "id": 403631,
+   "name": "Дыхание эпох",
+   "en": "Breath of Eons",
+   "cd": 120,
+   "kind": "burst"
+  }
+ ],
+ "_about_dps_cds": "Крупные боевые кулдауны DPS (бурсты) и внешние усиления урона — для вкладки «Нанесение урона». Номера проверены на Wowhead (октябрь 2026)."
 }

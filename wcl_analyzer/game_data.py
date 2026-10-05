@@ -162,6 +162,22 @@ def name_known(name: str, cls: str = "", spec: str = "") -> bool:
     return False
 
 
+def dps_cds() -> list[dict]:
+    """Крупные боевые кулдауны DPS и внешние усиления урона (Придание сил) — вкладка «Нанесение урона».
+    В старой копии таблицы раздела ещё нет — берём из сборки."""
+    d = data().get("dps_cds")
+    if d:
+        return d
+    try:
+        return json.loads(BUNDLED.read_text(encoding="utf-8")).get("dps_cds") or []
+    except (OSError, ValueError):
+        return []
+
+
+def dps_cd_ids() -> set[int]:
+    return {int(c["id"]) for c in dps_cds()}
+
+
 def lust_ids() -> set[int]:
     return {int(x) for x in data().get("lust_ids") or []}
 

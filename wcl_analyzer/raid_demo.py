@@ -62,10 +62,19 @@ PULLS = [
     (331.0, True, 0.0, [("Лиана", 160.1, WAVE), ("Мирель", 281.0, POOL)]),
 ]
 
+# Бурсты DPS и окно на боссе (вкладка «Нанесение урона»): номера — как в таблице игровых данных
+BURSTS = {"Торвин": 1719, "Мирель": 19574, "Кассия": 190319, "Лиана": 228260, "Фейра": 191427,
+          "Брам": 31884, "Ильвен": 194223, "Норра": 198067, "Астер": 375087, "Ровен": 42650}
+LATE_BURST = ("Лиана",)                     # бурст не под героизм
+PI, CORE = 10060, 900050                    # Придание сил; «Обнажённое ядро» — босс уязвим
+
 ABILITIES = {
     MELEE: "Ближний бой", CRUSH: "Сокрушение", WAVE: "Ледяная волна", SHARDS: "Осколки льда",
     POOL: "Лужа холода", BEAM: "Ледяной луч", ENRAGE: "Ярость босса", WHISPER: "Ледяной шёпот",
-    FROST: "Обморожение", LUST: "Bloodlust", POT: "Зелье мощи", HS: "Камень здоровья",
+    FROST: "Обморожение", LUST: "Bloodlust", PI: "Придание сил", CORE: "Обнажённое ядро",
+    1719: "Безрассудство", 19574: "Звериный гнев", 190319: "Возгорание", 228260: "Облик Бездны",
+    191427: "Метаморфоза", 31884: "Гнев карателя", 194223: "Парад планет", 198067: "Элементаль огня",
+    375087: "Ярость дракона", 42650: "Войско мертвых", POT: "Зелье мощи", HS: "Камень здоровья",
     DEF: "Защитная способность", KICK: "Прерывание", DISPEL: "Рассеивание",
     ASC: "Перерождение", APO: "Апофеоз",
     HYMN: "Божественный гимн", TIDE: "Тотем целительного потока", BRAND: "Хаотическое клеймо",
@@ -304,6 +313,12 @@ class FakeRaidClient:
                 if name in LOW_ACTIVE and rng.random() < 0.22:
                     t += rng.uniform(2.0, 4.5)
         cast(1.0, "Таргун", LUST)
+        # Бурсты: под героизм и (у топа) в окно уязвимости босса на 2:20; у Лианы — мимо героизма
+        for name, ab in BURSTS.items():
+            cast(60.0 if name in LATE_BURST else 2.0, name, ab)
+            if top:
+                cast(141.0, name, ab)
+        cast(1.5, "Элария", PI, target=PID["Кассия"])
         # Рейдовые кулдауны лекарей: на первые две волны, третья — без них
         cast(68.0, "Элария", HYMN)
         cast(158.5, "Таргун", TIDE)
@@ -379,7 +394,9 @@ class FakeRaidClient:
             rankings = {"data": [{"fightID": fid, "encounter": {"id": ENCOUNTER, "name": "Демо-босс"},
                                   "roles": roles}]}
 
-        boss_debuffs = []
+        boss_debuffs = [  # окно механики: босс уязвим 2:20–2:35 (наложено самим боссом, не игроком)
+            {"timestamp": ts(140.0), "type": "applydebuff", "sourceID": BOSS, "targetID": BOSS, "abilityGameID": CORE, "fight": fid},
+            {"timestamp": ts(155.0), "type": "removedebuff", "sourceID": BOSS, "targetID": BOSS, "abilityGameID": CORE, "fight": fid}]
         for src_name, ab in (("Фейра", BRAND), ("Квелл", TOUCH)):
             boss_debuffs.append({"timestamp": ts(1.5), "type": "applydebuff", "sourceID": PID[src_name],
                                  "targetID": BOSS, "abilityGameID": ab, "fight": fid})

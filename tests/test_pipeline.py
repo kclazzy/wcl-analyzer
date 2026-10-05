@@ -335,6 +335,37 @@ def test_wowhead_uses_requests():
     print("OK Wowhead: описания скачиваются через requests с сертификатами — работает и на телефоне")
 
 
+def test_burst_analysis():
+    """Нанесение урона: героизм, бурсты DPS, Придание сил и окно уязвимости на боссе; сравнение с лучшими киллами:
+    вторая волна бурстов у топа, бурст мимо героизма, бурст не нажат в окно; лист Excel; бурсты — не сейвы."""
+    import io
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    B = R["extras"]["burst"]
+    assert B["lust"]["caster"] == "Таргун" and B["lust"]["time"] == "0:01"
+    hints = " | ".join(B["hints"])
+    assert "Без бурста под героизм: Лиана" in hints, hints
+    assert "Обнажённое ядро" in hints and "Лучшие киллы делают ещё волны бурстов рейдом: 2:21" in hints, hints
+    kinds = {e["kind"] for e in B["timeline"]}
+    assert kinds >= {"lust", "external", "window", "burst"}, kinds
+    assert any(e["kind"] == "external" and "Кассия" in e["what"] for e in B["timeline"])
+    w = B["windows"][0]
+    assert w["amp"] and w["t0"] == 140.0 and not w["hit"], w
+    torvin = next(r for r in B["bursts"] if r["player"] == "Торвин")
+    assert torvin["cds"][0]["name"] == "Безрассудство" and torvin["with_lust"]
+    assert not any(c["id"] in (10060, 1719) for c in R["extras"]["raid_cds"]), "бурсты и Придание сил — не сейвы"
+    assert any("Нанесение урона" in line for line in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        wb = load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx"))
+        assert "Нанесение урона" in wb.sheetnames
+    print("OK нанесение урона: героизм, бурсты, окна на боссе, сравнение с лучшими киллами, лист Excel")
+
+
 def test_save_dir_full_path():
     """«Куда сохранять файлы» на компьютере: «Загрузки» — полным путём, выбранная папка — полным путём."""
     from pathlib import Path
@@ -845,6 +876,7 @@ if __name__ == "__main__":
     test_plan_press_times()
     test_roster_plan()
     test_save_dir_full_path()
+    test_burst_analysis()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()

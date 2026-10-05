@@ -1823,11 +1823,35 @@ function topIssues(issues){  // по одному, самому важному �
   return issues.filter(i => i.severity >= 4 && !seen.has(i.player) && seen.add(i.player)).slice(0, 5);
 }
 
+/* Нанесение урона: героизм, бурсты DPS, окна на боссе — по времени боя и против лучших киллов */
+function renderBurst(B, el){
+  if (!el) return;
+  if (!B || B.error || !((B.bursts||[]).length || (B.timeline||[]).length)) {
+    el.innerHTML = '<p class="empty">Нет данных о бурстах: в этом разборе нет кастов DPS (разбор из прежней версии?).</p>'; return; }
+  const KIND = {lust: ["Героизм", "HIGH"], window: ["Окно на боссе", "MEDIUM"], external: ["Усиление", "k-trinket"], burst: ["Бурсты рейда", "none"]};
+  const T = B.top;
+  el.innerHTML = `
+    ${(B.hints||[]).length ? `<div class="box brief"><h3>Главное по урону</h3><ul class="lines">${B.hints.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
+    ${box("По времени боя", "Героизм, усиления от других игроков (Придание сил), окна механики на боссе (уязвимость, оглушение — то, что босс получает сам, а не от игроков) и моменты, когда сразу несколько DPS жмут бурсты.",
+      table(["Когда","Фаза","Что","Кто"], (B.timeline||[]).map(e => [esc(e.time), esc(e.phase||""),
+        `<span class="tag ${KIND[e.kind] ? KIND[e.kind][1] : "none"}">${esc((KIND[e.kind]||[""])[0])}</span> ${esc(e.what)}`, esc(e.who||"")]),
+        {empty: "Ни героизма, ни бурстов, ни окон на боссе не найдено."}))}
+    ${box("Бурсты DPS", "Крупные боевые кулдауны каждого DPS: когда нажаты и сколько раз из возможных за этот бой. «Под героизм» — бурст нажат в первые 25 с героизма. Красным — нажато минимум на 2 раза меньше, чем можно.",
+      table(["Игрок","Кулдаун","Нажат в","Нажато / можно","Под героизм"], (B.bursts||[]).flatMap(r => r.cds.length
+        ? r.cds.map((c, i) => [i ? "" : `${esc(r.player)} <span style="color:var(--muted);font-size:13.5px">${esc(who(r.cls, r.spec))}</span>`,
+            esc(c.name), esc(c.time), `${c.used} / ${c.max_uses}`, i ? "" : (B.lust ? (r.with_lust ? "да" : '<span class="worse">нет</span>') : "—")])
+        : [[`${esc(r.player)} <span style="color:var(--muted);font-size:13.5px">${esc(who(r.cls, r.spec))}</span>`, '<span style="color:var(--muted)">крупных бурстов не найдено</span>', "", "", ""]]),
+        {flag: (() => { const f = (B.bursts||[]).flatMap(r => r.cds.length ? r.cds.map(c => c.max_uses - c.used >= 2) : [false]); return i => f[i]; })()}))}
+    ${T ? box("Лучшие киллы", `Как жмут героизм и бурсты гильдии с лучшими киллами этого босса (${T.kills}).`,
+      (T.lust ? `<p>Героизм: <b>${esc(T.lust.time)}</b>${T.lust.label ? ` (${esc(T.lust.label)})` : ""} — у ${T.lust.n} из ${T.lust.of}.</p>` : "")
+      + table(["Гильдия","Волны бурстов рейда"], (T.waves||[]).map(w => [esc(w.guild), esc((w.times||[]).join(", ") || "—")]))) : ""}`;
+}
+
 function renderRaid(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, S = R.summary, fd = S.first_death;
   const outcome = I.kill ? "килл" : (I.boss_pct!=null ? `вайп на ${num(I.boss_pct,1)}% здоровья босса` : "вайп");
-  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
+  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-dmg","Нанесение урона"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
   const el = resEl();
   el.innerHTML = `
     ${I.demo?'<div class="demo-flag">Демо: синтетический рейд, не реальный лог</div>':""}
@@ -1907,6 +1931,7 @@ function renderRaid(R){
   };
   if (X.damage_timeline) savesTab(false);
   else $("#p-r-cd").innerHTML = '<p class="empty">Нет данных об уроне по рейду.</p>';
+  renderBurst(X.burst, $("#p-r-dmg"));
   if (Object.keys(X).length) $("#p-r-sum").insertAdjacentHTML("beforeend", `<div class="grid2">
     <div>
       ${box("Прерывания", "Каст прошёл, хотя эту способность в бою прерывали.",

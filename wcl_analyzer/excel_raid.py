@@ -32,6 +32,7 @@ def write_raid_workbook(R: dict, path: str | Path, wb=None) -> Path:
     _brief(wb, R, demo)
     _damage(wb, R, demo)
     _vs_top(wb, R, demo)
+    _burst(wb, R, demo)
     _overview(wb, R, demo)
     _players(wb, R, demo)
     _mechanics(wb, R, demo)
@@ -43,6 +44,42 @@ def write_raid_workbook(R: dict, path: str | Path, wb=None) -> Path:
     path = Path(path)
     wb.save(path)
     return path
+
+
+# ------------------------------------------------------- Нанесение урона
+def _burst(wb, R, demo):
+    B = (R.get("extras") or {}).get("burst") or {}
+    if not B or B.get("error") or not (B.get("bursts") or B.get("timeline")):
+        return
+    s = Sheet(wb, "Нанесение урона", demo, {"A": 12, "B": 22, "C": 46, "D": 34, "E": 16})
+    s.title("Нанесение урона: героизм, бурсты, окна на боссе",
+            "Бурсты — крупные боевые кулдауны DPS. Окна на боссе — дебаффы самой механики боя (уязвимость, оглушение).")
+    if B.get("hints"):
+        s.section("Главное")
+        for line in B["hints"]:
+            s.cell(s.row, 1, "• " + line)
+            s.row += 1
+        s.row += 1
+    s.section("По времени боя")
+    kinds = {"lust": "Героизм", "window": "Окно на боссе", "external": "Усиление", "burst": "Бурсты рейда"}
+    s.table(["Когда", "Фаза", "Что", "Кто", "Тип"],
+            [[e["time"], e.get("phase") or "", e["what"], e.get("who") or "", kinds.get(e["kind"], "")] for e in B.get("timeline") or []])
+    s.section("Бурсты DPS", "Нажато / можно — сколько раз кулдаун нажат и сколько раз его можно было нажать за бой.")
+    rows = []
+    for r in B.get("bursts") or []:
+        if not r["cds"]:
+            rows.append([r["player"], "— не найдено", "", "", ""])
+        for c in r["cds"]:
+            rows.append([r["player"], c["name"], c["time"], f"{c['used']} / {c['max_uses']}", "да" if r["with_lust"] else "нет"])
+    s.table(["Игрок", "Кулдаун", "Нажат в", "Нажато / можно", "Под героизм"], rows)
+    T = B.get("top")
+    if T:
+        s.section("Лучшие киллы")
+        if T.get("lust"):
+            s.cell(s.row, 1, f"Героизм: {T['lust']['time']}" + (f" ({T['lust']['label']})" if T['lust'].get('label') else "")
+                   + f" — у {T['lust']['n']} из {T['lust']['of']}")
+            s.row += 1
+        s.table(["Гильдия", "Волны бурстов"], [[w["guild"], ", ".join(w["times"]) or "—"] for w in T.get("waves") or []])
 
 
 # --------------------------------------------------------------- Выжимка

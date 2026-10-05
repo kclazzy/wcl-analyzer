@@ -654,6 +654,11 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
     }
     phases = fight_phases(f, raw.get("phase_meta"), dur)
     extras["heaviest_mrt"] = heaviest_mrt(extras.get("heaviest"), phases)
+    try:  # нанесение урона: героизм, бурсты DPS, окна на боссе
+        from .raid_burst import burst_analysis
+        extras["burst"] = burst_analysis(raw, players, owner, rel, nm, dur, phases)
+    except Exception as e:  # noqa: BLE001 — дополнительная вкладка не должна ронять разбор
+        extras["burst"] = {"error": str(e)}
     for sp in extras.get("spikes", []):  # фаза пика и время от её начала: следующая фаза может прийти раньше или позже
         ph = phase_at(phases, sp["t"])
         sp["phase"] = ph["n"] if ph else None
@@ -728,6 +733,12 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
                                                else load_tree_data(log, save=save_talents))
     except Exception as e:  # noqa: BLE001
         log(f"Кулдауны состава не определены: {e}")
+    try:  # окна на боссе: описание способности — усиливает ли урон по боссу
+        from .raid_burst import enrich_windows
+        if "error" not in (R["extras"].get("burst") or {"error": 1}):
+            enrich_windows(R["extras"]["burst"], R["info"]["duration_s"], online=not R["info"]["demo"])
+    except Exception as e:  # noqa: BLE001
+        log(f"Описания окон на боссе не загружены: {e}")
     if compare_top and hasattr(client, "fight_rankings"):
         from .raid_top import TOP_KILLS, brief_lines, compare_with_top, fetch_top_kills
         f = raw["fight"]
@@ -756,6 +767,15 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
             except Exception as e:  # noqa: BLE001
                 log(f"Эпохальные киллы недоступны: {e}")
         extra = brief_lines(vs)
+        try:  # нанесение урона: когда героизм и бурсты у лучших киллов
+            from .raid_burst import compare_lust, compare_waves, top_summary
+            B = R["extras"].get("burst") or {}
+            if "error" not in B:
+                B["top"] = top_summary(kills)
+                lines = [x for x in (compare_lust(B.get("lust"), B["top"]), compare_waves(B.get("waves"), B["top"])) if x]
+                B["hints"] = lines + list(B.get("hints") or [])
+        except Exception as e:  # noqa: BLE001
+            log(f"Бурсты лучших киллов не сопоставлены: {e}")
         if extra:  # строка «Пики урона по рейду…» дублирует сравнение с топом
             R["brief"] = [x for x in R["brief"] if not x.startswith("Пики урона по рейду")]
             # Сразу после строки про самый тяжёлый момент
@@ -771,6 +791,10 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
     trend = R["extras"].get("pull_trend") or {}
     if trend.get("line") and len(R["brief"]) < 7:
         R["brief"].append(trend["line"])
+    B = R["extras"].get("burst") or {}
+    key = next((h for h in B.get("hints") or [] if h.startswith(("Лучшие киллы делают", "Окно «", "Героизм: у вас"))), None)
+    if key:   # главное по нанесению урона — после строк про урон и сейвы, подробно во вкладке
+        R["brief"] = (R["brief"][:5] + [key + " (подробно — во вкладке «Нанесение урона»)"] + R["brief"][5:])[:7]
     if hasattr(client, "points_left"):
         left = client.points_left()
         if left is not None:
@@ -851,7 +875,8 @@ def _raid_extras(raw, players, rows, deaths, casts_by, cast_tgt, last_hits, take
             name = nm(ab)
             # не рейдовые сейвы и не боевые кулдауны лекаря: тринкеты, защита на себя, перемещение,
             # сейвы на одну цель (Кокон, Подавление боли…) — в «нажатые кулдауны» и в MRT не попадают
-            if ab not in RAID_CD_IDS and (ab in NOT_RAID_CD_IDS or NOT_RAID_CD_RE.search(name) or is_trinket(pid, ab)):
+            if ab not in RAID_CD_IDS and (ab in NOT_RAID_CD_IDS or NOT_RAID_CD_RE.search(name) or is_trinket(pid, ab)
+                                          or ab in _gd.dps_cd_ids()):   # бурсты и Придание сил — не сейвы
                 continue
             known = ab in RAID_CD_IDS or _gd.name_known(name, p.get("cls", ""), p.get("spec", ""))
             if not known:

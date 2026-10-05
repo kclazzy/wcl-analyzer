@@ -90,12 +90,15 @@ def max_age_s(db_path=None, uid: str = LOCAL_UID) -> float:
     return float(user_prefs(db_path, uid)["ref_max_age_days"]) * 86400
 
 
-def ref_key(encounter_id, cls, spec, difficulty, top_n) -> str:
-    return f"{encounter_id}:{cls}:{spec}:{difficulty}:{top_n}"
+def ref_key(encounter_id, cls, spec, difficulty, top_n, site: str | None = None) -> str:
+    """Ключ эталона. У Classic, SoD и т. п. номера боссов пересекаются (Molten Core есть на нескольких сайтах),
+    поэтому версия игры — в ключе; у основной игры ключ прежний."""
+    key = f"{encounter_id}:{cls}:{spec}:{difficulty}:{top_n}"
+    return key if site in (None, "", "www") else f"{key}:{site}"
 
 
 def save_ref(db_path, uid: str = LOCAL_UID, **row) -> None:
-    key = ref_key(row["encounter_id"], row["cls"], row["spec"], row["difficulty"], row["top_n"])
+    key = ref_key(row["encounter_id"], row["cls"], row["spec"], row["difficulty"], row["top_n"], row.get("site"))
     with _lock:
         db = _db(db_path)
         db.execute("INSERT OR REPLACE INTO user_refs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -120,6 +123,8 @@ def list_refs(db_path, uid: str = LOCAL_UID) -> list[dict]:
     now = time.time()
     for r in rows:
         r.pop("uid")
+        parts = str(r["key"]).split(":")
+        r["site"] = parts[5] if len(parts) > 5 else "www"
         r["age_days"] = (now - r["collected_at"]) / 86400
         r["stale"] = now - r["collected_at"] > limit
     return rows
@@ -148,9 +153,11 @@ def import_refs(db_path, uid: str, refs: list[dict]) -> int:
                    "top_n": int(r["top_n"]), "duration": float(r["duration"]) if r.get("duration") else None,
                    "label": str(r.get("label", ""))[:80], "n_logs": int(r.get("n_logs", 0)),
                    "collected_at": float(r["collected_at"])}
+            from .config import site_key
+            row["site"] = site_key(r.get("site"))
         except (KeyError, TypeError, ValueError):
             continue
-        key = ref_key(row["encounter_id"], row["cls"], row["spec"], row["difficulty"], row["top_n"])
+        key = ref_key(row["encounter_id"], row["cls"], row["spec"], row["difficulty"], row["top_n"], row["site"])
         if key not in have or have[key]["collected_at"] < row["collected_at"]:
             save_ref(db_path, uid=uid, **row)
             n += 1

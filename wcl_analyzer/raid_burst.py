@@ -194,7 +194,7 @@ def burst_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, phases:
     _window_hits(windows, rows, dead)
     waves = [{**w, "time": _fmt_t(w["t"]), "phase_label": _phase_label(phases, w["t"])[1]} for w in _waves(rows)]
     B = {"lust": lust, "lusts": lusts, "bursts": rows, "externals": ext, "windows": windows, "waves": waves,
-         "duration": round(dur, 1), "top": None,
+         "duration": round(dur, 1), "top": None, "site": raw.get("site") or "www",
          "uses": [{"cls": r["cls"], "spec": r["spec"], "id": c["id"], "used": c["used"], "max": c["max_uses"]}
                   for r in rows for c in r["cds"] if not c["proc"] and c["max_uses"]]}
     refresh(B)
@@ -426,7 +426,8 @@ def refresh(B: dict) -> None:
     if wv:
         out.append(wv)
         keys["waves"] = wv
-    for w in sorted([w for w in ws if w.get("amp")], key=lambda w: (w["amp"] != "sure", w["t0"]))[:3]:
+    retail = (B.get("site") or "www") == "www"
+    for w in sorted([w for w in ws if w.get("amp") and retail], key=lambda w: (w["amp"] != "sure", w["t0"]))[:3]:
         if w.get("missed_ready"):
             s = ((f"Окно «{w['name']}»" if w["amp"] == "sure" else f"Возможное окно «{w['name']}»") + f" в {w['time']}"
                  + (f" ({w['phase_label']})" if w.get("phase_label") else "")
@@ -438,7 +439,7 @@ def refresh(B: dict) -> None:
     for r in rows:
         for c in r["cds"]:
             c["lazy"] = False
-            if c["proc"] or not c.get("max_uses") or dur <= 120:
+            if c["proc"] or not c.get("max_uses") or dur <= 120 or not retail:
                 continue
             gap = c["max_uses"] - c["used"]
             if gap < 2 or not (c["cd"] >= MAIN_CD_S or c["used"] < 0.7 * c["max_uses"]):
@@ -452,6 +453,9 @@ def refresh(B: dict) -> None:
         out.append("Бурсты нажаты реже, чем можно (с учётом времени, пока игрок лежал): "
                    + "; ".join(f"{p} — «{n}» {u} из {m}" + (f", у лучших киллов этот спек — {q:.0%} откатов" if q is not None else "")
                                for p, n, u, m, q in lazy[:4]) + ("…" if len(lazy) > 4 else ""))
+    if not retail:
+        out.append("Таблица бурстов — по основной игре: на этой версии игры откаты другие, поэтому «нажато реже» "
+                   "и «бурст был готов» не считаются; видно, когда героизм и кто что нажал")
     none = [r["player"] for r in rows if not r["cds"]]
     if none and len(none) < len(rows):
         out.append(f"Не нашли крупных бурстов у: {_list(none)} — проверьте вручную: спек или таланты могли не попасть "

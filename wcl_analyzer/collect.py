@@ -161,7 +161,7 @@ def collect_reference(client: WCLClient, encounter_id: int, cls: str, spec: str,
     import time as _time
     info = {"encounter_id": encounter_id, "boss": boss or logs[0].encounter_name, "cls": cls, "spec": spec,
             "difficulty": difficulty, "top_n": top_n, "duration": duration, "label": label,
-            "n_logs": len(logs), "collected_at": fetched_at or _time.time()}
+            "n_logs": len(logs), "collected_at": fetched_at or _time.time(), "site": getattr(client, "site", "www")}
     if meta is not None:
         meta.update(info)
     cache = getattr(client, "cache", None)

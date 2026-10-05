@@ -166,12 +166,14 @@ def _dur_s(rk: dict) -> float | None:
     return d / 1000.0 if d > 10000 else d
 
 
-def pick_kills(client, encounter_id: int, difficulty: int, target_s: float, n: int = KILLS) -> list[dict]:
+def pick_kills(client, encounter_id: int, difficulty: int, target_s: float, n: int = KILLS,
+               size: int | None = None) -> list[dict]:
     """Киллы из рейтинга WCL (по скорости, до PAGES страниц), отсортированные по близости длительности к target_s."""
     pool = []
     for page in range(1, PAGES + 1):
         try:
-            got = client.fight_rankings(encounter_id, difficulty, "speed", page=page)
+            from .api import size_kw
+            got = client.fight_rankings(encounter_id, difficulty, "speed", page=page, **size_kw(size))
         except Exception:  # noqa: BLE001 — следующая страница не обязательна
             if not pool:
                 raise
@@ -215,7 +217,7 @@ def plan_events(R: dict) -> list[dict]:
 
 
 def run_roster_plan(client, encounter_id: int, difficulty: int, minutes: float, roster_text: str,
-                    log=print, progress=lambda x: None) -> dict:
+                    log=print, progress=lambda x: None, size: int | None = None) -> dict:
     from .api import WCLError
     from .raid_top import _aggregate, light_raid, make_plan, mrt_note
 
@@ -226,7 +228,7 @@ def run_roster_plan(client, encounter_id: int, difficulty: int, minutes: float, 
     if not roster_cooldowns(players, target):
         raise LookupError("В составе нет ни одного рейдового кулдауна — проверьте классы и спеки в экспорте")
     log(f"Ищу в рейтинге Warcraft Logs киллы длительностью около {_fmt_t(target)}…")
-    cands = pick_kills(client, encounter_id, difficulty, target)
+    cands = pick_kills(client, encounter_id, difficulty, target, size=size)
     if not cands:
         raise LookupError("У этого босса на этой сложности пока нет киллов в рейтинге Warcraft Logs")
     kills, base = [], None

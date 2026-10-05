@@ -1,5 +1,5 @@
 {
- "version": 5,
+ "version": 6,
  "_about": "Игровые данные, которые меняются с патчами. Программа берёт этот файл из репозитория (main), если доступен, иначе — копию из сборки. Правка здесь не требует пересборки APK и .exe.",
  "raid_cds": [
   {
@@ -1127,7 +1127,8 @@
    "cd": 180,
    "dur": 8,
    "kind": "self",
-   "base": false
+   "base": false,
+   "group": 86659
   },
   {
    "class": "Paladin",
@@ -1163,7 +1164,8 @@
    "cd": 300,
    "dur": 8,
    "kind": "self",
-   "base": false
+   "base": false,
+   "plan": false
   },
   {
    "class": "DeathKnight",
@@ -1199,7 +1201,8 @@
    "cd": 60,
    "dur": 5,
    "kind": "self",
-   "base": false
+   "base": true,
+   "school": "magic"
   },
   {
    "class": "DeathKnight",
@@ -1211,7 +1214,8 @@
    "cd": 120,
    "dur": 8,
    "kind": "self",
-   "base": false
+   "base": false,
+   "plan": false
   },
   {
    "class": "DeathKnight",
@@ -1247,7 +1251,11 @@
    "cd": 60,
    "dur": 10,
    "kind": "self",
-   "base": true
+   "base": true,
+   "boss_debuff": [
+    207744,
+    207771
+   ]
   },
   {
    "class": "Druid",
@@ -1295,7 +1303,8 @@
    "cd": 180,
    "dur": 30,
    "kind": "self",
-   "base": false
+   "base": false,
+   "plan": false
   },
   {
    "class": "Monk",
@@ -1416,7 +1425,72 @@
    "dur": 8,
    "kind": "external",
    "base": true
+  },
+  {
+   "class": "Warrior",
+   "spec": null,
+   "id": 23920,
+   "buff": 23920,
+   "name": "Отражение заклинаний",
+   "en": "Spell Reflection",
+   "cd": 25,
+   "dur": 5,
+   "kind": "self",
+   "base": false,
+   "school": "magic"
+  },
+  {
+   "class": "Monk",
+   "spec": "Brewmaster",
+   "id": 122783,
+   "buff": 122783,
+   "name": "Распыление магии",
+   "en": "Diffuse Magic",
+   "cd": 90,
+   "dur": 6,
+   "kind": "self",
+   "base": false,
+   "school": "magic"
+  },
+  {
+   "class": "Paladin",
+   "spec": null,
+   "id": 204018,
+   "buff": 204018,
+   "name": "Благословение защиты от заклинаний",
+   "en": "Blessing of Spellwarding",
+   "cd": 300,
+   "dur": 10,
+   "kind": "external",
+   "base": false,
+   "school": "magic"
+  },
+  {
+   "class": "Paladin",
+   "spec": null,
+   "id": 1022,
+   "buff": 1022,
+   "name": "Благословение защиты",
+   "en": "Blessing of Protection",
+   "cd": 300,
+   "dur": 10,
+   "kind": "external",
+   "base": true,
+   "school": "physical",
+   "plan": false
+  },
+  {
+   "class": "Warrior",
+   "spec": null,
+   "id": 3411,
+   "buff": null,
+   "name": "Вмешательство",
+   "en": "Intervene",
+   "cd": 30,
+   "dur": 6,
+   "kind": "external",
+   "base": false
   }
  ],
- "_about_tank_cds": "Защитные кулдауны танков и внешние сейвы на танка — вкладка «Танки». Номера, откаты и длительность проверены на Wowhead (октябрь 2026). buff — номер баффа на танке, если отличается от каста (null — только по касту: Огненное клеймо висит на боссе); dur — сколько действует, с; base — есть у спека всегда (иначе — только если нажат в бою)."
+ "_about_tank_cds": "Защитные кулдауны танков и внешние сейвы на танка — вкладка «Танки». Номера, откаты и длительность проверены на Wowhead (октябрь 2026). buff — номер баффа на танке (null — только по касту); group — общий откат с другой записью (два номера одной способности); boss_debuff — способность висит дебаффом на боссе (Огненное клеймо); school — только против магии (magic) или физического урона (physical); plan: false — не ставить в план (Божественный щит, Благословение защиты сбрасывает угрозу и т. п.); base — есть у спека всегда (иначе — только если нажат в бою). Заряды и сокращение отката талантами программа видит по нажатиям в бою. Только для основной игры (Retail)."
 }

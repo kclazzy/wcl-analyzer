@@ -173,6 +173,8 @@ td .imp{font-size:13.5px}
 .tpbox{margin-top:18px;border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 16px;background:var(--soft)}
 .tpbox summary{cursor:pointer;font-weight:600}
 .tpgrid{display:grid;grid-template-columns:1.3fr 1.4fr 1fr 1.4fr auto;gap:12px;align-items:end;margin-top:12px}
+.tpgrid > div{min-width:0}
+@media (max-width:960px){.tpgrid{grid-template-columns:1fr 1fr}}
 @media (max-width:720px){.tpgrid{grid-template-columns:1fr}}
 .ftabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
 .ftabs button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:10px 18px;font-weight:600;font-size:15px;color:var(--muted);cursor:pointer}
@@ -810,7 +812,7 @@ const RUN_BTNS = ["#runBtn", "#progBtn", "#tpRun", "#rpRun"];
 
 /* ---------- «Топ прогресса» без лога: версия игры, рейд, сложность, босс — с Warcraft Logs ---------- */
 const TP_DIFF = {5: "Эпохальный", 4: "Героический", 3: "Обычный", 1: "Поиск рейда"};
-const SITES = [["www", "Retail — основная игра"], ["classic", "Classic — прогрессия"], ["fresh", "Classic Anniversary / Fresh"],
+const SITES = [["www", "Retail — основная игра"], ["classic", "Classic — прогрессия (Mists of Pandaria)"], ["fresh", "Classic Anniversary (TBC, Fresh)"],
                ["sod", "Season of Discovery"], ["vanilla", "Classic Era / Hardcore"]];
 const ZONES = {};          // версия игры → список рейдов
 const ZONES_FRESH = {};    // версия игры → список уже обновлён с Warcraft Logs при этом открытии страницы
@@ -831,39 +833,56 @@ function zoneOptions(zs){
 }
 function showZones(){
   const zs = ZONES[SITE] || []; TP_ZONES = zs;
-  if (!zs.length) { ["#tpZone", "#rpZone"].forEach(z => $(z).innerHTML = '<option value="">Рейды не найдены</option>'); return; }
+  if (!zs.length) return clearZones("Рейды не найдены");
   ["tp", "rp"].forEach(k => { const prev = $(`#${k}Zone`).value;
     $(`#${k}Zone`).innerHTML = zoneOptions(zs);
     if (zs.some(z => String(z.id) === prev)) $(`#${k}Zone`).value = prev;
     zoneChanged(k); });
 }
 /* Список рейдов — с Warcraft Logs при каждом открытии (раз за открытие страницы на версию игры); пока грузится —
-   прошлый список с этого устройства. Нет связи — остаётся прошлый. */
+   прошлый список с этого устройства. Нет связи — остаётся прошлый. Ответ для другой (уже не выбранной) версии
+   игры экран не трогает; один запрос на версию одновременно. */
+const ZONES_LOADING = {};
+function clearZones(text){
+  TP_ZONES = [];
+  ["tp", "rp"].forEach(k => { $(`#${k}Zone`).innerHTML = `<option value="">${esc(text)}</option>`;
+    $(`#${k}Diff`).innerHTML = ""; $(`#${k}Boss`).innerHTML = ""; });
+}
 async function loadZones(force){
   const site = SITE;
   if (ZONES_FRESH[site] && !force) return showZones();
   if (!ZONES[site]) { try { const c = JSON.parse(localStorage.getItem("wclZones_" + site) || "null");
                             if (c && c.zones && c.zones.length) ZONES[site] = c.zones; } catch(e){} }
-  if (ZONES[site]) showZones();
-  else ["#tpZone", "#rpZone"].forEach(z => $(z).innerHTML = '<option value="">Загружаю список…</option>');
+  if (ZONES[site]) showZones(); else clearZones("Загружаю список…");
+  if (ZONES_LOADING[site]) return ZONES_LOADING[site];
   $("#tpFresh").textContent = "Обновляю список рейдов с Warcraft Logs…";
-  try {
-    const r = await api("/api/zones", {site});
-    ZONES[site] = r.zones || []; ZONES_FRESH[site] = true;
-    try { localStorage.setItem("wclZones_" + site, JSON.stringify({at: Date.now(), zones: ZONES[site]})); } catch(e){}
-    if (SITE === site) { showZones(); $("#tpFresh").textContent = `Список рейдов обновлён с Warcraft Logs в ${new Date().toLocaleTimeString("ru-RU", {hour: "2-digit", minute: "2-digit"})}.`; }
-  } catch(e){
-    $("#tpFresh").textContent = ZONES[site] ? "Не удалось обновить список с Warcraft Logs — показан прошлый." : "";
-    if (!ZONES[site]) { ["#tpZone", "#rpZone"].forEach(z => $(z).innerHTML = `<option value="">${e.needKey ? "Нужен ключ Warcraft Logs" : "Список не загрузился"}</option>`);
-      showErr(e.message); if (e.needKey) $("#keyDlg").showModal(); }
-  }
+  ZONES_LOADING[site] = (async () => {
+    try {
+      const r = await api("/api/zones", {site});
+      ZONES[site] = r.zones || []; ZONES_FRESH[site] = true;
+      try { localStorage.setItem("wclZones_" + site, JSON.stringify({at: Date.now(), zones: ZONES[site]})); } catch(e){}
+      if (SITE !== site) return;
+      showZones();
+      $("#tpFresh").textContent = `Список рейдов обновлён с Warcraft Logs в ${new Date().toLocaleTimeString("ru-RU", {hour: "2-digit", minute: "2-digit"})}.`;
+    } catch(e){
+      if (SITE !== site) return;
+      $("#tpFresh").textContent = ZONES[site] ? "Не удалось обновить список с Warcraft Logs — показан прошлый." : "";
+      if (!ZONES[site]) { clearZones(e.needKey ? "Нужен ключ Warcraft Logs" : "Список не загрузился");
+        showErr(e.message); if (e.needKey) $("#keyDlg").showModal(); }
+    } finally { delete ZONES_LOADING[site]; }
+  })();
+  return ZONES_LOADING[site];
 }
 /* k: tp — «Топ прогресса» (есть «Все боссы»), rp — план по составу (один босс) */
 function zoneChanged(k){
   const z = (TP_ZONES || []).find(z => String(z.id) === $(`#${k}Zone`).value); if (!z) return;
   const prev = $(`#${k}Diff`).value || "5";
   const ds = [...z.difficulties].sort((a, b) => b.id - a.id);
-  $(`#${k}Diff`).innerHTML = ds.map(d => `<option value="${d.id}" ${String(d.id) === prev ? "selected" : ""}>${esc(TP_DIFF[d.id] || d.name || d.id)}</option>`).join("");
+  /* Classic: 10 и 25 игроков — разные рейтинги, поэтому сложность выбирается вместе с размером («25, Героический») */
+  const opts = ds.flatMap(d => SITE !== "www" && (d.sizes || []).length > 1
+    ? [...d.sizes].sort((a, b) => b - a).map(sz => [`${d.id}:${sz}`, `${sz}, ${TP_DIFF[d.id] || d.name || d.id}`])
+    : [[String(d.id), TP_DIFF[d.id] || d.name || d.id]]);
+  $(`#${k}Diff`).innerHTML = opts.map(([v, l]) => `<option value="${v}" ${v === prev ? "selected" : ""}>${esc(l)}</option>`).join("");
   $(`#${k}Boss`).innerHTML = (k === "tp" ? '<option value="all">Все боссы</option>' : "") + z.encounters.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join("");
 }
 const tpZoneChanged = () => zoneChanged("tp");
@@ -1889,28 +1908,35 @@ function renderBurst(B, el){
 }
 
 /* Танки: танкбастеры, чем танк был прикрыт, кулдауны танков, лучшие киллы и заметка MRT для танков */
+function fmtAmt(v){ v = +v || 0; return v >= 1e6 ? (v/1e6).toFixed(2).replace(".", ",") + " млн" : v >= 1e3 ? Math.round(v/1e3) + " тыс." : String(Math.round(v)); }
 function renderTank(T, el){
   if (!el) return;
-  if (!T || T.error || !T.tanks) { el.innerHTML = '<p class="empty">Нет данных о танках: разбор из прежней версии — разберите бой заново.</p>'; return; }
+  if (!T) { el.innerHTML = '<p class="empty">Нет данных о танках: разбор из прежней версии — разберите бой заново.</p>'; return; }
+  if (T.error) { el.innerHTML = `<p class="empty">Танки не разобраны: ${esc(T.error)}</p>`; return; }
+  if (!(T.tanks||[]).length) { el.innerHTML = '<p class="empty">В этом бою нет танков.</p>'; return; }
   const res = e => e.died ? `<span class="worse">смерть</span>${e.covered ? "" : " — без кулдауна"}`
-    : e.covered ? "прикрыт" : `<span class="worse">без кулдауна</span>`;
-  const ready = e => e.covered ? "" : [e.ready.length ? "откатан: " + e.ready.join(", ") : "",
+    : e.covered ? "прикрыт" : e.bare ? `<span class="worse">без кулдауна</span>` : "без кулдауна";
+  const ready = e => e.covered ? "" : [(r => r.length ? "откатан: " + r.join(", ") : "")(e.ready.filter(x => !(e.held||[]).includes(x))),
+    (e.held||[]).length ? "держал под следующий удар: " + e.held.join(", ") : "",
     e.ready_ext.length ? "свободны внешние: " + e.ready_ext.join(", ") : ""].filter(Boolean).join("; ");
   const prot = e => [...e.own.map(x => x.name), ...e.ext.map(x => `${x.name} (${x.from})`)].join(", ") || "—";
+  const mitig = e => [e.mitigated!=null ? `снижено ${Math.round(e.mitigated*100)}%` : "",
+    e.absorbed ? `поглощено ${Math.round(e.absorbed*100)}%${e.spec === "Brewmaster" ? " (с Stagger)" : ""}` : ""].filter(Boolean).join(", ");
   const top = (T.top || {}).abilities || {};
   const mrt = T.mrt ? `<div class="mrt" style="margin-top:12px">
     <button type="button" class="mini mrtbtn" data-mrt data-label="Скопировать для MRT (танки)">Скопировать для MRT (танки)</button>
-    <span class="hint" style="margin-left:8px">На каждый танкбастер — кулдаун танка или внешний сейв лекаря (→ кому), с учётом отката: сначала то, что сработало в этом бою, затем — что жмут лучшие киллы. В игре: /mrt → Заметки → вставить → Отправить.</span>
+    <span class="hint" style="margin-left:8px">На каждый танкбастер — кулдаун танка или внешний сейв (→ кому), с учётом отката и зарядов; нажать за 1–2 с до удара. Крупные удары — первыми и долгими кулдаунами. В игре: /mrt → Заметки → вставить → Отправить.</span>
     <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:13.5px">Текст заметки</summary>
       <textarea readonly rows="${Math.min(14, T.mrt.split("\n").length + 1)}" style="width:100%;margin-top:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;box-sizing:border-box">${esc(T.mrt)}</textarea></details></div>` : "";
   el.innerHTML = `
     ${(T.hints||[]).length ? `<div class="box brief"><h3>Главное по танкам</h3><ul class="lines">${T.hints.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
-    ${box("Танкбастеры", "Крупные удары босса по танку (не ближний бой): чем танк был прикрыт в момент удара — своим защитным кулдауном или внешним сейвом. «Снижено» — насколько удар меньше, чем без защиты (броня, кулдауны, активная защита). Активная защита (Ironfur, Shield Block и т. п.) висит почти всё время и здесь не оценивается.",
+    ${box("Танкбастеры", "Крупные удары босса по танку (не ближний бой и не адды): чем танк был прикрыт в момент удара — своим защитным кулдауном или внешним сейвом. «Снижено» — насколько удар меньше, чем без защиты (броня, кулдауны, активная защита); «поглощено» — доля, ушедшая в щиты. Красным — удар без кулдауна, хотя кулдаун был откатан и не ушёл на следующий удар, или смерть. Активная защита (Ironfur, Shield Block и т. п.) не оценивается.",
       table(["Когда","Фаза","Удар","Танк","Урон","Защита","Итог","Был готов"], (T.events||[]).map(e => [esc(e.time), esc(e.phase_label||""),
-        esc(e.ability), esc(e.tank), `${(e.damage/1e6).toFixed(2).replace(".", ",")} млн${e.mitigated!=null ? ` <span style="color:var(--muted);font-size:13px">снижено ${Math.round(e.mitigated*100)}%</span>` : ""}`,
+        esc(e.ability) + (e.hits > 1 ? ` <span style="color:var(--muted);font-size:13px">×${e.hits}</span>` : ""), esc(e.tank),
+        `${fmtAmt(e.damage)}${mitig(e) ? ` <span style="color:var(--muted);font-size:13px">${esc(mitig(e))}</span>` : ""}`,
         esc(prot(e)), res(e), esc(ready(e))]),
-        {empty: "Танкбастеров не найдено.", flag: (() => { const f = (T.events||[]).map(e => !e.covered || e.died); return i => f[i]; })()}))}
-    ${box("Защитные кулдауны танков", "Когда нажаты, сколько раз из возможных (пока танк был жив) и сколько нажатий пришлось на танкбастер.",
+        {empty: "Танкбастеров не найдено.", flag: (() => { const f = (T.events||[]).map(e => !!(e.bare || e.died)); return i => f[i]; })()}))}
+    ${box("Защитные кулдауны танков", "Когда нажаты, сколько раз из возможных (пока танк был жив; откат и заряды — с учётом того, как часто танк жал их в этом бою) и сколько нажатий пришлось на танкбастер.",
       table(["Танк","Кулдаун","Нажат в","Нажато / можно","На удары"], (T.cds||[]).map(c => [esc(c.tank), c.id ? esc(c.name) : '<span style="color:var(--muted)">кулдаунов из таблицы не нажато</span>',
         esc(c.time), c.id ? `${c.used} / ${c.max_uses}` : "", c.id ? `${c.on_hit} из ${c.used}` : ""])))}
     ${(T.plan||[]).length ? box("План на следующий пулл", "Кто и что жмёт на каждый танкбастер.",
@@ -1929,6 +1955,7 @@ function renderRaid(R){
   const el = resEl();
   el.innerHTML = `
     ${I.demo?'<div class="demo-flag">Демо: синтетический рейд, не реальный лог</div>':""}
+    ${I.site && I.site !== "www" ? `<div class="demo-flag">Версия игры: ${esc((SITES.find(x => x[0] === I.site) || [0, I.site])[1])}. Таблицы кулдаунов программы — по основной игре: откаты в плане сейвов могут отличаться, а «был готов», «нажато реже» и план танков не считаются.</div>` : ""}
     <div class="hero">
       <div>
         ${I.top_progress ? (TP => { const where = TP.server ? ` (${esc(TP.server)}${TP.region ? "-" + esc(TP.region) : ""})` : "";
@@ -2263,7 +2290,7 @@ document.addEventListener("click", async ev => {
 /* ---------- эталоны: список в этом браузере ---------- */
 function fmtDate(ts){ return new Date(ts*1000).toLocaleString("ru-RU",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"}); }
 function ageText(d){ return d < 1/24 ? "только что" : d < 1 ? `${Math.round(d*24)} ч назад` : `${Math.floor(d)} ${plural(Math.floor(d),"день","дня","дней")} назад`; }
-const refKey = r => [r.encounter_id, r.cls, r.spec, r.difficulty, r.top_n].join(":");
+const refKey = r => [r.encounter_id, r.cls, r.spec, r.difficulty, r.top_n].join(":") + (r.site && r.site !== "www" ? ":" + r.site : "");
 function getRefs(){
   const now = Date.now()/1000, limit = prefs().max_age_days * 86400;
   return (store.get("wclRefs") || []).map(r => ({...r, key: refKey(r), age_days:(now-r.collected_at)/86400, stale: now-r.collected_at > limit}));

@@ -80,7 +80,7 @@ def fetch_raid_raw(client, url: str, fight=None, log=print) -> dict:
     f = _pick_fight(report, fight if fight is not None else url_fight)
     fid, s, e = int(f["id"]), float(f["startTime"]), float(f["endTime"])
     log(f"Бой: {f['name']}, {'килл' if f.get('kill') else 'вайп'}, {_fmt_t((e - s) / 1000)}")
-    raw = {"report": report, "fight": f}
+    raw = {"report": report, "fight": f, "site": getattr(client, "site", "www")}
     if f.get("phaseTransitions") and hasattr(client, "report_phases"):
         raw["phase_meta"] = client.report_phases(code)
     log("Состав рейда, урон и лечение…")
@@ -687,7 +687,9 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
         sp["phase"] = ph["n"] if ph else None
         sp["phase_t"] = round(sp["t"] - ph["t"], 1) if ph else None
     info = {"code": code, "title": report.get("title", ""), "boss": f.get("name", ""), "phases": phases,
-            "difficulty": DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), str(f.get("difficulty"))),
+            "difficulty": (f"{f['size']}, " if raw.get("site", "www") != "www" and f.get("size") else "")
+                          + DIFFICULTY_NAMES.get(int(f.get("difficulty") or 0), str(f.get("difficulty"))),
+            "site": raw.get("site", "www"),
             "kill": kill, "duration_s": _r(dur), "duration": _fmt_t(dur), "fight_id": fid,
             "boss_pct": None if kill else next((p["boss_pct"] for p in pulls if p["selected"]), None),
             "url": f"{report.get('_site_url') or SITE_URL}/reports/{code}#fight={fid}", "size": len(rows),
@@ -723,8 +725,9 @@ _BRIEF_LOW = ("Расходники —", "Почти не били аддов",
 
 
 def _brief_insert(brief: list[str], line: str, pos: int, force: bool = False) -> None:
-    """Добавить строку в «Главное по бою», ничего не теряя молча: есть место — вставить; нет — заменить
-    наименее важную строку (расходники, адды, избегаемый урон, прерывания — они есть в своих вкладках)."""
+    """Добавить строку в «Главное по бою»: есть место — вставить; нет — заменить наименее важную строку
+    (расходники, адды, избегаемый урон, прерывания — они есть в своих вкладках). force — иначе заменить
+    последнюю строку; без force и без места строка остаётся только в своей вкладке."""
     if len(brief) < BRIEF_MAX:
         brief.insert(min(pos, len(brief)), line)
         return
@@ -790,6 +793,7 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
         kills: list = []
         try:
             kills = fetch_top_kills(client, int(f["encounterID"]), int(f.get("difficulty") or 0), log=log,
+                                    size=f.get("size") if getattr(client, "site", "www") != "www" else None,
                                     progress=lambda x: progress(0.5 + 0.25 * x))
             vs = compare_with_top(R, kills)
             if vs:
@@ -800,7 +804,7 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
             vs = None
         R["extras"]["vs_top"] = vs
         # Вкладка «Полученный урон и сейвы»: переключатель на лучшие эпохальные киллы
-        if mythic and int(f.get("difficulty") or 0) not in (0, 5):
+        if mythic and int(f.get("difficulty") or 0) not in (0, 5) and getattr(client, "site", "www") == "www":
             log("Лучшие киллы на эпохальной сложности — для вкладки «Полученный урон и сейвы»…")
             try:
                 kills_m = fetch_top_kills(client, int(f["encounterID"]), 5, log=log,

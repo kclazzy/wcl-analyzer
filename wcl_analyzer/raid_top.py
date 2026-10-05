@@ -31,6 +31,7 @@ def light_raid(client, code: str, fid: int, report: dict | None = None, difficul
     # рейдовые кулдауны, героизм и бурсты DPS — всё в одной выборке кастов
     ids = ", ".join(str(x) for x in sorted(game_data.cd_ids() | game_data.lust_ids() | game_data.dps_cd_ids()
                                          | game_data.tank_cd_ids()))
+    tank_buffs = ", ".join(sorted({str(c["buff"]) for c in game_data.tank_cds() if c.get("buff")}))
     report = report or client.report(code)
     f = next(x for x in report["fights"] if int(x["id"]) == int(fid))
     if difficulty and int(f.get("difficulty") or 0) and int(f["difficulty"]) != int(difficulty):
@@ -41,9 +42,11 @@ def light_raid(client, code: str, fid: int, report: dict | None = None, difficul
     got = None
     if hasattr(client, "events_multi") and not getattr(client, "_no_batch", False):
         try:  # урон по рейду и рейдовые кулдауны — одним запросом
-            got = client.events_multi(code, fid, s, e, {
-                "taken": {"data_type": "DamageTaken"},
-                "casts": {"data_type": "Casts", "filter_expression": f"ability.id in ({ids})"}})
+            specs = {"taken": {"data_type": "DamageTaken"}, "deaths": {"data_type": "Deaths"},
+                     "casts": {"data_type": "Casts", "filter_expression": f"ability.id in ({ids})"}}
+            if tank_buffs:   # защита на танках — как у вашего боя, чтобы доля прикрытых ударов считалась одинаково
+                specs["tank_buffs"] = {"data_type": "Buffs", "filter_expression": f"ability.id in ({tank_buffs})"}
+            got = client.events_multi(code, fid, s, e, specs)
         except WCLError:
             got = None
     if got is None:
@@ -51,21 +54,24 @@ def light_raid(client, code: str, fid: int, report: dict | None = None, difficul
             casts = client.events(code, fid, s, e, "Casts", filter_expression=f"ability.id in ({ids})")
         except (WCLError, TypeError):
             casts = client.events(code, fid, s, e, "Casts")
-        got = {"taken": client.events(code, fid, s, e, "DamageTaken"), "casts": casts}
-    raw = {"report": report, "fight": f, "details": client.player_details(code, fid),
-           "taken": got["taken"], "casts": got["casts"], "deaths": [], "pulls": []}
+        got = {"taken": client.events(code, fid, s, e, "DamageTaken"), "casts": casts,
+               "deaths": client.events(code, fid, s, e, "Deaths")}
+    raw = {"report": report, "fight": f, "site": getattr(client, "site", "www"), "details": client.player_details(code, fid),
+           "taken": got["taken"], "casts": got["casts"], "deaths": got.get("deaths") or [], "pulls": [],
+           "tank_buffs": got.get("tank_buffs") or []}
     return analyze_raid(raw)
 
 
 def fetch_top_kills(client, encounter_id: int, difficulty: int, n: int = TOP_KILLS, log=print,
-                    progress=lambda x: None) -> list[dict]:
+                    progress=lambda x: None, size: int | None = None) -> list[dict]:
     """Лучшие киллы босса по скорости: пики урона по рейду и рейдовые кулдауны каждого."""
     from .api import WCLError
     from .collect import parallel_workers
 
     if not difficulty:
         raise LookupError("не удалось определить сложность боя")
-    ranks = client.fight_rankings(encounter_id, difficulty, "speed")
+    from .api import size_kw
+    ranks = client.fight_rankings(encounter_id, difficulty, "speed", **size_kw(size))
     cands = [r for r in ranks if (r.get("report") or {}).get("code")][: n + 3]
 
     def load(rk):

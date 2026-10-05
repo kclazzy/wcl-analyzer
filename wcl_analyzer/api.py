@@ -200,7 +200,7 @@ class MemoryCache:
 
 
 _NOT_RAID = re.compile(r"dungeon|mythic\+|delve|torghast|challenge|arena|battleground|подземел|арена|поле бо|"
-                       r"world boss|мировые боссы|\\b(?:beta|бета|ptr|test)\\b", re.I)
+                       r"world boss|мировые боссы|\b(?:beta|бета|ptr|test)\b", re.I)
 
 
 def pick_raid_zones(zones: list[dict], all_expansions: bool = False) -> list[dict]:
@@ -222,8 +222,17 @@ def pick_raid_zones(zones: list[dict], all_expansions: bool = False) -> list[dic
     raids.sort(key=lambda z: (-exp_id(z), bool(z.get("frozen")), -int(z["id"])))
     return [{"id": z["id"], "name": z["name"], "frozen": bool(z.get("frozen")),
              "expansion": (z.get("expansion") or {}).get("name"), "expansion_id": exp_id(z),
-             "difficulties": [{"id": int(d["id"]), "name": d.get("name")} for d in z["difficulties"]],
+             "difficulties": [{"id": int(d["id"]), "name": d.get("name"), "sizes": d.get("sizes") or []}
+                              for d in z["difficulties"]],
              "encounters": [{"id": e["id"], "name": e["name"]} for e in z.get("encounters") or []]} for z in raids]
+
+
+def size_kw(size) -> dict:
+    """Аргумент size для fight_rankings — только если размер задан (тестовые клиенты его не знают)."""
+    try:
+        return {"size": int(size)} if size and int(size) > 0 else {}
+    except (TypeError, ValueError):
+        return {}
 
 
 class WCLClient:
@@ -275,7 +284,7 @@ class WCLClient:
 
     def _token_locked(self) -> str:
         tok, exp = self._tokens.get(self.site, (None, 0.0))
-        if self.site == "www" and self._token:   # совместимость: токен, заданный напрямую
+        if self.site == "www" and self._token and self._token_exp > exp:   # токен, заданный напрямую (тесты)
             tok, exp = self._token, self._token_exp
         if tok and time.time() < exp - 60:
             return tok
@@ -527,18 +536,25 @@ class WCLClient:
         all_expansions=False — только последнее дополнение сайта; True — все, новые дополнения первыми.
         Список — с сайта Warcraft Logs той версии игры, что у клиента (основная, Classic, SoD…)."""
         q = """query { worldData { zones { id name frozen expansion { id name }
-                 difficulties { id name } encounters { id name } } } }"""
+                 difficulties { id name sizes } encounters { id name } } } }"""
         zones = (self.query(q, {}, max_age_s=max_age_s).get("worldData") or {}).get("zones") or []
         return pick_raid_zones(zones, all_expansions)
 
     def fight_rankings(self, encounter_id: int, difficulty: int, metric: str = "speed",
-                       page: int = 1, max_age_s: float = 3 * 86400) -> list[dict]:
-        """Лучшие киллы босса (рейтинг гильдий): [{report: {code, fightID}, guild, duration, …}]."""
-        q = """query($enc: Int!, $diff: Int, $page: Int, $metric: FightRankingMetricType) {
-                 worldData { encounter(id: $enc) {
-                   fightRankings(difficulty: $diff, page: $page, metric: $metric) } } }"""
-        enc = self.query(q, {"enc": encounter_id, "diff": difficulty, "page": page, "metric": metric},
-                         max_age_s=max_age_s)["worldData"]["encounter"] or {}
+                       page: int = 1, max_age_s: float = 3 * 86400, size: int | None = None) -> list[dict]:
+        """Лучшие киллы босса (рейтинг гильдий): [{report: {code, fightID}, guild, duration, …}].
+        size — размер рейда (Classic: 10 и 25 игроков — разные рейтинги); None — без отбора."""
+        if size:
+            q = """query($enc: Int!, $diff: Int, $page: Int, $metric: FightRankingMetricType, $size: Int) {
+                     worldData { encounter(id: $enc) {
+                       fightRankings(difficulty: $diff, page: $page, metric: $metric, size: $size) } } }"""
+            variables = {"enc": encounter_id, "diff": difficulty, "page": page, "metric": metric, "size": int(size)}
+        else:
+            q = """query($enc: Int!, $diff: Int, $page: Int, $metric: FightRankingMetricType) {
+                     worldData { encounter(id: $enc) {
+                       fightRankings(difficulty: $diff, page: $page, metric: $metric) } } }"""
+            variables = {"enc": encounter_id, "diff": difficulty, "page": page, "metric": metric}
+        enc = self.query(q, variables, max_age_s=max_age_s)["worldData"]["encounter"] or {}
         data = enc.get("fightRankings") or {}
         if isinstance(data, dict) and "data" in data and isinstance(data["data"], dict):
             data = data["data"]

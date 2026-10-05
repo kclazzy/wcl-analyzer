@@ -168,7 +168,7 @@ class FakeRaidClient:
                 "endTime": self.fights[-1]["endTime"] + 60_000, "zone": {"id": 53, "name": "Демо-рейд"},
                 "fights": self.fights,
                 "masterData": {"actors": actors,
-                               "abilities": [{"gameID": k, "name": v, "type": 0} for k, v in ABILITIES.items()]}}
+                               "abilities": [{"gameID": k, "name": v, "type": 1 if k in (MELEE, CRUSH) else 0} for k, v in ABILITIES.items()]}}
 
     def player_details(self, code, fight_id):
         g = self._gen(fight_id, code)

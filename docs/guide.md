@@ -25,6 +25,8 @@
 | Компьютер (Windows 10/11) | [WCL-Analyzer.exe](https://github.com/kclazzy/wcl-analyzer/releases/latest/download/WCL-Analyzer.exe) — 25 МБ | Двойной щелчок. Если Windows пишет «Система Windows защитила ваш компьютер» — «Подробнее» → «Выполнить в любом случае» (у программы нет платной подписи). |
 | Телефон (Android 7 и новее) | [WCL-Analyzer.apk](https://github.com/kclazzy/wcl-analyzer/releases/latest/download/WCL-Analyzer.apk) — 38 МБ | Откройте скачанный файл и разрешите установку из этого источника — обычный шаг для приложений не из Google Play. |
 
+Classic, Classic Anniversary, Season of Discovery и Classic Era: ссылку на отчёт с их сайта (`classic.`, `fresh.`, `sod.`, `vanilla.warcraftlogs.com`) программа понимает сама, ключ тот же. Таблицы кулдаунов программы — по основной игре, поэтому на этих версиях оценки «был готов», «нажато реже» и план танков не считаются (об этом пишет плашка над разбором).
+
 Все версии и список изменений — на странице [выпусков](https://github.com/kclazzy/wcl-analyzer/releases/latest). iPhone не поддерживается.
 
 На компьютере откроется чёрное окно и страница программы в браузере. Чёрное окно не закрывайте, пока пользуетесь: в нём работает программа.

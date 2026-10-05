@@ -135,9 +135,23 @@ def _cleanup() -> None:
 def job_site(params: dict) -> str:
     """Версия игры для разбора: выбрана в списке («Топ прогресса» без лога, план по составу) или по ссылке на отчёт."""
     from .config import SITES, site_of_url
-    if params.get("site") in SITES:
-        return params["site"]
-    return site_of_url(params.get("url"))
+    if params.get("url"):   # есть ссылка на отчёт — версия игры по ней (отчёт лежит только на своём сайте)
+        return site_of_url(params["url"])
+    return params["site"] if params.get("site") in SITES else "www"
+
+
+def diff_size(value, default: int = 5) -> tuple[int, int | None]:
+    """«4» → (4, None); «4:25» → (4, 25): сложность и размер рейда (Classic: 10 и 25 — разные рейтинги)."""
+    a, _, b = str(value if value not in (None, "") else default).partition(":")
+    try:
+        diff = int(a)
+    except ValueError:
+        diff = default
+    try:
+        size = int(b) if b else None
+    except ValueError:
+        size = None
+    return diff, (size if size and 0 < size <= 40 else None)
 
 
 def _site_url(client) -> str:
@@ -285,7 +299,9 @@ def _run_player(job: dict, params: dict, creds, log) -> None:
         job["progress"] = 0.12
         if params.get("against"):
             log("Загружаю лог для сравнения…")
-            other = load_my_log(client, params["against"])
+            from .config import site_of_url
+            oc = client.for_site(site_of_url(params["against"])) if hasattr(client, "for_site") else client
+            other = load_my_log(oc, params["against"])
             tops, label = [other], f"Игрок {other.name}"
         else:
             tops, label = _player_ref(client, me, me.difficulty, params, log, ref_meta)
@@ -733,7 +749,7 @@ def _spell_meta_path() -> str:
 
 
 REF_FIELDS = ("encounter_id", "boss", "cls", "spec", "difficulty", "top_n", "duration", "label", "n_logs",
-              "collected_at")
+              "collected_at", "site")
 
 
 def _run_refresh(job: dict, params: dict, creds, log) -> None:
@@ -747,14 +763,15 @@ def _run_refresh(job: dict, params: dict, creds, log) -> None:
                          "spec": str(r["spec"])[:40], "difficulty": int(r["difficulty"]),
                          "top_n": max(1, min(50, int(r["top_n"]))),
                          "duration": float(r["duration"]) if r.get("duration") else None,
-                         "boss": str(r.get("boss", ""))[:80]})
+                         "boss": str(r.get("boss", ""))[:80], "site": r.get("site") or "www"})
         except (KeyError, TypeError, ValueError):
             continue
     out = []
     for i, r in enumerate(refs):
         log(f"[{i}/{len(refs)}] {r['boss']}: {spec_ru(r['cls'], r['spec'])}, топ-{r['top_n']}…")
         meta: dict = {}
-        collect_reference(client, r["encounter_id"], r["cls"], r["spec"], r["difficulty"], top_n=r["top_n"],
+        rc = client.for_site(r["site"]) if hasattr(client, "for_site") else client   # эталон Classic — с сайта Classic
+        collect_reference(rc, r["encounter_id"], r["cls"], r["spec"], r["difficulty"], top_n=r["top_n"],
                           duration=r["duration"], force=True, log=lambda m: log("  " + m.strip()),
                           meta=meta, max_age_s=_max_age_s(params), save=not SERVER["public"])
         out.append({k: meta.get(k) for k in REF_FIELDS})
@@ -818,7 +835,8 @@ def _run_roster_plan(job: dict, params: dict, creds, log) -> None:
     if params.get("encounter") in (None, "", "all"):
         raise LookupError("Выберите босса — план составляется на одного босса")
     client = _client(creds, job, log, wait=bool(params.get("wait")))
-    R = run_roster_plan(client, int(params["encounter"]), int(params.get("difficulty") or 5), minutes, roster, log=log,
+    diff, size = diff_size(params.get("difficulty"))
+    R = run_roster_plan(client, int(params["encounter"]), diff, minutes, roster, log=log, size=size,
                         progress=lambda x: job.__setitem__("progress", max(job["progress"], min(0.97, x))))
     _excel_bytes(job, f"План_по_составу_{R['info']['boss']}", write_roster_plan_workbook, R)
     job["result"] = {**R, "excel": f"/api/report/{job['id']}"}
@@ -833,7 +851,7 @@ def _basis_text(diff) -> str:
             f"самый ранний по дате среди {FIRST_KILL_PAGES * 100} киллов рейтинга WCL (рейтинга прогресса для этой сложности нет)…")
 
 
-def _progress_cands(client, enc: int, diff: int) -> list[dict]:
+def _progress_cands(client, enc: int, diff: int, size: int | None = None) -> list[dict]:
     """Чей бой показывать. Эпохальная — рейтинг WCL по прогрессу (первые киллы в мире). Для героической и
     обычной сложности такого рейтинга нет — берём самый ранний килл по дате среди FIRST_KILL_PAGES страниц
     рейтинга киллов (basis="first_kill"); дат в ответе нет — самый быстрый килл (basis="fastest")."""
@@ -846,14 +864,15 @@ def _progress_cands(client, enc: int, diff: int) -> list[dict]:
                 "server": srv.get("name"), "region": srv.get("region"), "start": _kill_time(rk)}
 
     # Рейтинг — свежий при каждом запуске (не старше 10 минут): топ прогресса меняется, пока идёт гонка
-    ranks = [] if int(diff or 0) != 5 else [r for r in client.fight_rankings(enc, diff, "progress", max_age_s=600)
+    from .api import size_kw
+    ranks = [] if int(diff or 0) != 5 else [r for r in client.fight_rankings(enc, diff, "progress", max_age_s=600, **size_kw(size))
                                            if (r.get("report") or {}).get("code")]
     if ranks:
         return [cand(rk, i + 1, "progress") for i, rk in enumerate(ranks[:10])]
     pool = []
     for page in range(1, FIRST_KILL_PAGES + 1):
         try:
-            got = client.fight_rankings(enc, diff, "speed", page=page, max_age_s=600)
+            got = client.fight_rankings(enc, diff, "speed", page=page, max_age_s=600, **size_kw(size))
         except Exception:  # noqa: BLE001 — следующая страница не обязательна
             break
         pool += [r for r in got if (r.get("report") or {}).get("code")]
@@ -913,6 +932,11 @@ def _progress_one(job, client, cands: list[dict], params: dict, log, lo: float, 
     raise LookupError(f"Логи первых гильдий недоступны — проверено мест: {len(tried)}. {places}.{hint}")
 
 
+def _fight_size(client, f: dict) -> int | None:
+    """Размер рейда для рейтинга — только на Classic (в основной игре размер гибкий, отбор по нему пустой)."""
+    return f.get("size") if getattr(client, "site", "www") != "www" else None
+
+
 def _run_top_progress(job: dict, params: dict, creds, log) -> None:
     """«Топ прогресса»: бой гильдии, первой убившей этого босса на этой сложности (рейтинг WCL по прогрессу),
     разобранный как обычный бой рейда — урон, сейвы и кто какие кулдауны жал, смерти, состав. Без сравнения
@@ -936,17 +960,17 @@ def _run_top_progress(job: dict, params: dict, creds, log) -> None:
                      if str(z["id"]) == str(params["zone"])), None)
         if not zone:
             raise LookupError("Рейд не найден в Warcraft Logs — обновите страницу и выберите снова")
-        diff = int(params.get("difficulty") or 5)
+        diff, size = diff_size(params.get("difficulty"))
         encs = zone["encounters"] if params.get("encounter") in (None, "", "all") else \
             [e for e in zone["encounters"] if str(e["id"]) == str(params["encounter"])]
         if not encs:
             raise LookupError("Босс не найден в этом рейде")
-        bosses = [(int(e["id"]), diff, e["name"]) for e in encs]
+        bosses = [(int(e["id"]), diff, e["name"], size) for e in encs]
         if len(bosses) > 1:
             return _run_top_progress_all(job, params, client, bosses, zone["name"], log)
-        enc, _, name = bosses[0]
+        enc, _, name, _ = bosses[0]
         log(f"{name} ({DIFFICULTY_NAMES.get(diff, '')}): ищу первый килл — " + _basis_text(diff))
-        cands = _progress_cands(client, enc, diff)
+        cands = _progress_cands(client, enc, diff, size)
         if not cands:
             raise LookupError(f"{name}: на этой сложности пока нет киллов в рейтингах Warcraft Logs")
         job["progress"] = 0.1
@@ -966,14 +990,14 @@ def _run_top_progress(job: dict, params: dict, creds, log) -> None:
             k = (int(f["encounterID"]), int(f.get("difficulty") or 0))
             if k not in seen:
                 seen.add(k)
-                bosses.append((k[0], k[1], f.get("name", "")))
+                bosses.append((k[0], k[1], f.get("name", ""), _fight_size(client, f)))
         title = (report.get("zone") or {}).get("name") or report.get("title") or "Все боссы"
         return _run_top_progress_all(job, params, client, bosses, title, log)
     fid = params.get("fight") if params.get("fight") not in (None, "") else url_fight
     f = next((f for f in fights if str(f["id"]) == str(fid)), None) or fights[-1]
     enc, diff = int(f["encounterID"]), int(f.get("difficulty") or 0)
     log(f"{f.get('name')} ({DIFFICULTY_NAMES.get(diff, '')}): ищу первый килл — " + _basis_text(diff))
-    cands = _progress_cands(client, enc, diff)
+    cands = _progress_cands(client, enc, diff, _fight_size(client, f))
     if not cands:
         raise LookupError("У этого босса на этой сложности пока нет киллов в рейтингах Warcraft Logs")
     job["progress"] = 0.1
@@ -991,7 +1015,7 @@ def _run_top_progress_all(job: dict, params: dict, client, bosses: list[tuple], 
     from .excel_raid import write_raid_workbook
     multi = len({b[1] for b in bosses}) > 1
     order = [f"b{i}" for i in range(len(bosses))]
-    titles = {f"b{i}": name + (f" ({DIFFICULTY_NAMES.get(d, '')[:4]}.)" if multi else "") for i, (_, d, name) in enumerate(bosses)}
+    titles = {f"b{i}": name + (f" ({DIFFICULTY_NAMES.get(d, '')[:4]}.)" if multi else "") for i, (_, d, name, *_r) in enumerate(bosses)}
     parts, errors, writers = {}, {}, []
     log(f"Боссов: {len(bosses)}. На каждого — бой гильдии с первым киллом в мире.")
 
@@ -1002,13 +1026,14 @@ def _run_top_progress_all(job: dict, params: dict, client, bosses: list[tuple], 
                 "kinds": {k: "raid" for k in order}, "queued": [k for k in order if k not in parts and k not in errors and k != pending],
                 "excel": f"/api/report/{job['id']}",
                 "params": {"mode": "progress", "url": params.get("url"), "fight": "all", "zone": params.get("zone"),
+                           "site": job.get("site"),
                            "encounter": params.get("encounter"), "difficulty": params.get("difficulty")}}
-    for i, (enc, diff, name) in enumerate(bosses):
+    for i, (enc, diff, name, size) in enumerate(bosses):
         key, lo = order[i], i / len(bosses)
         job["partial"], job["partial_v"] = combined(pending=key), job.get("partial_v", 0) + 1
         log(f"[{i + 1}/{len(bosses)}] {name} ({DIFFICULTY_NAMES.get(diff, '')})")
         try:
-            cands = _progress_cands(client, enc, diff)
+            cands = _progress_cands(client, enc, diff, size)
             if not cands:
                 raise LookupError("на этой сложности пока нет киллов в рейтингах Warcraft Logs")
             R = _progress_one(job, client, cands, params, lambda m: log("  " + m), lo, lo + 1 / len(bosses), difficulty=diff)

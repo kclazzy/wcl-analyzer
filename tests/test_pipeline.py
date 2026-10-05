@@ -461,6 +461,17 @@ def test_tank_analysis():
     from wcl_analyzer.raid import run_raid
     from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
     from wcl_analyzer import raid_tank as rt
+    import json as _json
+    from wcl_analyzer import game_data
+    orig_data = game_data._DATA   # таблица из сборки: копия в репозитории может обновиться позже
+    game_data._DATA = _json.loads(game_data.BUNDLED.read_text(encoding="utf-8"))
+    try:
+        _tank_checks(rt, run_raid, FakeRaidClient, DEMO_URL, tempfile, Path, load_workbook, write_raid_workbook)
+    finally:
+        game_data._DATA = orig_data
+
+
+def _tank_checks(rt, run_raid, FakeRaidClient, DEMO_URL, tempfile, Path, load_workbook, write_raid_workbook):
     R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
     T = R["extras"]["tank"]
     assert [b["name"] for b in T["busters"]] == ["Сокрушение"], T["busters"]
@@ -468,12 +479,14 @@ def test_tank_analysis():
     assert (b["n"], b["covered"]) == (8, 5), b
     bare = [e for e in T["events"] if not e["covered"]]
     assert [(e["time"], e["tank"]) for e in bare] == [("1:45", "Гронвальд"), ("3:45", "Сайрена"), ("4:25", "Гронвальд")], bare
-    assert bare[0]["ready"] == ["Ни шагу назад"], bare[0]
+    assert bare[0]["ready"] == ["Ни шагу назад"] and bare[0]["held"] == ["Ни шагу назад"] and not bare[0]["bare"], bare[0]
+    assert [e["time"] for e in T["events"] if e["bare"]] == ["3:45", "4:25"]   # 1:45 — держал под следующий удар
     gs = next(e for e in T["events"] if e["time"] == "5:05")
     assert gs["covered"] and gs["ext"][0]["from"] == "Элария", gs
     assert T["top"]["abilities"]["900001"]["share"] == 1.0
     hints = " | ".join(T["hints"])
-    assert "у лучших киллов — 100%" in hints and "1:45 «Сокрушение», Гронвальд — Ни шагу назад" in hints, hints
+    assert "у лучших киллов — 100%" in hints and "4:25 «Сокрушение», Гронвальд — Глухая оборона" in hints, hints
+    assert "Антимагический панцирь" not in hints, "против физического удара магическая защита не предлагается"
     assert any("вкладке «Танки»" in x for x in R["brief"]), R["brief"]
     assert all(r["pick"] for r in T["plan"]) and "{spell:871}" in T["mrt"] and "→" in T["mrt"], T["mrt"]
     assert not any(c["id"] in (871, 55233, 47788) for c in R["extras"]["raid_cds"]), "кулдауны танков — не рейдовые сейвы"
@@ -507,7 +520,46 @@ def test_tank_analysis():
     assert ev["1:30"]["ext"] and ev["1:30"]["ext"][0]["from"] == "Disc"
     assert ev["2:30"]["died"] and not ev["2:30"]["covered"] and "Ни шагу назад" in ev["2:30"]["ready"], ev["2:30"]
     assert T["key"] and T["key"].startswith("Танк Tank умер от «Big Smash»"), T["key"]
-    print("OK танки: танкбастеры, прикрыт ли удар, смерть от удара, лучшие киллы, план и заметка MRT, лист Excel")
+
+    # Тики каждые 2,5 с не склеиваются в один огромный удар; снятие баффа без наложения — не «с начала боя»;
+    # удар по двум танкам — две строки; два номера GoAK — один откат; заряды — по нажатиям; адды — не бастеры;
+    # на Classic — без «был готов» и плана; план: крупные удары первыми, комбо — одним кулдауном
+    def run(taken, casts=(), buffs=(), extra=None, site="www"):
+        r = {"fight": {"name": "X"}, "taken": taken, "casts": list(casts), "tank_buffs": list(buffs), "deaths": [],
+             "site": site, "report": {"masterData": {"actors": [{"id": 100, "subType": "Boss"}, {"id": 200, "subType": "NPC"}],
+                                                     "abilities": [{"gameID": 5000, "type": "1"}, {"gameID": 6000, "type": "32"}]}},
+             **(extra or {})}
+        return rt.tank_analysis(r, players, lambda x: x, lambda ev: ev["timestamp"] / 1000,
+                                lambda ab: names.get(ab, f"Spell {ab}"), 300.0, [], [])
+    melee = [hit(t, 1, 1, 100_000) for t in range(0, 300, 2)]
+    ticks = [hit(10 + 2.5 * i, 1, 7000, 150_000) for i in range(40)]
+    assert not run(melee + ticks)["busters"], "тики не склеиваются в танкбастер"
+    T = run(melee + [hit(50, 1, 5000, 900_000)],
+            buffs=[{"timestamp": ms(200), "type": "removebuff", "sourceID": 1, "targetID": 1, "abilityGameID": 871}])
+    assert not T["events"][0]["covered"], "снятие без наложения не растягивает бафф на весь бой"
+    T = run(melee + [hit(50, 1, 5000, 900_000), hit(51, 2, 5000, 900_000)])
+    assert sorted(e["tank"] for e in T["events"]) == ["Tank", "Tank2"]
+    add = [{**hit(40 + 30 * i, 1, 8000, 900_000), "sourceID": 200} for i in range(5)]
+    assert not run(melee + add)["busters"], "удары аддов — не танкбастеры"
+    T = run(melee + [hit(50, 2, 5000, 900_000), hit(150, 2, 5000, 900_000)],
+            casts=[{"timestamp": ms(49), "type": "cast", "sourceID": 2, "abilityGameID": 212641}])
+    second = next(e for e in T["events"] if e["time"] == "2:30")
+    assert "Защитник древних королей" not in second["ready"], "два номера GoAK — один откат"
+    T = run(melee + [hit(50, 1, 6000, 900_000)])
+    assert "Отражение заклинаний" not in T["events"][0]["ready"]   # 25 с — не «крупный» кулдаун
+    T = run(melee + [hit(40, 1, 5000, 900_000), hit(70, 1, 5000, 900_000)],
+            casts=[{"timestamp": ms(39), "type": "cast", "sourceID": 1, "abilityGameID": 871},
+                   {"timestamp": ms(69), "type": "cast", "sourceID": 1, "abilityGameID": 871}])
+    assert T["_eff"]["1:871"][1] == 2, "два нажатия Глухой обороны за 30 с — два заряда"
+    T = run(melee + [hit(50, 1, 5000, 900_000)], site="classic")
+    assert T["events"] and not T["events"][0]["ready"] and not T["plan"] and not T["mrt"]
+    assert any("по основной игре" in h for h in T["hints"])
+    T = run(melee + [hit(60, 1, 5000, 400_000), hit(120, 1, 5000, 1_500_000), hit(121.5, 1, 6000, 1_200_000)])
+    first = {r["time"]: r for r in T["plan"]}
+    assert first["2:00"]["pick"]["name"] == "Глухая оборона" and first["2:02"]["why"] == "тот же кулдаун", T["plan"]
+    assert first["1:00"]["pick"]["name"] == "Ни шагу назад", "крупный удар — первым; меньшему — другой кулдаун"
+    print("OK танки: танкбастеры, прикрыт ли удар, смерть от удара, лучшие киллы, план и заметка MRT, лист Excel; "
+          "тики, адды, два танка, общий откат, заряды, школа урона, Classic")
 
 
 def test_save_dir_full_path():
@@ -877,7 +929,27 @@ def test_game_versions():
                 return [{"report": {"code": "CLASSIC00001", "fightID": 2}, "guild": {"name": "G"}}]
         c = web._progress_cands(Q(), 1, 4)
         assert c[0]["url"].startswith("https://classic.warcraftlogs.com/reports/") and all(a == 600 for a in calls), (c, calls)
+    # ссылка важнее выбора в списке; сложность с размером рейда; размер — в рейтинг; эталоны версий не путаются
+    assert web.job_site({"site": "www", "url": "https://classic.warcraftlogs.com/reports/X"}) == "classic"
+    assert web.diff_size("4:25") == (4, 25) and web.diff_size("5") == (5, None) and web.diff_size("x:99") == (5, None)
+    got = {}
+
+    class Q2(Q):
+        def fight_rankings(self, enc, diff, metric="speed", page=1, max_age_s=None, size=None):
+            got["size"] = size
+            return []
+    web._progress_cands(Q2(), 1, 4, 25)
+    assert got["size"] == 25
+    from wcl_analyzer import settings
+    assert settings.ref_key(1, "Mage", "Fire", 3, 10) == "1:Mage:Fire:3:10"
+    assert settings.ref_key(1, "Mage", "Fire", 3, 10, "sod") == "1:Mage:Fire:3:10:sod"
+    from wcl_analyzer.api import pick_raid_zones
+    zs = pick_raid_zones([{"id": 1, "name": "Raid (Beta)", "expansion": {"id": 12}, "difficulties": [{"id": 5}], "encounters": [{"id": 1, "name": "A"}]},
+                          {"id": 2, "name": "Real Raid", "expansion": {"id": 11}, "difficulties": [{"id": 3, "sizes": [10, 25]}], "encounters": [{"id": 2, "name": "B"}]}])
+    assert [z["name"] for z in zs] == ["Real Raid"] and zs[0]["difficulties"][0]["sizes"] == [10, 25], zs
     html = (Path(__file__).resolve().parents[1] / "wcl_analyzer" / "web" / "index.html").read_text(encoding="utf-8")
+    src = (Path(__file__).resolve().parents[1] / "wcl_analyzer" / "web.py").read_text(encoding="utf-8")
+    assert '"site": job.get("site")' in src, "«Продолжить» в топе прогресса помнит версию игры"
     assert 'id="tpSite"' in html and 'id="rpSite"' in html and 'api("/api/zones", {site})' in html
     print("OK версии игры: Classic, SoD и др. — свой сайт и API, ключ общий, свежий список рейдов")
 

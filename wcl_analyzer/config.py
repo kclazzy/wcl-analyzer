@@ -12,8 +12,8 @@ SITE_URL = "https://www.warcraftlogs.com"
 # Порядок — как в списке «Версия игры».
 SITES = {
     "www": "Retail — основная игра",
-    "classic": "Classic — прогрессия (classic.warcraftlogs.com)",
-    "fresh": "Classic Anniversary / Fresh (fresh.warcraftlogs.com)",
+    "classic": "Classic — прогрессия, Mists of Pandaria (classic.warcraftlogs.com)",
+    "fresh": "Classic Anniversary — TBC (fresh.warcraftlogs.com)",
     "sod": "Season of Discovery (sod.warcraftlogs.com)",
     "vanilla": "Classic Era / Hardcore (vanilla.warcraftlogs.com)",
 }

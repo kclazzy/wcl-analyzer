@@ -22,7 +22,8 @@ def _client():
 
 def _run_job(runner, params: dict, creds) -> dict:
     """Командная строка запускает те же задачи, что и приложение (web.py), — один код на всё."""
-    job = {"id": "cli", "progress": 0.0, "log": [], "state": "running"}
+    from .web import job_site
+    job = {"id": "cli", "progress": 0.0, "log": [], "state": "running", "site": job_site(params)}
     runner(job, params, creds, lambda m: print(m, flush=True))
     return job
 
@@ -69,7 +70,9 @@ def cmd_compare(a):
     creds = _creds()
     actor = None
     if a.player:  # имя персонажа → номер игрока в отчёте
-        insp = inspect_report(web.CLIENT_FACTORY(creds), a.url, a.fight)
+        from .config import site_of_url
+        cl = web.CLIENT_FACTORY(creds)
+        insp = inspect_report(cl.for_site(site_of_url(a.url)) if hasattr(cl, "for_site") else cl, a.url, a.fight)
         actor = next((p["id"] for p in insp["players"] if p["name"].lower() == a.player.lower()), None)
         if actor is None:
             raise ValueError(f"В бою нет игрока {a.player}")

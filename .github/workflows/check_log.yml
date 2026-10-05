@@ -1,0 +1,24 @@
+name: check-log
+on:
+  push:
+    branches: [debug/log]
+permissions:
+  contents: write
+jobs:
+  log:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt
+      - name: Разбор лога
+        env:
+          WCL_CLIENT_ID: ${{ secrets.WCL_CLIENT_ID }}
+          WCL_CLIENT_SECRET: ${{ secrets.WCL_CLIENT_SECRET }}
+          WCL_GAME_DATA: bundled
+        run: python tools/check_log.py "$(cat debug_url.txt)" || true
+      - name: commit
+        run: |
+          git config user.name bot; git config user.email bot@users.noreply.github.com
+          git add debug_log_out.json && git commit -m "log" && git push

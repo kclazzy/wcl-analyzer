@@ -458,7 +458,9 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
             pot_cast[src] += 1
         elif HEALTHSTONE_RE.search(name):
             hs_cast[src] += 1
-    pot_from_details = any(p["potions"] is not None for p in players.values())
+    # playerDetails бывает с нулём зелий у всех (новые зелья Warcraft Logs не считает) — тогда берём касты;
+    # у игрока — большее из двух (пре-пот виден только в playerDetails)
+    pot_from_details = any((p["potions"] or 0) > 0 for p in players.values())
 
     kicks, disp = Counter(), Counter()
     for ev in raw.get("interrupts", []):
@@ -574,8 +576,8 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
             "parse": ranks.get(p["name"], ranks.get(pid)),
             "deaths": sum(1 for d in deaths if d["id"] == pid),
             "first_death": _r(first_death.get(pid)),
-            "potions": p["potions"] if pot_from_details else pot_cast.get(pid, 0),
-            "healthstones": p["healthstones"] if p["healthstones"] is not None else hs_cast.get(pid, 0),
+            "potions": max(p["potions"] or 0, pot_cast.get(pid, 0)),
+            "healthstones": max(p["healthstones"] or 0, hs_cast.get(pid, 0)),
             "interrupts": kicks.get(pid, 0), "dispels": disp.get(pid, 0),
             "taken": round(sum(d for d, _ in per.values())), "selective": round(sel),
             "top_selective": {"name": nm(top_sel[0]), "damage": round(top_sel[1]), "hits": top_sel[2]} if top_sel else None,

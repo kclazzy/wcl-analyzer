@@ -112,28 +112,43 @@ def _get(url: str, timeout: float = 30) -> bytes:
     return r.content
 
 
+def _offline(e: Exception) -> bool:
+    """Нет связи (нет интернета, адрес не найден, тайм-аут) — а не ответ сервера с ошибкой."""
+    import requests
+    return isinstance(e, (requests.ConnectionError, requests.Timeout))
+
+
 def latest_info() -> dict:
-    """Последняя сборка: с GitHub (файл выпуска или API), а если GitHub недоступен — через jsDelivr."""
-    errors = []
+    """Последняя сборка: с GitHub (файл выпуска или API), а если GitHub недоступен — через jsDelivr.
+    Вся проверка укладывается в ~25 с: без интернета страница сразу получает понятный ответ."""
+    errors, offline = [], []
     try:
-        return {**json.loads(_get(BASE + "update.json", 15)), "source": "github"}
+        return {**json.loads(_get(BASE + "update.json", 8)), "source": "github"}
     except Exception as e:  # noqa: BLE001
         errors.append(f"github.com — {_why(e)}")
+        offline.append(_offline(e))
+    if not offline[-1]:   # github.com отвечает, но файла нет — пробуем API; нет связи с GitHub вовсе — сразу зеркало
+        try:
+            rel = json.loads(_get(API, 8))
+            m = re.search(r"<!--update (\{.*?\}) -->", rel.get("body") or "", re.S)
+            if m:
+                return {**json.loads(m.group(1)), "tag": rel.get("tag_name"), "source": "api"}
+            errors.append("api.github.com — в выпуске нет данных о версии")
+            offline.append(False)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"api.github.com — {_why(e)}")
+            offline.append(_offline(e))
     try:
-        rel = json.loads(_get(API, 15))
-        m = re.search(r"<!--update (\{.*?\}) -->", rel.get("body") or "", re.S)
-        if m:
-            return {**json.loads(m.group(1)), "tag": rel.get("tag_name"), "source": "api"}
-        errors.append("api.github.com — в выпуске нет данных о версии")
-    except Exception as e:  # noqa: BLE001
-        errors.append(f"api.github.com — {_why(e)}")
-    try:
-        ver = json.loads(_get(JSD_DATA + "/resolved?specifier=latest", 15))["version"]
-        texts = [_get(f"{JSD_CDN}@{ver}/{f}", 15) for f in SHELL_FILES]
+        ver = json.loads(_get(JSD_DATA + "/resolved?specifier=latest", 8))["version"]
+        texts = [_get(f"{JSD_CDN}@{ver}/{f}", 8) for f in SHELL_FILES]
         return {"build": _num(str(ver).split(".")[-1]), "shell": shell_fingerprint(texts), "tag": ver,
                 "source": "jsdelivr"}
     except Exception as e:  # noqa: BLE001
         errors.append(f"jsdelivr.net — {_why(e)}")
+        offline.append(_offline(e))
+    if all(offline):
+        raise UpdateError("Нет связи с интернетом — проверить обновления не получилось. "
+                          "Подключитесь к сети и нажмите «Проверить обновления» ещё раз.")
     raise UpdateError("Сервер обновлений недоступен с этого устройства: " + "; ".join(errors))
 
 

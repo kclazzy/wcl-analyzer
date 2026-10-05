@@ -330,7 +330,31 @@ def test_restart_script():
     print("OK перезапуск .exe: русские пути и ограничение попыток замены")
 
 
+def test_check_offline_message():
+    """Нет интернета — понятное «нет связи с интернетом», без упоминания Warcraft Logs, и без долгих повторов."""
+    import requests
+    from wcl_analyzer import update
+    calls = []
+
+    def off(url, timeout=30):
+        calls.append(url)
+        raise requests.ConnectionError("no net")
+    orig = update._get
+    update._get = off
+    try:
+        try:
+            update.latest_info()
+            raise AssertionError("ожидалась ошибка")
+        except update.UpdateError as e:
+            assert "интернет" in str(e) and "Warcraft" not in str(e), e
+        assert len(calls) == 2, calls   # github.com недоступен → api.github.com не пробуем, сразу зеркало
+    finally:
+        update._get = orig
+    print("OK проверка обновлений без интернета: понятное сообщение, без лишних попыток")
+
+
 if __name__ == "__main__":
+    test_check_offline_message()
     test_apply_code_skips_old_and_keeps_running_dir()
     test_zip_escape_rejected()
     test_failed_build_not_retried()

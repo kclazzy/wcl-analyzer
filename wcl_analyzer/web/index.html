@@ -581,12 +581,12 @@ function authHeaders(extra={}){
   if (KEY && KEY.id && KEY.s) { h["X-WCL-Id"] = KEY.id; h["X-WCL-Secret"] = KEY.s; }
   return h;
 }
-async function api(path, body, timeoutS = 120){
+async function api(path, body, timeoutS = 120, slowMsg){
   /* Без ответа дольше timeoutS — показываем ошибку, а не крутим «Ищу…» бесконечно */
   const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), timeoutS * 1000);
   let r;
   try { r = await fetch(path, {...(body ? {method:"POST", headers:authHeaders({"Content-Type":"application/json"}), body:JSON.stringify(body)} : {headers:authHeaders()}), signal: ctl.signal}); }
-  catch(e){ throw new Error(e.name === "AbortError" ? "Warcraft Logs долго не отвечает. Попробуйте ещё раз через минуту." : "Нет связи с программой. Проверьте, что она запущена."); }
+  catch(e){ throw new Error(e.name === "AbortError" ? (slowMsg || "Warcraft Logs долго не отвечает. Попробуйте ещё раз через минуту.") : "Нет связи с программой. Проверьте, что она запущена."); }
   finally { clearTimeout(tm); }
   let data; try { data = await r.json(); } catch { data = {error: `Ошибка сервера (${r.status})`}; }
   if (!r.ok) { const e = new Error(data.error || "Ошибка"); e.needKey = data.need_key; throw e; }
@@ -2407,7 +2407,7 @@ async function initUpdates(){
 async function checkUpdates(silent){
   const msg = $("#updMsg"); if (!silent) msg.textContent = "Проверяю…";
   try {
-    UPD = await api("/api/update/check", {}, 30);
+    UPD = await api("/api/update/check", {}, 40, "Сервер обновлений не отвечает — проверьте подключение к интернету и попробуйте позже.");
     try { localStorage.setItem("wclUpdCheck", String(Date.now())); } catch(e){}
   } catch(e){ if (!silent) msg.textContent = "Не удалось проверить: " + e.message; return; }
   $("#updPill").hidden = !UPD.available;
@@ -2426,7 +2426,7 @@ $("#updPill").onclick = () => { $("#appFoot").scrollIntoView({behavior:"smooth"}
 $("#updApply").onclick = async () => {
   const b = $("#updApply"), msg = $("#updMsg"); b.disabled = true; msg.textContent = "Скачиваю обновление…";
   try {
-    const r = await api("/api/update/apply", {kind: UPD && UPD.kind}, 600);
+    const r = await api("/api/update/apply", {kind: UPD && UPD.kind}, 600, "Обновление долго не скачивается — проверьте подключение к интернету и попробуйте ещё раз.");
     msg.textContent = r.ok ? `Готово. ${r.restart || ""}` : r.up_to_date ? (r.error || "У вас последняя версия.")
       : r.error ? "Не удалось обновить: " + r.error
       : "Откройте страницу выпусков и скачайте новую версию: " + (r.url || "https://github.com/kclazzy/wcl-analyzer/releases/latest");

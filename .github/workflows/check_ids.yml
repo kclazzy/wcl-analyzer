@@ -1,7 +1,7 @@
-name: check-ids2
+name: check-ids3
 on:
   push:
-    branches: [debug/ids2]
+    branches: [debug/ids3]
 permissions:
   contents: write
 jobs:
@@ -29,10 +29,15 @@ jobs:
                       out.append(f"{i}\t{loc}\tERR {e}")
           for n in open("debug_names.txt").read().splitlines():
               try:
-                  t = get("https://www.wowhead.com/search?q=" + urllib.parse.quote(n))
-                  ids = re.findall(r'"id":(\d+),[^{}]*?"name":"' + re.escape(n) + '"', t)[:6]
-                  ids2 = re.findall(r'/spell=(\d+)/[a-z0-9-]*' + re.escape(n.lower().replace(" ", "-")), t)[:6]
-                  out.append(f"NAME {n}: {ids} {ids2}")
+                  for base in ("https://nether.wowhead.com/search/suggestions-template?q=", "https://www.wowhead.com/search/suggestions-template?q="):
+                      try:
+                          t = get(base + urllib.parse.quote(n))
+                          d = json.loads(t)
+                          res = [(r.get("id"), r.get("name"), r.get("typeName") or r.get("type")) for r in d.get("results", []) if str(r.get("type")) in ("6", "spell") or r.get("typeName") == "Spell"][:8]
+                          out.append(f"NAME {n} [{base[:20]}]: {res}")
+                          break
+                      except Exception as e:
+                          out.append(f"NAME {n} [{base[:20]}]: ERR {e}")
               except Exception as e:
                   out.append(f"NAME {n}: ERR {e}")
           open("debug_ids_out.txt", "w").write("\n".join(out))

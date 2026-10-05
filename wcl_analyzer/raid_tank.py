@@ -29,6 +29,7 @@ PRESS_LEAD_S = 1.5     # в заметке MRT — нажать за 1,5 с до
 MAX_BUSTERS = 5
 GUIDE_TYPES = {"tankbuster", "tankmechanic", "tankcombo", "tankbustersolo", "tankbustersoak", "tankbolt",
                "tankdebuff", "tankswap", "tanksoaks"}
+last_candidates: list = []   # кандидаты в танкбастеры последнего разбора — для проверки порогов
 MELEE_RE = re.compile(r"^(melee|ближний бой|атака ближнего боя|auto attack|автоатака)$", re.I)
 
 
@@ -138,6 +139,8 @@ def tank_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, phases: 
     guide = _guide_busters(((raw.get("fight") or {}).get("name")))
 
     busters = []
+    last_candidates.clear()
+    last_candidates.append({"base": round(base), "use_un": use_un, "melee_n": len(melee), "boss_ids": len(boss_ids)})
     for ab, hs in hits.items():
         if tot_by_ab[ab] <= 0 or tank_by_ab[ab] / tot_by_ab[ab] < 0.7:
             continue
@@ -168,6 +171,8 @@ def tank_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, phases: 
             ok = not base or med >= GUIDE_X * base
         else:
             ok = bool(base) and med >= BUSTER_X * base and len(occ) <= max(1, dur / 8)
+        last_candidates.append({"name": name, "sure": sure, "ratio": round(med / base, 2) if base else None,
+                                "n": len(occ), "ok": ok, "total": round(tank_by_ab[ab]), "boss": boss_by_ab[ab] >= 0.5 * tank_by_ab[ab]})
         if ok:
             busters.append({"id": ab, "name": name, "sure": sure, "occ": occ, "total": tank_by_ab[ab],
                             "school": schools.get(ab, 0)})

@@ -75,12 +75,31 @@ def parse_tooltip(data: dict) -> dict | None:
     return {"name": html.unescape(data["name"]).strip(), "desc": shorten(clean(desc))}
 
 
+def _get_json(url: str, timeout: float):
+    """JSON по адресу. Через requests с сертификатами certifi — как запросы к Warcraft Logs: в Android-приложении
+    у стандартного urllib нет списка корневых сертификатов, и HTTPS к Wowhead там молча не работал."""
+    try:
+        import requests
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=timeout)
+        r.raise_for_status()
+        return r.json()
+    except ImportError:
+        pass
+    import ssl
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = ssl.create_default_context()
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
 def fetch(spell_id, timeout: float = 8) -> dict | None:
     """Подсказка с Wowhead (без кэша). None — не нашлось или нет связи."""
     try:
-        req = urllib.request.Request(TOOLTIP.format(id=int(spell_id)), headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return parse_tooltip(json.loads(r.read().decode("utf-8", "replace")))
+        return parse_tooltip(_get_json(TOOLTIP.format(id=int(spell_id)), timeout))
     except Exception:  # noqa: BLE001 — описание необязательно
         return None
 

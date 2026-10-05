@@ -316,6 +316,25 @@ def test_cache_prune():
     print("OK кэш WCL: сжатие, удаление старого (3 недели) и лишнего (лимит), эталоны не трогаются")
 
 
+def test_wowhead_uses_requests():
+    """Описание с Wowhead скачивается через requests (сертификаты certifi), как запросы к Warcraft Logs:
+    в Android-приложении у urllib нет корневых сертификатов, и описания на телефоне не подтягивались."""
+    from unittest import mock
+    from wcl_analyzer import wowhead
+
+    class R:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"name": "Волна", "tooltip": "<table><tr><td>x</td></tr></table><table><tr><td>Наносит урон всем.</td></tr></table>"}
+    with mock.patch("requests.get", return_value=R()) as g, \
+            mock.patch("urllib.request.urlopen", side_effect=AssertionError("urllib без сертификатов")):
+        assert wowhead.fetch(4321) == {"name": "Волна", "desc": "Наносит урон всем."}
+        assert "spell/4321" in g.call_args[0][0]
+    print("OK Wowhead: описания скачиваются через requests с сертификатами — работает и на телефоне")
+
+
 def test_save_dir_full_path():
     """«Куда сохранять файлы» на компьютере: «Загрузки» — полным путём, выбранная папка — полным путём."""
     from pathlib import Path
@@ -826,6 +845,7 @@ if __name__ == "__main__":
     test_plan_press_times()
     test_roster_plan()
     test_save_dir_full_path()
+    test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()
     test_saves_all_bosses()

@@ -1,64 +1,26 @@
-167105	0	Colossus Smash	45 sec cooldown	
-167105	7	Удар колосса	Восстановление: 45 сек	
-262161	0	Warbreaker	45 sec cooldown	
-262161	7	Миротворец	Восстановление: 45 сек	
-436358	0	Demolish	30 sec cooldown	
-436358	7	Разрушение	Восстановление: 30 сек	
-228920	0	Ravager	1.5 min cooldown	
-228920	7	Опустошитель	Восстановление: 1.5 мин	
-376079	0	Champion's Spear	1.5 min cooldown	
-376079	7	Копье защитника	Восстановление: 1.5 мин	
+391528	0	Convoke the Spirits	2 min cooldown	
+391528	7	Созыв духов	Восстановление: 2 мин	
+466904	0	Harrier's Cry	6 min cooldown	
+466904	7	Крик загонщика	Восстановление: 6 мин	
 63560	0	Dark Transformation	-	
 63560	7	Темное превращение	-	
-455395	0	ERR HTTP Error 404: Not Found
-455395	7	ERR HTTP Error 404: Not Found
-279302	0	Frostwyrm's Fury	1.5 min cooldown	
-279302	7	Ярость ледяного змея	Восстановление: 1.5 мин	
-383269	0	Graveyard	-	
-383269	7	Кладбище	-	
-386997	0	Soul Rot	1 min cooldown	
-386997	7	Гниение души	Восстановление: 1 мин	
-442726	0	Malevolence	1 min cooldown	
-442726	7	Зловредность	Восстановление: 1 мин	
-360966	0	Spearhead	1.5 min cooldown	
-360966	7	Острие копья	Восстановление: 1.5 мин	
-84714	0	Frozen Orb	1 min cooldown	
-84714	7	Ледяной шар	Восстановление: 1 мин	
-51690	0	Killing Spree	3 min cooldown	
-51690	7	Череда убийств	Восстановление: 3 мин	
-357210	0	Deep Breath	2 min cooldown	
-357210	7	Глубокий вдох	Восстановление: 2 мин	
-404977	0	Time Skip	3 min cooldown	
-404977	7	Пропустить время	Восстановление: 3 мин	
-343527	0	Execution Sentence	1 min cooldown	
-343527	7	Смертный приговор	Восстановление: 1 мин	
-255937	0	Wake of Ashes	30 sec cooldown	
-255937	7	Испепеляющий след	Восстановление: 30 сек	
-384631	0	Flagellation	1.5 min cooldown	
-384631	7	Флагелляция	Восстановление: 1.5 мин	
-383410	0	Celestial Alignment	3 min cooldown	
-383410	7	Парад планет	Восстановление: 3 мин	
-390414	0	Incarnation: Chosen of Elune	3 min cooldown	
-390414	7	Воплощение: избранный Элуны	Восстановление: 3 мин	
-446035	0	Bladestorm	1.5 min cooldown	
-446035	7	Вихрь клинков	Восстановление: 1.5 мин	
-31884	0	Avenging Wrath	2 min cooldown	
-31884	7	Гнев карателя	Восстановление: 2 мин	
-231895	0	Avenging Wrath	2 min cooldown	
-231895	7	Гнев карателя	Восстановление: 2 мин	
-191427	0	Metamorphosis	2 min cooldown	
-191427	7	Метаморфоза	Восстановление: 2 мин	
-42650	0	Army of the Dead	1.5 min cooldown	
-42650	7	Войско мертвых	Восстановление: 1.5 мин	
-51271	0	Pillar of Frost	45 sec cooldown	
-51271	7	Ледяной столп	Восстановление: 45 сек	
-137639	0	Storm, Earth, and Fire	1.5 min recharge	2 Charges
-137639	7	Буря, земля и огонь	-	
-185313	0	Shadow Dance	20 sec cooldown	
-185313	7	Танец теней	Восстановление: 20 сек	
-212283	0	Symbols of Death	30 sec cooldown	
-212283	7	Символы смерти	Восстановление: 30 сек	
-NAME Void Metamorphosis: ERR HTTP Error 403: Forbidden
-NAME Collapsing Star: ERR HTTP Error 403: Forbidden
-NAME Void Ray: ERR HTTP Error 403: Forbidden
-NAME The Hunt: ERR HTTP Error 403: Forbidden
+444995	0	Surging Totem	25 sec cooldown	
+444995	7	Пульсирующий тотем	Восстановление: 25 сек	
+1217605	0	Void Metamorphosis	-	
+1217605	7	Метаморфоза Бездны	-	
+442294	0	Reaver's Glaive	-	
+442294	7	Клинок разорителя	-	
+370965	0	The Hunt	1.5 min cooldown	
+370965	7	Охота	Восстановление: 1.5 мин	
+442501	0	Woven Ironblast	5 sec cooldown	
+442501	7	Стальной паутинный заряд	Восстановление: 5 сек	
+NAME Void Metamorphosis [https://nether.wowhe]: ERR HTTP Error 404: Not Found
+NAME Void Metamorphosis [https://www.wowhead.]: ERR HTTP Error 403: Forbidden
+NAME Collapsing Star [https://nether.wowhe]: ERR HTTP Error 404: Not Found
+NAME Collapsing Star [https://www.wowhead.]: ERR HTTP Error 403: Forbidden
+NAME Void Ray [https://nether.wowhe]: ERR HTTP Error 404: Not Found
+NAME Void Ray [https://www.wowhead.]: ERR HTTP Error 403: Forbidden
+NAME The Hunt [https://nether.wowhe]: ERR HTTP Error 404: Not Found
+NAME The Hunt [https://www.wowhead.]: ERR HTTP Error 403: Forbidden
+NAME Harrier's Cry [https://nether.wowhe]: ERR HTTP Error 404: Not Found
+NAME Harrier's Cry [https://www.wowhead.]: ERR HTTP Error 403: Forbidden

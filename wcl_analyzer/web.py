@@ -1394,6 +1394,27 @@ _SPELL_LOCK = threading.Lock()
 SPELL_PER_MIN = 30   # публичный сервер: не больше 30 описаний в минуту с одного адреса
 
 
+LIVE_POLL_MAX_AGE_S = 45   # слежение за логом: список боёв не старше 45 с (страница спрашивает раз в минуту)
+
+
+def live_summary(rep: dict) -> dict:
+    """Бои с боссами живого отчёта для слежения: номер, босс, сложность, исход; сколько минут отчёт не пополнялся."""
+    fights = []
+    for f in rep.get("fights") or []:
+        if not int(f.get("encounterID") or 0):
+            continue
+        pct = f.get("fightPercentage")
+        fights.append({"id": int(f["id"]), "name": f.get("name", ""), "difficulty": int(f.get("difficulty") or 0),
+                       "kill": bool(f.get("kill")), "pct": round(float(pct), 1) if pct is not None else None,
+                       "duration": round((float(f["endTime"]) - float(f["startTime"])) / 1000)})
+    try:
+        idle = max(0.0, time.time() - float(rep.get("endTime") or 0) / 1000)
+    except (TypeError, ValueError):
+        idle = None
+    return {"code": rep.get("code"), "title": rep.get("title", ""), "fights": fights,
+            "idle_min": round(idle / 60, 1) if idle is not None else None}
+
+
 def _spell_rate_ok(ip: str) -> bool:
     now = time.time()
     with _SPELL_LOCK:
@@ -1654,6 +1675,20 @@ class Handler(BaseHTTPRequestHandler):
                     cl = cl.for_site(site_of_url(body.get("url")))
                 cl = _limited(cl, 0)  # поиск боя не ждёт сброса лимита: сразу объясняем, что случилось
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
+            if path == "/api/live":
+                # Слежение за живым логом: свежий список боёв (не старше LIVE_POLL_MAX_AGE_S) — новые пуллы
+                from .config import site_of_url
+                from .logs import parse_report_url
+                code, _, _ = parse_report_url(str(body.get("url") or ""))
+                cl = CLIENT_FACTORY(creds)
+                if hasattr(cl, "for_site"):
+                    cl = cl.for_site(site_of_url(body.get("url")))
+                cl = _limited(cl, 0)
+                try:
+                    rep = cl.report(code, max_age_s=LIVE_POLL_MAX_AGE_S)
+                except TypeError:   # клиент без свежей выборки (демо, тесты)
+                    rep = cl.report(code)
+                return self._json(live_summary(rep))
             if path == "/api/analyze":
                 params = {k: body.get(k) for k in ("mode", "demo", "url", "fight", "actor", "ref", "against", "units", "prev", "wait",
                                                    "zone", "encounter", "difficulty", "roster", "minutes",

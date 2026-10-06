@@ -412,6 +412,10 @@ dialog label.check input{width:auto;margin:0}
         <label class="chk" title="Если бой не эпохальный, бой и игроки дополнительно сравниваются с эпохальным топом; переключатель — в шапке результата. Это вдвое больше загрузок топа — расходует лимит Warcraft Logs"><input type="checkbox" id="mythicToo"> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
       </div>
+      <div class="runrow" style="margin-top:4px">
+        <button class="btn" id="liveBtn" type="button" title="Отчёт пишется прямо сейчас (Warcraft Logs Uploader в режиме Live Log): программа раз в минуту смотрит, не появился ли новый пулл, и сама разбирает его — урон, сейвы, смерти, танки, лекари, прерывания (без ротации, чтобы хватило лимита). Страницу держите открытой">Следить за логом</button>
+        <span class="pickinfo" id="liveInfo" aria-live="polite"></span>
+      </div>
     </div>
     <div class="error" id="err" role="alert" hidden></div>
     <div class="okmsg" id="okmsg" role="status" hidden></div>
@@ -831,6 +835,71 @@ $("#pickBy").addEventListener("change", updatePickInfo);
 $("#ref").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
 const RUN_BTNS = ["#runBtn", "#progBtn", "#tpRun", "#rpRun"];
+
+/* ---------- Слежение за живым логом: раз в минуту — нет ли нового пулла; новый — разбирается сам ---------- */
+const LIVE_POLL_S = 60, LIVE_IDLE_STOP_MIN = 90;
+const DIFF_SHORT = {1: "LFR", 3: "обычный", 4: "героический", 5: "эпохальный"};
+let LIVE = null;
+function liveStatus(text){ $("#liveInfo").textContent = text || ""; }
+function liveStop(why){
+  if (!LIVE) return;
+  clearTimeout(LIVE.timer); LIVE = null;
+  $("#liveBtn").textContent = "Следить за логом"; $("#liveBtn").setAttribute("aria-pressed", "false");
+  liveStatus(why || "");
+  document.title = BASE_TITLE;
+}
+const BASE_TITLE = document.title;
+function liveNotify(text){
+  document.title = "● " + text;
+  try { if (window.Notification && Notification.permission === "granted") new Notification("WCL Analyzer", {body: text}); } catch(e){}
+}
+async function livePoll(){
+  if (!LIVE) return;
+  const me = LIVE;
+  let L;
+  try { L = await api("/api/live", {url: me.url}, 60); }
+  catch(e) {
+    if (LIVE !== me) return;
+    me.fails = (me.fails || 0) + 1;
+    liveStatus(`Не удалось проверить лог (${e.message || e}) — попробую снова через минуту`);
+    if (me.fails >= 10) return liveStop("Слежение остановлено: 10 раз подряд не удалось проверить лог");
+    me.timer = setTimeout(livePoll, LIVE_POLL_S * 1000); return;
+  }
+  if (LIVE !== me) return;
+  me.fails = 0;
+  const fresh = (L.fights || []).filter(f => !me.seen.has(f.id));
+  fresh.forEach(f => me.seen.add(f.id));
+  if (me.first) { me.first = false; }
+  else if (fresh.length) me.queue.push(...fresh);
+  const last = (L.fights || []).slice(-1)[0];
+  const lastTxt = last ? `последний — ${last.name}, ${last.kill ? "килл" : last.pct != null ? `вайп ${String(last.pct).replace(".", ",")}%` : "вайп"}` : "боссов пока нет";
+  /* Новый пулл — разбор сразу, если сейчас ничего не считается; несколько новых — разбирается последний */
+  if (me.queue.length && !RUNNING) {
+    const f = me.queue[me.queue.length - 1], skipped = me.queue.length - 1;
+    me.queue = [];
+    me.done += 1;
+    liveStatus(`Новый пулл: ${f.name} — разбираю…` + (skipped ? ` (ещё ${skipped} пропущено: разбирается последний)` : ""));
+    try {
+      await run({mode: "fight", url: me.url, fight: String(f.id), actor: "all", ref: "none", pick: null, mythic: false, wait: false});
+      liveNotify(`${f.name}: ${f.kill ? "килл" : f.pct != null ? `вайп ${String(f.pct).replace(".", ",")}%` : "вайп"} — разбор готов`);
+    } catch(e) {}
+    if (LIVE !== me) return;
+  }
+  const idle = L.idle_min;
+  if (idle != null && idle > LIVE_IDLE_STOP_MIN) return liveStop(`Слежение остановлено: лог не пополнялся ${Math.round(idle)} мин. Разобрано новых пуллов: ${me.done}`);
+  liveStatus(`Слежу за «${L.title || "логом"}»: пуллов с боссами ${(L.fights || []).length}, ${lastTxt}. Проверка раз в минуту` +
+    (me.done ? ` · разобрано новых: ${me.done}` : " · новый пулл разберётся сам"));
+  me.timer = setTimeout(livePoll, LIVE_POLL_S * 1000);
+}
+$("#liveBtn").onclick = () => {
+  if (LIVE) return liveStop("Слежение остановлено");
+  if (!inspected) return showErr("Сначала нажмите «Найти бой» по ссылке на отчёт, который пишется сейчас.");
+  LIVE = {url: inspected.url, seen: new Set(), queue: [], first: true, done: 0, timer: null};
+  $("#liveBtn").textContent = "Остановить слежение"; $("#liveBtn").setAttribute("aria-pressed", "true");
+  liveStatus("Проверяю лог…");
+  try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch(e){}
+  livePoll();
+};
 
 /* ---------- «Топ прогресса» без лога: версия игры, рейд, сложность, босс — с Warcraft Logs ---------- */
 const TP_DIFF = {5: "Эпохальный", 4: "Героический", 3: "Обычный", 1: "Поиск рейда"};
@@ -1846,8 +1915,10 @@ function renderSaves(R){
           ${(b.top_kills||[]).length ? ` · сравнение: ${b.top_kills.length} ${plural(b.top_kills.length,"лучший килл","лучших килла","лучших киллов")}` : ""}</p>
         ${(b.saves_brief||[]).length ? `<ul class="lines">${b.saves_brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : ""}
         ${(b.plan||[]).length ? planTable(b.plan, b.boss, b.phases) : '<p class="empty">Пиков урона по рейду, на которые нужны сейвы, не найдено.</p>'}
+        ${discordBox(b.discord)}
       </div></div>`).join("")}
-    ${(R.skipped||[]).length ? box("Не получилось", "", `<ul class="lines">${R.skipped.map(x=>`<li>${esc(x.boss)} (${esc(x.difficulty)}): ${esc(x.reason)}</li>`).join("")}</ul>`) : ""}`;
+    ${(R.skipped||[]).length ? box("Не получилось", "", `<ul class="lines">${R.skipped.map(x=>`<li>${esc(x.boss)} (${esc(x.difficulty)}): ${esc(x.reason)}</li>`).join("")}</ul>`) : ""}
+    ${(R.discord||[]).length ? box("Итоги вечера для Discord", "По каждому боссу — исход и главное; ссылка на лог в конце.", discordBox(R.discord, "Итоги вечера — вставить в канал гильдии.")) : ""}`;
   el.hidden = false;
   el.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
     el.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
@@ -1981,6 +2052,40 @@ function renderTank(T, el){
         `${Math.round(top[b.id].share*100)}%`, esc(((T.en && top[b.id].names_en) || top[b.id].names || []).join(", "))]))) : ""}`;
 }
 
+/* Текст для Discord: кнопка «Скопировать» и сам текст (тот же обработчик, что у заметок MRT) */
+function discordBox(texts, hint){
+  texts = (Array.isArray(texts) ? texts : [texts]).filter(Boolean);
+  if (!texts.length) return "";
+  return `<div class="discord" style="margin-top:12px">${texts.map((t, i) => `<div class="mrt" style="margin-top:${i ? 8 : 0}px">
+    <button type="button" class="mini mrtbtn" data-mrt data-label="${texts.length > 1 ? `Скопировать для Discord (${i + 1} из ${texts.length})` : "Скопировать для Discord"}">${texts.length > 1 ? `Скопировать для Discord (${i + 1} из ${texts.length})` : "Скопировать для Discord"}</button>
+    ${i ? "" : `<span class="hint" style="margin-left:8px">${esc(hint || "Короткая сводка — вставить в канал гильдии.")}${texts.length > 1 ? " Discord принимает до 2000 символов в сообщении, поэтому сводка разбита на части." : ""}</span>`}
+    <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:13.5px">Текст</summary>
+      <textarea readonly rows="${Math.min(14, t.split("\n").length + 1)}" style="width:100%;margin-top:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;box-sizing:border-box">${esc(t)}</textarea></details></div>`).join("")}</div>`;
+}
+
+function renderHeal(H, el){
+  if (!el) return;
+  if (!H) { el.innerHTML = '<p class="empty">Нет данных о лекарях: разбор из прежней версии — разберите бой заново.</p>'; return; }
+  if (H.error) { el.innerHTML = `<p class="empty">Лекари не разобраны: ${esc(H.error)}</p>`; return; }
+  const rows = H.healers || [];
+  if (!rows.length) { el.innerHTML = '<p class="empty">В этом бою нет лекарей.</p>'; return; }
+  const manaCell = r => r.mana_end == null ? '<span style="color:var(--muted)">нет данных</span>'
+    : (r.oom ? `<span class="worse">0% с ${esc(r.oom)}</span>` : (r.mana_end < 0.1 ? `<span class="worse">${pct(r.mana_end,0)}</span>` : pct(r.mana_end,0)));
+  const peakCell = r => r.peak == null ? "—" : (r.peak < 1 ? `<span class="worse">×${num(r.peak,1)}</span>` : `×${num(r.peak,1)}`);
+  el.innerHTML = `
+    ${(H.hints||[]).length ? `<div class="box brief"><h3>Главное по лекарям</h3><ul class="lines">${H.hints.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
+    ${box("Лекари", "Лечение и доля в лечении лекарей; оверхил — доля лечения, ушедшая в полное здоровье; мана — к концу боя (красным — кончилась или меньше 10%); «в пики» — во сколько раз лекарь лечит сильнее обычного в пики урона по рейду.",
+      table(["Лекарь","Лечение","HPS","Доля","Оверхил","Мана к концу","В пики","Активность"], rows.map(r => [esc(r.player) + ` <span style="color:var(--muted);font-size:13px">${esc(who(r.cls, r.spec))}</span>`,
+        fmtAmt(r.healing), num(r.hps), pct(r.share,0), r.overheal == null ? "—" : pct(r.overheal,0), manaCell(r), peakCell(r), r.active == null ? "—" : pct(r.active,0)]),
+        {num:[1,2,3,4,6,7], flag: i => !!(rows[i].oom || (rows[i].peak != null && rows[i].peak < 1))}))}
+    ${box("Внешние сейвы на игроков", "Сейвы лекарей на одну цель (Pain Suppression, Guardian Spirit, Ironbark, Life Cocoon, Blessing of Sacrifice, Time Dilation…): кому и когда; «выжил» — цель прожила ещё 10 с.",
+      table(["Когда","Лекарь","Сейв","На кого","Итог"], (H.externals||[]).map(u => [esc(u.time), esc(u.healer), esc(u.name), esc(u.target),
+        u.died ? '<span class="worse">умер</span>' : "выжил"]), {empty: "Внешних сейвов на игроков не было."}))}
+    ${box("Смерть в пик урона со свободным сейвом", "Игрок умер в пик урона по рейду (или танк — в любой момент), а внешний сейв лекаря был откатан. Смерти в конце вайпа не считаются.",
+      table(["Когда","Кто","От чего","Был свободен"], (H.missed||[]).map(m => [esc(m.time), esc(m.player), esc(m.ability), esc(m.free.join(", "))]),
+        {empty: "Таких смертей нет.", flag: () => true}))}`;
+}
+
 function renderKicks(K, el){
   if (!el) return;
   if (!K) { el.innerHTML = '<p class="empty">Нет данных о прерываниях: разбор из прежней версии — разберите бой заново.</p>'; return; }
@@ -2012,7 +2117,7 @@ function renderRaid(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, S = R.summary, fd = S.first_death;
   const outcome = I.kill ? "килл" : (I.boss_pct!=null ? `вайп на ${num(I.boss_pct,1)}% здоровья босса` : "вайп");
-  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-dmg","Нанесение урона"],["r-tank","Танки"],["r-kick","Прерывания"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
+  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-dmg","Нанесение урона"],["r-tank","Танки"],["r-heal","Лекари"],["r-kick","Прерывания"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
   const el = resEl();
   el.innerHTML = `
     ${I.demo?'<div class="demo-flag">Демо: синтетический рейд, не реальный лог</div>':""}
@@ -2039,6 +2144,7 @@ function renderRaid(R){
     <div class="box brief">
       <h3>Главное по бою</h3>
       ${(R.brief||[]).length ? `<ul class="lines">${R.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : '<p class="empty">Явных проблем не найдено.</p>'}
+      ${discordBox((R.extras||{}).discord)}
       ${(R.extras||{}).damage_timeline ? `<p class="hint" style="margin:12px 0 0">График урона по рейду, план сейвов на следующий пулл и сравнение с лучшими киллами — во вкладке «Полученный урон и сейвы».</p>` : ""}
       ${topIssues(R.issues).length ? `<h3 style="margin-top:16px">Кому что поправить</h3>` + topIssues(R.issues).map(i=>`<div class="issue"><div class="who"><b>${esc(i.player)}</b><span>${esc(i.role)}, ${esc(who(i.cls, i.spec))}</span></div>
           <div class="gwrap">${guideText(i.text, R.guide_links, R.guide_videos, R.guide_info)}${guideDesc(i.text, R.guide_info)}</div><span class="sev s${i.severity}">${i.kind?esc(i.kind):""}</span></div>`).join("") : ""}
@@ -2100,6 +2206,7 @@ function renderRaid(R){
   lazy["r-dmg"] = () => renderBurst(X.burst, $("#p-r-dmg"));
   lazy["r-tank"] = () => renderTank(X.tank, $("#p-r-tank"));
   lazy["r-kick"] = () => renderKicks(X.kicks, $("#p-r-kick"));
+  lazy["r-heal"] = () => renderHeal(X.heal, $("#p-r-heal"));
   if (Object.keys(X).length) $("#p-r-sum").insertAdjacentHTML("beforeend", `<div class="grid2">
     <div>
       ${box("Прерывания", "Каст прошёл, хотя эту способность в бою прерывали.",

@@ -1278,6 +1278,52 @@ def test_kicks():
     print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
 
 
+def test_healers():
+    """Лекари: мана кончилась (Вейла), оверхил выше остальных (Таргун), в пики лечит меньше обычного (Осирон),
+    внешний сейв на игрока, смерть в пик со свободным сейвом — только в пик (не от лужи), лист Excel."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    H = R["extras"]["heal"]
+    assert "error" not in H, H
+    by = {r["player"]: r for r in H["healers"]}
+    assert by["Вейла"]["oom"] and by["Вейла"]["mana_end"] == 0 and by["Элария"]["mana_end"] > 0.3, by
+    assert by["Таргун"]["overheal"] > by["Элария"]["overheal"] * 1.5, by
+    assert by["Осирон"]["peak"] < 1 < by["Элария"]["peak"], by
+    hs = " ".join(H["hints"])
+    assert "Вейла: закончилась мана" in hs and "Таргун: оверхил" in hs and "Осирон" in hs, H["hints"]
+    assert any(u["target"] == "Сайрена" and not u["died"] for u in H["externals"]), H["externals"]
+    assert [m["player"] for m in H["missed"]] == ["Лиана"], H["missed"]
+    assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
+
+
+def test_discord():
+    """Сводка для Discord: без отсылок к вкладкам, ссылка без превью, разметка в именах экранирована,
+    длинный вечер — на несколько сообщений, каждое до 2000 символов."""
+    from wcl_analyzer.discord import boss_text, evening_messages
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    t = R["extras"]["discord"]
+    assert t.startswith("**Демо-босс**") and "во вкладке" not in t and "<https://" in t and len(t) <= 1900, t
+    assert boss_text({"info": {"boss": "Snake_Boss*"}, "brief": ["x_y"]}).startswith("**Snake\\_Boss\\***")
+    S = {"info": {"title": "Вечер", "url": "https://www.warcraftlogs.com/reports/X"},
+         "bosses": [{"boss": f"Босс {i}", "kill": i % 2 == 0, "boss_pct": 12.3, "duration": "5:00", "pulls": 3,
+                     "brief": ["Первая смерть: " + "а" * 150, "Пики урона: " + "б" * 150]} for i in range(12)]}
+    msgs = evening_messages(S)
+    assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
+    assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
+    assert sum(m.count("**Босс ") for m in msgs) == 12
+    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+
+
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
@@ -1300,6 +1346,8 @@ if __name__ == "__main__":
     test_guide_buster_weak_hits()
     test_potions_zero_details()
     test_kicks()
+    test_healers()
+    test_discord()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()
@@ -1501,6 +1549,52 @@ def test_kicks():
     assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
     assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
     print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
+
+
+def test_healers():
+    """Лекари: мана кончилась (Вейла), оверхил выше остальных (Таргун), в пики лечит меньше обычного (Осирон),
+    внешний сейв на игрока, смерть в пик со свободным сейвом — только в пик (не от лужи), лист Excel."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    H = R["extras"]["heal"]
+    assert "error" not in H, H
+    by = {r["player"]: r for r in H["healers"]}
+    assert by["Вейла"]["oom"] and by["Вейла"]["mana_end"] == 0 and by["Элария"]["mana_end"] > 0.3, by
+    assert by["Таргун"]["overheal"] > by["Элария"]["overheal"] * 1.5, by
+    assert by["Осирон"]["peak"] < 1 < by["Элария"]["peak"], by
+    hs = " ".join(H["hints"])
+    assert "Вейла: закончилась мана" in hs and "Таргун: оверхил" in hs and "Осирон" in hs, H["hints"]
+    assert any(u["target"] == "Сайрена" and not u["died"] for u in H["externals"]), H["externals"]
+    assert [m["player"] for m in H["missed"]] == ["Лиана"], H["missed"]
+    assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
+
+
+def test_discord():
+    """Сводка для Discord: без отсылок к вкладкам, ссылка без превью, разметка в именах экранирована,
+    длинный вечер — на несколько сообщений, каждое до 2000 символов."""
+    from wcl_analyzer.discord import boss_text, evening_messages
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    t = R["extras"]["discord"]
+    assert t.startswith("**Демо-босс**") and "во вкладке" not in t and "<https://" in t and len(t) <= 1900, t
+    assert boss_text({"info": {"boss": "Snake_Boss*"}, "brief": ["x_y"]}).startswith("**Snake\\_Boss\\***")
+    S = {"info": {"title": "Вечер", "url": "https://www.warcraftlogs.com/reports/X"},
+         "bosses": [{"boss": f"Босс {i}", "kill": i % 2 == 0, "boss_pct": 12.3, "duration": "5:00", "pulls": 3,
+                     "brief": ["Первая смерть: " + "а" * 150, "Пики урона: " + "б" * 150]} for i in range(12)]}
+    msgs = evening_messages(S)
+    assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
+    assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
+    assert sum(m.count("**Босс ") for m in msgs) == 12
+    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
 
 
 if __name__ == "__main__":
@@ -1731,6 +1825,52 @@ def test_kicks():
     print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
 
 
+def test_healers():
+    """Лекари: мана кончилась (Вейла), оверхил выше остальных (Таргун), в пики лечит меньше обычного (Осирон),
+    внешний сейв на игрока, смерть в пик со свободным сейвом — только в пик (не от лужи), лист Excel."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    H = R["extras"]["heal"]
+    assert "error" not in H, H
+    by = {r["player"]: r for r in H["healers"]}
+    assert by["Вейла"]["oom"] and by["Вейла"]["mana_end"] == 0 and by["Элария"]["mana_end"] > 0.3, by
+    assert by["Таргун"]["overheal"] > by["Элария"]["overheal"] * 1.5, by
+    assert by["Осирон"]["peak"] < 1 < by["Элария"]["peak"], by
+    hs = " ".join(H["hints"])
+    assert "Вейла: закончилась мана" in hs and "Таргун: оверхил" in hs and "Осирон" in hs, H["hints"]
+    assert any(u["target"] == "Сайрена" and not u["died"] for u in H["externals"]), H["externals"]
+    assert [m["player"] for m in H["missed"]] == ["Лиана"], H["missed"]
+    assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
+
+
+def test_discord():
+    """Сводка для Discord: без отсылок к вкладкам, ссылка без превью, разметка в именах экранирована,
+    длинный вечер — на несколько сообщений, каждое до 2000 символов."""
+    from wcl_analyzer.discord import boss_text, evening_messages
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    t = R["extras"]["discord"]
+    assert t.startswith("**Демо-босс**") and "во вкладке" not in t and "<https://" in t and len(t) <= 1900, t
+    assert boss_text({"info": {"boss": "Snake_Boss*"}, "brief": ["x_y"]}).startswith("**Snake\\_Boss\\***")
+    S = {"info": {"title": "Вечер", "url": "https://www.warcraftlogs.com/reports/X"},
+         "bosses": [{"boss": f"Босс {i}", "kill": i % 2 == 0, "boss_pct": 12.3, "duration": "5:00", "pulls": 3,
+                     "brief": ["Первая смерть: " + "а" * 150, "Пики урона: " + "б" * 150]} for i in range(12)]}
+    msgs = evening_messages(S)
+    assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
+    assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
+    assert sum(m.count("**Босс ") for m in msgs) == 12
+    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+
+
 if __name__ == "__main__":
     test_analysis_quality()
 
@@ -1903,6 +2043,52 @@ def test_kicks():
     assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
     assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
     print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
+
+
+def test_healers():
+    """Лекари: мана кончилась (Вейла), оверхил выше остальных (Таргун), в пики лечит меньше обычного (Осирон),
+    внешний сейв на игрока, смерть в пик со свободным сейвом — только в пик (не от лужи), лист Excel."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    H = R["extras"]["heal"]
+    assert "error" not in H, H
+    by = {r["player"]: r for r in H["healers"]}
+    assert by["Вейла"]["oom"] and by["Вейла"]["mana_end"] == 0 and by["Элария"]["mana_end"] > 0.3, by
+    assert by["Таргун"]["overheal"] > by["Элария"]["overheal"] * 1.5, by
+    assert by["Осирон"]["peak"] < 1 < by["Элария"]["peak"], by
+    hs = " ".join(H["hints"])
+    assert "Вейла: закончилась мана" in hs and "Таргун: оверхил" in hs and "Осирон" in hs, H["hints"]
+    assert any(u["target"] == "Сайрена" and not u["died"] for u in H["externals"]), H["externals"]
+    assert [m["player"] for m in H["missed"]] == ["Лиана"], H["missed"]
+    assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
+
+
+def test_discord():
+    """Сводка для Discord: без отсылок к вкладкам, ссылка без превью, разметка в именах экранирована,
+    длинный вечер — на несколько сообщений, каждое до 2000 символов."""
+    from wcl_analyzer.discord import boss_text, evening_messages
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    t = R["extras"]["discord"]
+    assert t.startswith("**Демо-босс**") and "во вкладке" not in t and "<https://" in t and len(t) <= 1900, t
+    assert boss_text({"info": {"boss": "Snake_Boss*"}, "brief": ["x_y"]}).startswith("**Snake\\_Boss\\***")
+    S = {"info": {"title": "Вечер", "url": "https://www.warcraftlogs.com/reports/X"},
+         "bosses": [{"boss": f"Босс {i}", "kill": i % 2 == 0, "boss_pct": 12.3, "duration": "5:00", "pulls": 3,
+                     "brief": ["Первая смерть: " + "а" * 150, "Пики урона: " + "б" * 150]} for i in range(12)]}
+    msgs = evening_messages(S)
+    assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
+    assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
+    assert sum(m.count("**Босс ") for m in msgs) == 12
+    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
 
 
 if __name__ == "__main__":
@@ -2515,6 +2701,52 @@ def test_kicks():
     assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
     assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
     print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
+
+
+def test_healers():
+    """Лекари: мана кончилась (Вейла), оверхил выше остальных (Таргун), в пики лечит меньше обычного (Осирон),
+    внешний сейв на игрока, смерть в пик со свободным сейвом — только в пик (не от лужи), лист Excel."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    H = R["extras"]["heal"]
+    assert "error" not in H, H
+    by = {r["player"]: r for r in H["healers"]}
+    assert by["Вейла"]["oom"] and by["Вейла"]["mana_end"] == 0 and by["Элария"]["mana_end"] > 0.3, by
+    assert by["Таргун"]["overheal"] > by["Элария"]["overheal"] * 1.5, by
+    assert by["Осирон"]["peak"] < 1 < by["Элария"]["peak"], by
+    hs = " ".join(H["hints"])
+    assert "Вейла: закончилась мана" in hs and "Таргун: оверхил" in hs and "Осирон" in hs, H["hints"]
+    assert any(u["target"] == "Сайрена" and not u["died"] for u in H["externals"]), H["externals"]
+    assert [m["player"] for m in H["missed"]] == ["Лиана"], H["missed"]
+    assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
+
+
+def test_discord():
+    """Сводка для Discord: без отсылок к вкладкам, ссылка без превью, разметка в именах экранирована,
+    длинный вечер — на несколько сообщений, каждое до 2000 символов."""
+    from wcl_analyzer.discord import boss_text, evening_messages
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    t = R["extras"]["discord"]
+    assert t.startswith("**Демо-босс**") and "во вкладке" not in t and "<https://" in t and len(t) <= 1900, t
+    assert boss_text({"info": {"boss": "Snake_Boss*"}, "brief": ["x_y"]}).startswith("**Snake\\_Boss\\***")
+    S = {"info": {"title": "Вечер", "url": "https://www.warcraftlogs.com/reports/X"},
+         "bosses": [{"boss": f"Босс {i}", "kill": i % 2 == 0, "boss_pct": 12.3, "duration": "5:00", "pulls": 3,
+                     "brief": ["Первая смерть: " + "а" * 150, "Пики урона: " + "б" * 150]} for i in range(12)]}
+    msgs = evening_messages(S)
+    assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
+    assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
+    assert sum(m.count("**Босс ") for m in msgs) == 12
+    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
 
 
 if __name__ == "__main__":

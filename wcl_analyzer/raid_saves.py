@@ -45,6 +45,7 @@ def boss_entry(R: dict, c: dict) -> dict:
         "saves_brief": X.get("saves_brief") or [],
         "top_kills": V.get("kills") or [], "top_cover": V.get("top_cover"), "my_cover": V.get("my_cover"),
         "roster": len({x["player"] for x in X.get("roster_cds") or []}),
+        "brief": (R.get("brief") or [])[:3], "discord": X.get("discord") or "",
     }
 
 
@@ -90,13 +91,16 @@ def run_raid_saves(client, url: str, log=print, progress=lambda x: None, talent_
         progress((i + 1) / len(chosen))
     if not bosses:
         raise LookupError("Не удалось составить план ни для одного босса: " + "; ".join(s["reason"] for s in skipped))
-    return {"mode": "saves",
+    from .discord import evening_messages
+    out = {"mode": "saves",
             "info": {"code": code, "title": report.get("title", ""), "zone": (report.get("zone") or {}).get("name", ""),
                      "url": f"{report.get('_site_url') or SITE_URL}/reports/{code}", "bosses": len(bosses),
                      "boss": (report.get("zone") or {}).get("name") or report.get("title", ""),
                      "difficulty": ", ".join(dict.fromkeys(b["difficulty"] for b in bosses)),
                      "demo": code.startswith("DEMO")},
             "bosses": bosses, "skipped": skipped}
+    out["discord"] = evening_messages(out)
+    return out
 
 
 def _pct(f: dict) -> str:

@@ -93,6 +93,11 @@ def main():
     assert st == 200 and s["available"] and s["limit"] == 3600 and s["spent"] == 120.5 and s["reset_in"] == 900, s
     del _FC.rate_limit
 
+    # Слежение за живым логом: список боёв с боссами и сколько минут отчёт не пополнялся
+    st, s = anna.req("POST", "/api/live", {"url": url})
+    assert st == 200 and isinstance(s["fights"], list) and s["fights"] and {"id", "name", "kill", "pct"} <= set(s["fights"][0]), s
+    assert anna.req("POST", "/api/live", {"url": "not a link"})[0] == 400
+
     # Обновление программы: на публичном сервере его нет
     st, s = anna.req("GET", "/api/version")
     assert st == 200 and s["updates"] is False and s["build"], s

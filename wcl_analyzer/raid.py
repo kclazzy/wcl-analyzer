@@ -129,8 +129,19 @@ def fetch_raid_raw(client, url: str, fight=None, log=print, pull_deaths: bool = 
             batched = client.events_multi(code, fid, s, e, specs, {"dmg_table": {"data_type": "DamageDone"},
                                                                     "heal_table": {"data_type": "Healing"}},
                                           fields={"details": "playerDetails(fightIDs: $fid)"})
+            # лекари: касты с маной (по каждому лекарю — фильтр «source.id in (…)» Warcraft Logs не понимает)
+            # и график лечения по времени — тем же маленьким запросом
+            det0 = client.unwrap_details(batched.get("details")) if hasattr(client, "unwrap_details") else batched.get("details")
+            for p in (det0 or {}).get("healers") or []:
+                if p.get("id") is not None:
+                    small[f"heal_res_{int(p['id'])}"] = {"data_type": "Casts", "source_id": int(p["id"]),
+                                                          "include_resources": True, "filter_expression": 'type = "cast"'}
+            small_fields = {"heal_graph": f"graph(fightIDs: $fid, dataType: Healing, startTime: {s}, endTime: {e})"}
             if small:
-                batched.update(client.events_multi(code, fid, s, e, small))
+                try:
+                    batched.update(client.events_multi(code, fid, s, e, small, fields=small_fields))
+                except WCLError:   # график лечения есть не у всех версий сайта — без него
+                    batched.update(client.events_multi(code, fid, s, e, small))
             if other:
                 log(f"Смерти в других пуллах ({len(other)})…")
                 batched.update(client.events_multi(code, fid, s, e, {
@@ -154,6 +165,8 @@ def fetch_raid_raw(client, url: str, fight=None, log=print, pull_deaths: bool = 
         raw["boss_buffs"] = [ev for i in range(len(bosses)) for ev in batched.get(f"boss_buffs_{i}") or []]
         raw["burst_buffs"] = batched.get("burst_buffs") or []
         raw["tank_buffs"] = batched.get("tank_buffs") or []
+        raw["heal_res"] = {int(k[len("heal_res_"):]): v for k, v in batched.items() if k.startswith("heal_res_")}
+        raw["heal_graph"] = batched.get("heal_graph")
     else:
         log("Состав рейда, урон и лечение…")
         raw["details"] = client.player_details(code, fid)
@@ -743,6 +756,13 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
                                         latin=sum(1 for n in _ln if n.isascii()) > len(_ln) / 2)
     except Exception as e:  # noqa: BLE001
         extras["kicks"] = {"error": str(e)}
+    try:  # лекари: оверхил, мана, лечение в пики, внешние сейвы
+        from .raid_heal import heal_analysis
+        _ln = [a.get("name") or "" for a in report["masterData"]["abilities"]]
+        extras["heal"] = heal_analysis(raw, players, owner, rel, nm, dur, extras.get("spikes") or [], deaths, kill,
+                                       latin=sum(1 for n in _ln if n.isascii()) > len(_ln) / 2)
+    except Exception as e:  # noqa: BLE001
+        extras["heal"] = {"error": str(e)}
     for sp in extras.get("spikes", []):  # фаза пика и время от её начала: следующая фаза может прийти раньше или позже
         ph = phase_at(phases, sp["t"])
         sp["phase"] = ph["n"] if ph else None
@@ -782,7 +802,8 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
 
 
 BRIEF_MAX = 7
-_BRIEF_LOW = ("Расходники —", "Почти не били аддов", "Больше всего избегаемого урона", "Пропущенные прерывания")
+_BRIEF_LOW = ("Расходники —", "Почти не били аддов", "Больше всего избегаемого урона", "Пропущенные прерывания",
+              "Рейдовых кулдаунов нажато")
 
 
 def _brief_insert(brief: list[str], line: str, pos: int, force: bool = False) -> None:
@@ -916,12 +937,20 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
     key = (R["extras"].get("tank") or {}).get("key")
     if key:
         _brief_insert(R["brief"], key + " (подробно — во вкладке «Танки»)", 4)
+    key = (R["extras"].get("heal") or {}).get("key")
+    if key:   # лекари: мана кончилась или смерть в пик со свободным внешним сейвом
+        _brief_insert(R["brief"], key, 5)
     trend = R["extras"].get("pull_trend") or {}
     if trend.get("line") and len(R["brief"]) < 7:
         R["brief"].append(trend["line"])
     TK = R["extras"].get("tank") or {}
     for k in ("_eff", "_owned", "light"):   # служебное (план и сравнение с топом) — странице не нужно
         TK.pop(k, None)
+    try:  # короткая сводка для Discord
+        from .discord import boss_text
+        R["extras"]["discord"] = boss_text(R)
+    except Exception:  # noqa: BLE001
+        pass
     if hasattr(client, "points_left"):
         left = client.points_left()
         if left is not None:

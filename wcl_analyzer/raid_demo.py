@@ -190,6 +190,8 @@ class FakeRaidClient:
         if data_type == "Casts":
             key = "boss_casts" if hostility == "Enemies" else "casts"
         evs = g.get(key, []) if key else []
+        if data_type == "Casts" and include_resources and source_id is not None:
+            return self._heal_res(g, int(source_id), start, end)
         if source_id is not None:
             evs = [e for e in evs if e.get("sourceID") == source_id]
         if target_id is not None:
@@ -202,13 +204,56 @@ class FakeRaidClient:
         out = {}
         for k, p in specs.items():
             out[k] = self.events(code, int(p.get("fight_id") or fight_id), p.get("start", start), p.get("end", end),
-                                 p["data_type"], p.get("source_id"), p.get("target_id"), p.get("hostility"))
+                                 p["data_type"], p.get("source_id"), p.get("target_id"), p.get("hostility"),
+                                 bool(p.get("include_resources")))
         for k, p in (tables or {}).items():
             out[k] = self.raid_table(code, fight_id, p["data_type"])
         for k, f in (fields or {}).items():
             if f.startswith("playerDetails"):
                 out[k] = {"data": {"playerDetails": self.player_details(code, fight_id)}}
+            elif f.startswith("graph"):
+                out[k] = {"data": self._heal_graph(self._gen(fight_id, code), start, end)}
         return out
+
+    # Лекари: мана по кастам (Вейла к концу боя без маны) и график лечения (Элария лечит в пики, Осирон — нет)
+    HEAL_MANA_END = {"Элария": 0.32, "Таргун": 0.21, "Вейла": 0.0, "Осирон": 0.41}
+
+    def _heal_res(self, g, pid, start, end):
+        name = next((n for n, i in PID.items() if i == pid), None)
+        if name not in self.HEAL_MANA_END:
+            return []
+        dur = (end - start) / 1000
+        out, t, mx = [], 2.0, 250_000
+        while t < dur:
+            frac = t / dur
+            if name == "Вейла":   # мана кончилась на 80% боя
+                left = max(0.0, 1 - frac / 0.8)
+            else:
+                left = 1 - (1 - self.HEAL_MANA_END[name]) * frac
+            out.append({"timestamp": start + t * 1000, "type": "cast", "sourceID": pid, "abilityGameID": 800001,
+                        "classResources": [{"amount": int(mx * left), "max": mx, "type": 0}]})
+            t += 1.5
+        return out
+
+    def _heal_graph(self, g, start, end):
+        dur = (end - start) / 1000
+        n = 120
+        step = dur / n
+        peaks = (66, 156, 246)
+        series = []
+        for name, cls, spec, r in ROSTER:
+            if r != "healer":
+                continue
+            base = self.heal_rate[name]
+            data = []
+            for i in range(n):
+                t = i * step
+                in_peak = any(p - 2 <= t <= p + 8 for p in peaks)
+                k = {"Элария": 2.2, "Осирон": 0.7}.get(name, 1.4) if in_peak else 1.0
+                data.append(round(base * k))
+            series.append({"name": name, "id": PID[name], "type": cls, "pointStart": 0, "pointInterval": step * 1000,
+                           "total": int(base * dur), "data": data})
+        return {"series": series, "startTime": start, "endTime": end}
 
     @staticmethod
     def unwrap_details(pd):
@@ -408,7 +453,8 @@ class FakeRaidClient:
                                 "total": int(self.rate[name] * alive_s), "activeTime": int(act_d * alive_s * 1000)})
             heal_entries.append({"name": name, "id": PID[name], "guid": 1000 + PID[name], "type": cls,
                                  "icon": f"{cls}-{spec}", "itemLevel": self.ilvl[name],
-                                 "total": int(self.heal_rate[name] * alive_s), "activeTime": int(act_h * alive_s * 1000)})
+                                 "total": int(self.heal_rate[name] * alive_s), "activeTime": int(act_h * alive_s * 1000),
+                                 "overheal": int(self.heal_rate[name] * alive_s * (0.82 if name == "Таргун" else 0.3))})
 
         rankings = {"data": []}
         if kill:

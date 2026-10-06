@@ -465,7 +465,8 @@ class WCLClient:
                  encounters { id name } } } }"""
         return self.query(q, {"id": zone_id})["worldData"]["zone"]
 
-    def report(self, code: str) -> dict:
+    def report(self, code: str, max_age_s: float | None = None) -> dict:
+        """Отчёт: бои, участники, способности. max_age_s — не старше стольких секунд (слежение за живым логом)."""
         q = """query($code: String!) { reportData { report(code: $code) {
                  code title startTime endTime
                  zone { id name }
@@ -477,13 +478,14 @@ class WCLClient:
                    abilities { gameID name type icon } }
                  phases { encounterID phases { id name isIntermission } } } } }"""
         v = {"code": code}
+        kw = {"max_age_s": max_age_s} if max_age_s is not None else {}
         try:   # названия фаз — в том же запросе (раньше — отдельным)
-            rep = self.query(q, v)["reportData"]["report"]
+            rep = self.query(q, v, **kw)["reportData"]["report"]
         except WCLError as e:
             if "phase" not in str(e).lower():
                 raise
             q = q.replace("phases { encounterID phases { id name isIntermission } }", "")
-            rep = self.query(q, v)["reportData"]["report"]
+            rep = self.query(q, v, **kw)["reportData"]["report"]
         if rep is None:
             raise WCLError(f"Отчёт {code} не найден или закрыт")
         # Отчёт пишется прямо сейчас (закончился меньше 12 ч назад): из кэша — не старше 10 минут, иначе новых

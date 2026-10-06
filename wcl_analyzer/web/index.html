@@ -412,6 +412,10 @@ dialog label.check input{width:auto;margin:0}
         <label class="chk" title="Если бой не эпохальный, бой и игроки дополнительно сравниваются с эпохальным топом; переключатель — в шапке результата. Это вдвое больше загрузок топа — расходует лимит Warcraft Logs"><input type="checkbox" id="mythicToo"> Также сравнить с эпохальным топом</label>
         <span class="pickinfo" id="pickInfo" aria-live="polite"></span>
       </div>
+      <div class="runrow" style="margin-top:4px">
+        <button class="btn" id="liveBtn" type="button" title="Отчёт пишется прямо сейчас (Warcraft Logs Uploader в режиме Live Log): программа раз в минуту смотрит, не появился ли новый пулл, и сама разбирает его — урон, сейвы, смерти, танки, лекари, прерывания (без ротации, чтобы хватило лимита). Страницу держите открытой">Следить за логом</button>
+        <span class="pickinfo" id="liveInfo" aria-live="polite"></span>
+      </div>
     </div>
     <div class="error" id="err" role="alert" hidden></div>
     <div class="okmsg" id="okmsg" role="status" hidden></div>
@@ -831,6 +835,71 @@ $("#pickBy").addEventListener("change", updatePickInfo);
 $("#ref").addEventListener("change", updatePickInfo);
 $("#pickMax").addEventListener("input", updatePickInfo);
 const RUN_BTNS = ["#runBtn", "#progBtn", "#tpRun", "#rpRun"];
+
+/* ---------- Слежение за живым логом: раз в минуту — нет ли нового пулла; новый — разбирается сам ---------- */
+const LIVE_POLL_S = 60, LIVE_IDLE_STOP_MIN = 90;
+const DIFF_SHORT = {1: "LFR", 3: "обычный", 4: "героический", 5: "эпохальный"};
+let LIVE = null;
+function liveStatus(text){ $("#liveInfo").textContent = text || ""; }
+function liveStop(why){
+  if (!LIVE) return;
+  clearTimeout(LIVE.timer); LIVE = null;
+  $("#liveBtn").textContent = "Следить за логом"; $("#liveBtn").setAttribute("aria-pressed", "false");
+  liveStatus(why || "");
+  document.title = BASE_TITLE;
+}
+const BASE_TITLE = document.title;
+function liveNotify(text){
+  document.title = "● " + text;
+  try { if (window.Notification && Notification.permission === "granted") new Notification("WCL Analyzer", {body: text}); } catch(e){}
+}
+async function livePoll(){
+  if (!LIVE) return;
+  const me = LIVE;
+  let L;
+  try { L = await api("/api/live", {url: me.url}, 60); }
+  catch(e) {
+    if (LIVE !== me) return;
+    me.fails = (me.fails || 0) + 1;
+    liveStatus(`Не удалось проверить лог (${e.message || e}) — попробую снова через минуту`);
+    if (me.fails >= 10) return liveStop("Слежение остановлено: 10 раз подряд не удалось проверить лог");
+    me.timer = setTimeout(livePoll, LIVE_POLL_S * 1000); return;
+  }
+  if (LIVE !== me) return;
+  me.fails = 0;
+  const fresh = (L.fights || []).filter(f => !me.seen.has(f.id));
+  fresh.forEach(f => me.seen.add(f.id));
+  if (me.first) { me.first = false; }
+  else if (fresh.length) me.queue.push(...fresh);
+  const last = (L.fights || []).slice(-1)[0];
+  const lastTxt = last ? `последний — ${last.name}, ${last.kill ? "килл" : last.pct != null ? `вайп ${String(last.pct).replace(".", ",")}%` : "вайп"}` : "боссов пока нет";
+  /* Новый пулл — разбор сразу, если сейчас ничего не считается; несколько новых — разбирается последний */
+  if (me.queue.length && !RUNNING) {
+    const f = me.queue[me.queue.length - 1], skipped = me.queue.length - 1;
+    me.queue = [];
+    me.done += 1;
+    liveStatus(`Новый пулл: ${f.name} — разбираю…` + (skipped ? ` (ещё ${skipped} пропущено: разбирается последний)` : ""));
+    try {
+      await run({mode: "fight", url: me.url, fight: String(f.id), actor: "all", ref: "none", pick: null, mythic: false, wait: false});
+      liveNotify(`${f.name}: ${f.kill ? "килл" : f.pct != null ? `вайп ${String(f.pct).replace(".", ",")}%` : "вайп"} — разбор готов`);
+    } catch(e) {}
+    if (LIVE !== me) return;
+  }
+  const idle = L.idle_min;
+  if (idle != null && idle > LIVE_IDLE_STOP_MIN) return liveStop(`Слежение остановлено: лог не пополнялся ${Math.round(idle)} мин. Разобрано новых пуллов: ${me.done}`);
+  liveStatus(`Слежу за «${L.title || "логом"}»: пуллов с боссами ${(L.fights || []).length}, ${lastTxt}. Проверка раз в минуту` +
+    (me.done ? ` · разобрано новых: ${me.done}` : " · новый пулл разберётся сам"));
+  me.timer = setTimeout(livePoll, LIVE_POLL_S * 1000);
+}
+$("#liveBtn").onclick = () => {
+  if (LIVE) return liveStop("Слежение остановлено");
+  if (!inspected) return showErr("Сначала нажмите «Найти бой» по ссылке на отчёт, который пишется сейчас.");
+  LIVE = {url: inspected.url, seen: new Set(), queue: [], first: true, done: 0, timer: null};
+  $("#liveBtn").textContent = "Остановить слежение"; $("#liveBtn").setAttribute("aria-pressed", "true");
+  liveStatus("Проверяю лог…");
+  try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch(e){}
+  livePoll();
+};
 
 /* ---------- «Топ прогресса» без лога: версия игры, рейд, сложность, босс — с Warcraft Logs ---------- */
 const TP_DIFF = {5: "Эпохальный", 4: "Героический", 3: "Обычный", 1: "Поиск рейда"};

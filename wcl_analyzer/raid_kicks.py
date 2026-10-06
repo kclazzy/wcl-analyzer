@@ -13,6 +13,7 @@ from .compare import _fmt_t
 from .raid_burst import _key
 
 CAST_WINDOW_S = 15.0    # прерывание или завершение каста — до 15 с от начала (и до следующего каста этого врага)
+MULTI_S = 5.0           # касты разных врагов одного типа ближе 5 с — враги кастуют одновременно
 MAX_KICKERS = 5         # больше пяти человек в одной очереди — уже нужен стан или контроль, а не очередь
 WASTED_MIN = 3          # «прерывание впустую» в подсказках — от трёх нажатий
 
@@ -103,7 +104,7 @@ def kick_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, site: st
             starts = sorted([t for t, _ in ks] + fin)
         used_k, used_f = set(), set()
         if starts:
-            g["spans"].append((starts[0], starts[-1]))
+            g["spans"].append((starts[0], starts[-1], key[0]))
         for i, t in enumerate(starts):
             end = min(starts[i + 1] if i + 1 < len(starts) else t + CAST_WINDOW_S, t + CAST_WINDOW_S) + 0.05
             k = next((j for j, (kt, _) in enumerate(ks) if j not in used_k and t - 0.05 <= kt <= end), None)
@@ -162,7 +163,8 @@ def kick_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, site: st
         # несколько врагов этого типа кастуют одновременно (адды) — на каждого свой человек, общая очередь
         # не годится: в план — те, кто их прерывал, без проверки «успевают ли по кругу»
         sp = sorted(g["spans"])
-        multi = any(b[0] < a[1] for a, b in zip(sp, sp[1:]))
+        # «одновременно» — касты двух разных врагов ближе MULTI_S или их серии кастов перекрываются
+        multi = any(b[0] < a[1] or b[0] - a[0] < MULTI_S for a, b in zip(sp, sp[1:]))
         # сначала — кто прерывал эту способность в бою, потом — кто прерывал вообще, потом — у кого прерывание есть
         pref = [pid for pid, _ in g["by"].most_common() if pid in kick_of]
         pref += sorted((pid for pid in kick_of if pid not in pref and presses.get(pid)),

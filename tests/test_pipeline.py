@@ -562,8 +562,8 @@ def _tank_checks(rt, run_raid, FakeRaidClient, DEMO_URL, tempfile, Path, load_wo
     assert any("по основной игре" in h for h in T["hints"])
     T = run(melee + [hit(60, 1, 5000, 400_000), hit(120, 1, 5000, 1_500_000), hit(121.5, 1, 6000, 1_200_000)])
     first = {r["time"]: r for r in T["plan"]}
-    assert first["2:00"]["pick"]["name"] == "Глухая оборона" and first["2:02"]["why"] == "тот же кулдаун", T["plan"]
-    assert first["1:00"]["pick"]["name"] == "Ни шагу назад", "крупный удар — первым; меньшему — другой кулдаун"
+    assert first["2:00"]["pick"]["name"] == "Shield Wall" and first["2:02"]["why"] == "тот же кулдаун", T["plan"]
+    assert first["1:00"]["pick"]["name"] == "Last Stand", "крупный удар — первым; меньшему — другой кулдаун"
     print("OK танки: танкбастеры, прикрыт ли удар, смерть от удара, лучшие киллы, план и заметка MRT, лист Excel; "
           "тики, адды, два танка, общий откат, заряды, школа урона, Classic")
 
@@ -1201,6 +1201,69 @@ def test_guide_buster_weak_hits():
     print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
 
 
+def test_potions_zero_details():
+    """Warcraft Logs отдаёт ноль зелий у всех (новые зелья не считает) — зелья берутся из кастов."""
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    for r in ("tanks", "healers", "dps"):
+        for p in raw["details"].get(r) or []:
+            p["potionUse"] = 0
+    pid = int(raw["details"]["dps"][0]["id"])
+    raw["report"]["masterData"]["abilities"].append({"gameID": 999101, "name": "Potion of Recklessness"})
+    raw["casts"] = list(raw["casts"]) + [{"type": "cast", "timestamp": float(raw["fight"]["startTime"]) + 5000,
+                                          "sourceID": pid, "abilityGameID": 999101}]
+    c = analyze_raid(raw)["extras"]["consumables"]
+    name = raw["details"]["dps"][0]["name"]
+    assert name not in c["no_potion"] and c["potion_source"] == "касты", c
+    print("OK зелья: ноль в playerDetails — считаем по кастам")
+
+
+def test_kicks():
+    """Прерывания: прервано/прошло, очередь успевает по откатам (каст каждые 5 с — нужно 3 человека с откатом 15 с),
+    заметка MRT, лист Excel, строка в «Главном»."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    from wcl_analyzer.raid_kicks import kick_analysis
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    R = analyze_raid(raw)
+    K = R["extras"]["kicks"]
+    assert "error" not in K, K
+    g = K["groups"][0]
+    assert g["casts"] == g["kicked"] + g["missed"] and g["missed"] >= 1 and g["rotation"], g
+    assert K["mrt"].startswith("Прерывания:") and f"{{spell:{g['id']}}}" in K["mrt"], K["mrt"]
+    assert any("очередь на следующий пулл" in h for h in K["hints"]), K["hints"]
+    with tempfile.TemporaryDirectory() as d:
+        wb = load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx"))
+        assert "Прерывания" in wb.sheetnames
+    # синтетика: враг кастует каждые 5 с, прерывания с откатом 15 с — в очереди трое, по кругу
+    f0 = 1_000_000.0
+    players = {i: {"name": f"P{i}", "cls": "Rogue", "spec": "Outlaw", "role": "dps"} for i in range(1, 6)}
+    raw2 = {"report": {"masterData": {"actors": [{"id": 50, "gameID": 777, "name": "Caster", "type": "NPC"}],
+                                       "abilities": []}},
+            "fight": {"name": "Test"},
+            "boss_casts": [{"type": "begincast", "timestamp": f0 + t * 1000, "sourceID": 50, "abilityGameID": 4242}
+                           for t in range(10, 100, 5)],
+            "interrupts": [{"type": "interrupt", "timestamp": f0 + t * 1000 + 500, "sourceID": 1, "targetID": 50,
+                            "abilityGameID": 1766, "extraAbilityGameID": 4242} for t in range(10, 100, 15)],
+            "casts": [{"type": "cast", "timestamp": f0 + t * 1000 + 500, "sourceID": 1, "abilityGameID": 1766}
+                      for t in range(10, 100, 15)]}
+    for t in range(15, 100, 5):
+        if (t - 10) % 15:
+            raw2["boss_casts"].append({"type": "cast", "timestamp": f0 + t * 1000 + 2000, "sourceID": 50, "abilityGameID": 4242})
+    K2 = kick_analysis(raw2, players, lambda x: x, lambda ev: (float(ev["timestamp"]) - f0) / 1000,
+                       lambda ab: "Shadow Bolt" if int(ab) == 4242 else f"Spell {ab}", 120.0)
+    g2 = K2["groups"][0]
+    assert g2["casts"] == 18 and g2["kicked"] == 6 and g2["missed"] == 12, g2
+    assert len(g2["rotation"]) == 3 and g2["rotation"][0]["player"] == "P1" and g2["uncovered"] == 0, g2["rotation"]
+    assert "P1" in K2["mrt"] and " > " in K2["mrt"], K2["mrt"]
+    print("OK прерывания: прервано/прошло, очередь по откатам, заметка MRT, лист Excel")
+
+
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
@@ -1221,6 +1284,8 @@ if __name__ == "__main__":
     test_game_versions()
     test_spikes_dense_damage()
     test_guide_buster_weak_hits()
+    test_potions_zero_details()
+    test_kicks()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()
@@ -1345,6 +1410,69 @@ def test_guide_buster_weak_hits():
     assert "Weak Slam" in names, names
     assert "Rotting Bite" not in names, names
     print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
+
+
+def test_potions_zero_details():
+    """Warcraft Logs отдаёт ноль зелий у всех (новые зелья не считает) — зелья берутся из кастов."""
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    for r in ("tanks", "healers", "dps"):
+        for p in raw["details"].get(r) or []:
+            p["potionUse"] = 0
+    pid = int(raw["details"]["dps"][0]["id"])
+    raw["report"]["masterData"]["abilities"].append({"gameID": 999101, "name": "Potion of Recklessness"})
+    raw["casts"] = list(raw["casts"]) + [{"type": "cast", "timestamp": float(raw["fight"]["startTime"]) + 5000,
+                                          "sourceID": pid, "abilityGameID": 999101}]
+    c = analyze_raid(raw)["extras"]["consumables"]
+    name = raw["details"]["dps"][0]["name"]
+    assert name not in c["no_potion"] and c["potion_source"] == "касты", c
+    print("OK зелья: ноль в playerDetails — считаем по кастам")
+
+
+def test_kicks():
+    """Прерывания: прервано/прошло, очередь успевает по откатам (каст каждые 5 с — нужно 3 человека с откатом 15 с),
+    заметка MRT, лист Excel, строка в «Главном»."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    from wcl_analyzer.raid_kicks import kick_analysis
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    R = analyze_raid(raw)
+    K = R["extras"]["kicks"]
+    assert "error" not in K, K
+    g = K["groups"][0]
+    assert g["casts"] == g["kicked"] + g["missed"] and g["missed"] >= 1 and g["rotation"], g
+    assert K["mrt"].startswith("Прерывания:") and f"{{spell:{g['id']}}}" in K["mrt"], K["mrt"]
+    assert any("очередь на следующий пулл" in h for h in K["hints"]), K["hints"]
+    with tempfile.TemporaryDirectory() as d:
+        wb = load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx"))
+        assert "Прерывания" in wb.sheetnames
+    # синтетика: враг кастует каждые 5 с, прерывания с откатом 15 с — в очереди трое, по кругу
+    f0 = 1_000_000.0
+    players = {i: {"name": f"P{i}", "cls": "Rogue", "spec": "Outlaw", "role": "dps"} for i in range(1, 6)}
+    raw2 = {"report": {"masterData": {"actors": [{"id": 50, "gameID": 777, "name": "Caster", "type": "NPC"}],
+                                       "abilities": []}},
+            "fight": {"name": "Test"},
+            "boss_casts": [{"type": "begincast", "timestamp": f0 + t * 1000, "sourceID": 50, "abilityGameID": 4242}
+                           for t in range(10, 100, 5)],
+            "interrupts": [{"type": "interrupt", "timestamp": f0 + t * 1000 + 500, "sourceID": 1, "targetID": 50,
+                            "abilityGameID": 1766, "extraAbilityGameID": 4242} for t in range(10, 100, 15)],
+            "casts": [{"type": "cast", "timestamp": f0 + t * 1000 + 500, "sourceID": 1, "abilityGameID": 1766}
+                      for t in range(10, 100, 15)]}
+    for t in range(15, 100, 5):
+        if (t - 10) % 15:
+            raw2["boss_casts"].append({"type": "cast", "timestamp": f0 + t * 1000 + 2000, "sourceID": 50, "abilityGameID": 4242})
+    K2 = kick_analysis(raw2, players, lambda x: x, lambda ev: (float(ev["timestamp"]) - f0) / 1000,
+                       lambda ab: "Shadow Bolt" if int(ab) == 4242 else f"Spell {ab}", 120.0)
+    g2 = K2["groups"][0]
+    assert g2["casts"] == 18 and g2["kicked"] == 6 and g2["missed"] == 12, g2
+    assert len(g2["rotation"]) == 3 and g2["rotation"][0]["player"] == "P1" and g2["uncovered"] == 0, g2["rotation"]
+    assert "P1" in K2["mrt"] and " > " in K2["mrt"], K2["mrt"]
+    print("OK прерывания: прервано/прошло, очередь по откатам, заметка MRT, лист Excel")
 
 
 if __name__ == "__main__":
@@ -1498,6 +1626,69 @@ def test_guide_buster_weak_hits():
     print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
 
 
+def test_potions_zero_details():
+    """Warcraft Logs отдаёт ноль зелий у всех (новые зелья не считает) — зелья берутся из кастов."""
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    for r in ("tanks", "healers", "dps"):
+        for p in raw["details"].get(r) or []:
+            p["potionUse"] = 0
+    pid = int(raw["details"]["dps"][0]["id"])
+    raw["report"]["masterData"]["abilities"].append({"gameID": 999101, "name": "Potion of Recklessness"})
+    raw["casts"] = list(raw["casts"]) + [{"type": "cast", "timestamp": float(raw["fight"]["startTime"]) + 5000,
+                                          "sourceID": pid, "abilityGameID": 999101}]
+    c = analyze_raid(raw)["extras"]["consumables"]
+    name = raw["details"]["dps"][0]["name"]
+    assert name not in c["no_potion"] and c["potion_source"] == "касты", c
+    print("OK зелья: ноль в playerDetails — считаем по кастам")
+
+
+def test_kicks():
+    """Прерывания: прервано/прошло, очередь успевает по откатам (каст каждые 5 с — нужно 3 человека с откатом 15 с),
+    заметка MRT, лист Excel, строка в «Главном»."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    from wcl_analyzer.raid_kicks import kick_analysis
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    R = analyze_raid(raw)
+    K = R["extras"]["kicks"]
+    assert "error" not in K, K
+    g = K["groups"][0]
+    assert g["casts"] == g["kicked"] + g["missed"] and g["missed"] >= 1 and g["rotation"], g
+    assert K["mrt"].startswith("Прерывания:") and f"{{spell:{g['id']}}}" in K["mrt"], K["mrt"]
+    assert any("очередь на следующий пулл" in h for h in K["hints"]), K["hints"]
+    with tempfile.TemporaryDirectory() as d:
+        wb = load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx"))
+        assert "Прерывания" in wb.sheetnames
+    # синтетика: враг кастует каждые 5 с, прерывания с откатом 15 с — в очереди трое, по кругу
+    f0 = 1_000_000.0
+    players = {i: {"name": f"P{i}", "cls": "Rogue", "spec": "Outlaw", "role": "dps"} for i in range(1, 6)}
+    raw2 = {"report": {"masterData": {"actors": [{"id": 50, "gameID": 777, "name": "Caster", "type": "NPC"}],
+                                       "abilities": []}},
+            "fight": {"name": "Test"},
+            "boss_casts": [{"type": "begincast", "timestamp": f0 + t * 1000, "sourceID": 50, "abilityGameID": 4242}
+                           for t in range(10, 100, 5)],
+            "interrupts": [{"type": "interrupt", "timestamp": f0 + t * 1000 + 500, "sourceID": 1, "targetID": 50,
+                            "abilityGameID": 1766, "extraAbilityGameID": 4242} for t in range(10, 100, 15)],
+            "casts": [{"type": "cast", "timestamp": f0 + t * 1000 + 500, "sourceID": 1, "abilityGameID": 1766}
+                      for t in range(10, 100, 15)]}
+    for t in range(15, 100, 5):
+        if (t - 10) % 15:
+            raw2["boss_casts"].append({"type": "cast", "timestamp": f0 + t * 1000 + 2000, "sourceID": 50, "abilityGameID": 4242})
+    K2 = kick_analysis(raw2, players, lambda x: x, lambda ev: (float(ev["timestamp"]) - f0) / 1000,
+                       lambda ab: "Shadow Bolt" if int(ab) == 4242 else f"Spell {ab}", 120.0)
+    g2 = K2["groups"][0]
+    assert g2["casts"] == 18 and g2["kicked"] == 6 and g2["missed"] == 12, g2
+    assert len(g2["rotation"]) == 3 and g2["rotation"][0]["player"] == "P1" and g2["uncovered"] == 0, g2["rotation"]
+    assert "P1" in K2["mrt"] and " > " in K2["mrt"], K2["mrt"]
+    print("OK прерывания: прервано/прошло, очередь по откатам, заметка MRT, лист Excel")
+
+
 if __name__ == "__main__":
     test_analysis_quality()
 
@@ -1593,6 +1784,69 @@ def test_guide_buster_weak_hits():
     assert "Weak Slam" in names, names
     assert "Rotting Bite" not in names, names
     print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
+
+
+def test_potions_zero_details():
+    """Warcraft Logs отдаёт ноль зелий у всех (новые зелья не считает) — зелья берутся из кастов."""
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    for r in ("tanks", "healers", "dps"):
+        for p in raw["details"].get(r) or []:
+            p["potionUse"] = 0
+    pid = int(raw["details"]["dps"][0]["id"])
+    raw["report"]["masterData"]["abilities"].append({"gameID": 999101, "name": "Potion of Recklessness"})
+    raw["casts"] = list(raw["casts"]) + [{"type": "cast", "timestamp": float(raw["fight"]["startTime"]) + 5000,
+                                          "sourceID": pid, "abilityGameID": 999101}]
+    c = analyze_raid(raw)["extras"]["consumables"]
+    name = raw["details"]["dps"][0]["name"]
+    assert name not in c["no_potion"] and c["potion_source"] == "касты", c
+    print("OK зелья: ноль в playerDetails — считаем по кастам")
+
+
+def test_kicks():
+    """Прерывания: прервано/прошло, очередь успевает по откатам (каст каждые 5 с — нужно 3 человека с откатом 15 с),
+    заметка MRT, лист Excel, строка в «Главном»."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    from wcl_analyzer.raid_kicks import kick_analysis
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    R = analyze_raid(raw)
+    K = R["extras"]["kicks"]
+    assert "error" not in K, K
+    g = K["groups"][0]
+    assert g["casts"] == g["kicked"] + g["missed"] and g["missed"] >= 1 and g["rotation"], g
+    assert K["mrt"].startswith("Прерывания:") and f"{{spell:{g['id']}}}" in K["mrt"], K["mrt"]
+    assert any("очередь на следующий пулл" in h for h in K["hints"]), K["hints"]
+    with tempfile.TemporaryDirectory() as d:
+        wb = load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx"))
+        assert "Прерывания" in wb.sheetnames
+    # синтетика: враг кастует каждые 5 с, прерывания с откатом 15 с — в очереди трое, по кругу
+    f0 = 1_000_000.0
+    players = {i: {"name": f"P{i}", "cls": "Rogue", "spec": "Outlaw", "role": "dps"} for i in range(1, 6)}
+    raw2 = {"report": {"masterData": {"actors": [{"id": 50, "gameID": 777, "name": "Caster", "type": "NPC"}],
+                                       "abilities": []}},
+            "fight": {"name": "Test"},
+            "boss_casts": [{"type": "begincast", "timestamp": f0 + t * 1000, "sourceID": 50, "abilityGameID": 4242}
+                           for t in range(10, 100, 5)],
+            "interrupts": [{"type": "interrupt", "timestamp": f0 + t * 1000 + 500, "sourceID": 1, "targetID": 50,
+                            "abilityGameID": 1766, "extraAbilityGameID": 4242} for t in range(10, 100, 15)],
+            "casts": [{"type": "cast", "timestamp": f0 + t * 1000 + 500, "sourceID": 1, "abilityGameID": 1766}
+                      for t in range(10, 100, 15)]}
+    for t in range(15, 100, 5):
+        if (t - 10) % 15:
+            raw2["boss_casts"].append({"type": "cast", "timestamp": f0 + t * 1000 + 2000, "sourceID": 50, "abilityGameID": 4242})
+    K2 = kick_analysis(raw2, players, lambda x: x, lambda ev: (float(ev["timestamp"]) - f0) / 1000,
+                       lambda ab: "Shadow Bolt" if int(ab) == 4242 else f"Spell {ab}", 120.0)
+    g2 = K2["groups"][0]
+    assert g2["casts"] == 18 and g2["kicked"] == 6 and g2["missed"] == 12, g2
+    assert len(g2["rotation"]) == 3 and g2["rotation"][0]["player"] == "P1" and g2["uncovered"] == 0, g2["rotation"]
+    assert "P1" in K2["mrt"] and " > " in K2["mrt"], K2["mrt"]
+    print("OK прерывания: прервано/прошло, очередь по откатам, заметка MRT, лист Excel")
 
 
 if __name__ == "__main__":
@@ -2128,6 +2382,69 @@ def test_guide_buster_weak_hits():
     assert "Weak Slam" in names, names
     assert "Rotting Bite" not in names, names
     print("OK танкбастер из гайда: слабый, но редкий удар — да; частые тики — нет")
+
+
+def test_potions_zero_details():
+    """Warcraft Logs отдаёт ноль зелий у всех (новые зелья не считает) — зелья берутся из кастов."""
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    for r in ("tanks", "healers", "dps"):
+        for p in raw["details"].get(r) or []:
+            p["potionUse"] = 0
+    pid = int(raw["details"]["dps"][0]["id"])
+    raw["report"]["masterData"]["abilities"].append({"gameID": 999101, "name": "Potion of Recklessness"})
+    raw["casts"] = list(raw["casts"]) + [{"type": "cast", "timestamp": float(raw["fight"]["startTime"]) + 5000,
+                                          "sourceID": pid, "abilityGameID": 999101}]
+    c = analyze_raid(raw)["extras"]["consumables"]
+    name = raw["details"]["dps"][0]["name"]
+    assert name not in c["no_potion"] and c["potion_source"] == "касты", c
+    print("OK зелья: ноль в playerDetails — считаем по кастам")
+
+
+def test_kicks():
+    """Прерывания: прервано/прошло, очередь успевает по откатам (каст каждые 5 с — нужно 3 человека с откатом 15 с),
+    заметка MRT, лист Excel, строка в «Главном»."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import analyze_raid, fetch_raid_raw
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    from wcl_analyzer.raid_kicks import kick_analysis
+    raw = fetch_raid_raw(FakeRaidClient(), DEMO_URL, None, log=lambda m: None)
+    R = analyze_raid(raw)
+    K = R["extras"]["kicks"]
+    assert "error" not in K, K
+    g = K["groups"][0]
+    assert g["casts"] == g["kicked"] + g["missed"] and g["missed"] >= 1 and g["rotation"], g
+    assert K["mrt"].startswith("Прерывания:") and f"{{spell:{g['id']}}}" in K["mrt"], K["mrt"]
+    assert any("очередь на следующий пулл" in h for h in K["hints"]), K["hints"]
+    with tempfile.TemporaryDirectory() as d:
+        wb = load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx"))
+        assert "Прерывания" in wb.sheetnames
+    # синтетика: враг кастует каждые 5 с, прерывания с откатом 15 с — в очереди трое, по кругу
+    f0 = 1_000_000.0
+    players = {i: {"name": f"P{i}", "cls": "Rogue", "spec": "Outlaw", "role": "dps"} for i in range(1, 6)}
+    raw2 = {"report": {"masterData": {"actors": [{"id": 50, "gameID": 777, "name": "Caster", "type": "NPC"}],
+                                       "abilities": []}},
+            "fight": {"name": "Test"},
+            "boss_casts": [{"type": "begincast", "timestamp": f0 + t * 1000, "sourceID": 50, "abilityGameID": 4242}
+                           for t in range(10, 100, 5)],
+            "interrupts": [{"type": "interrupt", "timestamp": f0 + t * 1000 + 500, "sourceID": 1, "targetID": 50,
+                            "abilityGameID": 1766, "extraAbilityGameID": 4242} for t in range(10, 100, 15)],
+            "casts": [{"type": "cast", "timestamp": f0 + t * 1000 + 500, "sourceID": 1, "abilityGameID": 1766}
+                      for t in range(10, 100, 15)]}
+    for t in range(15, 100, 5):
+        if (t - 10) % 15:
+            raw2["boss_casts"].append({"type": "cast", "timestamp": f0 + t * 1000 + 2000, "sourceID": 50, "abilityGameID": 4242})
+    K2 = kick_analysis(raw2, players, lambda x: x, lambda ev: (float(ev["timestamp"]) - f0) / 1000,
+                       lambda ab: "Shadow Bolt" if int(ab) == 4242 else f"Spell {ab}", 120.0)
+    g2 = K2["groups"][0]
+    assert g2["casts"] == 18 and g2["kicked"] == 6 and g2["missed"] == 12, g2
+    assert len(g2["rotation"]) == 3 and g2["rotation"][0]["player"] == "P1" and g2["uncovered"] == 0, g2["rotation"]
+    assert "P1" in K2["mrt"] and " > " in K2["mrt"], K2["mrt"]
+    print("OK прерывания: прервано/прошло, очередь по откатам, заметка MRT, лист Excel")
 
 
 if __name__ == "__main__":

@@ -267,6 +267,11 @@ def dps_cd_ids() -> set[int]:
     return _IDS_CACHE["ids"]
 
 
+def interrupts() -> list[dict]:
+    """Прерывания классов — вкладка «Прерывания»."""
+    return _section("interrupts")
+
+
 def tank_cds() -> list[dict]:
     """Защитные кулдауны танков и внешние сейвы на танка — вкладка «Танки»."""
     return _section("tank_cds")

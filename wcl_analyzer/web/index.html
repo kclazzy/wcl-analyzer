@@ -1978,14 +1978,41 @@ function renderTank(T, el){
         esc(r.ability), esc(r.tank), r.pick ? esc(r.pick.name + (r.pick.external ? ` (${r.pick.player})` : "")) : '<span class="worse">нет свободного кулдауна</span>', esc(r.why||"")])) + mrt) : ""}
     ${Object.keys(top).length ? box("Лучшие киллы", `Какая доля ударов прикрыта кулдауном у гильдий с лучшими киллами этого босса (${T.top.kills}).`,
       table(["Удар","У вас","У лучших","Чем прикрывают чаще всего"], (T.busters||[]).filter(b => top[b.id]).map(b => [esc(b.name), `${b.covered} из ${b.n}`,
-        `${Math.round(top[b.id].share*100)}%`, esc((top[b.id].names||[]).join(", "))]))) : ""}`;
+        `${Math.round(top[b.id].share*100)}%`, esc(((T.en && top[b.id].names_en) || top[b.id].names || []).join(", "))]))) : ""}`;
+}
+
+function renderKicks(K, el){
+  if (!el) return;
+  if (!K) { el.innerHTML = '<p class="empty">Нет данных о прерываниях: разбор из прежней версии — разберите бой заново.</p>'; return; }
+  if (K.error) { el.innerHTML = `<p class="empty">Прерывания не разобраны: ${esc(K.error)}</p>`; return; }
+  const G = K.groups || [];
+  const ppl = a => (a||[]).map(p => esc(p.player) + (p.n != null ? ` ×${p.n}` : "")).join(", ");
+  const rot = g => (g.rotation||[]).map(p => `${esc(p.player)} <span style="color:var(--muted);font-size:13px">${esc(p.kick)}, ${p.cd} с</span>`).join(" → ")
+    + (g.backup ? ` <span style="color:var(--muted);font-size:13px">запас: ${esc(g.backup.player)}</span>` : "");
+  const mrt = K.mrt ? `<div class="mrt" style="margin-top:12px">
+    <button type="button" class="mini mrtbtn" data-mrt data-label="Скопировать для MRT (прерывания)">Скопировать для MRT (прерывания)</button>
+    <span class="hint" style="margin-left:8px">На каждую прерываемую способность — очередь по порядку и запасной. Очередь подобрана так, чтобы каждый успевал откатить своё прерывание к следующему касту. В игре: /mrt → Заметки → вставить → Отправить.</span>
+    <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:13.5px">Текст заметки</summary>
+      <textarea readonly rows="${Math.min(14, K.mrt.split("\n").length + 1)}" style="width:100%;margin-top:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;box-sizing:border-box">${esc(K.mrt)}</textarea></details></div>` : "";
+  el.innerHTML = `
+    ${(K.hints||[]).length ? `<div class="box brief"><h3>Главное по прерываниям</h3><ul class="lines">${K.hints.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
+    ${box("Что прерывали", "Прерываемой считается способность врага, которую в этом бою прервали хотя бы раз. «Прошло» — каст завершился. Касты, сбитые станом или отменённые, не считаются.",
+      table(["Способность","Враг","Кастов","Прервано","Прошло","Кто прерывал","Когда прошло"], G.map(g => [esc(g.name), esc(g.npc), num(g.casts), num(g.kicked),
+        g.missed ? `<span class="worse">${num(g.missed)}</span>` : "0", ppl(g.by), esc((g.missed_times||[]).join(", "))]),
+        {num:[2,3,4], empty:"Прерываемых кастов не было.", flag: i => !!G[i].missed}))}
+    ${G.some(g => (g.rotation||[]).length) ? box("Очередь на следующий пулл", "Кто за кем прерывает. Сначала — кто прерывал эту способность в бою, затем — у кого прерывание откатано. Откат — по таблице или по факту, если игрок жал чаще.",
+      table(["Способность","Враг","Очередь","Между кастами"], G.filter(g => (g.rotation||[]).length).map(g => [esc(g.name), esc(g.npc),
+        rot(g) + (g.uncovered ? ` <span class="worse">не успевают: ${g.uncovered}</span>` : ""), g.gap ? `${g.gap} с` : "—"])) + mrt) : ""}
+    ${box("Игроки", "Сколько раз прервали каст и сколько нажали всего; «впустую» — каст уже сбит другим или закончился.",
+      table(["Игрок","Прерывание","Прервал","Нажато","Впустую"], (K.players||[]).map(r => [esc(r.player), esc(r.kick||""), num(r.kicks), num(r.presses),
+        r.wasted >= 3 ? `<span class="worse">${num(r.wasted)}</span>` : num(r.wasted)]), {num:[2,3,4], empty:"Прерываний не было."}))}`;
 }
 
 function renderRaid(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, S = R.summary, fd = S.first_death;
   const outcome = I.kill ? "килл" : (I.boss_pct!=null ? `вайп на ${num(I.boss_pct,1)}% здоровья босса` : "вайп");
-  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-dmg","Нанесение урона"],["r-tank","Танки"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
+  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-dmg","Нанесение урона"],["r-tank","Танки"],["r-kick","Прерывания"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
   const el = resEl();
   el.innerHTML = `
     ${I.demo?'<div class="demo-flag">Демо: синтетический рейд, не реальный лог</div>':""}
@@ -2072,6 +2099,7 @@ function renderRaid(R){
     else $("#p-r-cd").innerHTML = '<p class="empty">Нет данных об уроне по рейду.</p>'; };
   lazy["r-dmg"] = () => renderBurst(X.burst, $("#p-r-dmg"));
   lazy["r-tank"] = () => renderTank(X.tank, $("#p-r-tank"));
+  lazy["r-kick"] = () => renderKicks(X.kicks, $("#p-r-kick"));
   if (Object.keys(X).length) $("#p-r-sum").insertAdjacentHTML("beforeend", `<div class="grid2">
     <div>
       ${box("Прерывания", "Каст прошёл, хотя эту способность в бою прерывали.",

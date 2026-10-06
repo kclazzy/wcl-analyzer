@@ -80,6 +80,7 @@ for c in pick_fights(rep, difficulties=None):
             "consumables": X.get("consumables"),
             "deaths": [(d["time"], d["player"], d["ability"], d.get("wipe_tail")) for d in R.get("deaths") or []],
             "top": {"n": (X.get("vs_top") or {}).get("n")},
+            "kicks": X.get("kicks"),
         })
     except Exception as e:
         item["error"] = f"{type(e).__name__}: {e}"
@@ -91,4 +92,4 @@ try:
 except Exception:
     pass
 out["log_tail"] = log[-200:]
-json.dump(out, open("debug_log_out.json", "w"), ensure_ascii=False, indent=1, default=str)
+json.dump(out, open(sys.argv[2] if len(sys.argv) > 2 else "debug_log_out.json", "w"), ensure_ascii=False, indent=1, default=str)

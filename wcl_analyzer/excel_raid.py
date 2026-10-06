@@ -34,6 +34,7 @@ def write_raid_workbook(R: dict, path: str | Path, wb=None) -> Path:
     _vs_top(wb, R, demo)
     _burst(wb, R, demo)
     _tank(wb, R, demo)
+    _kicks(wb, R, demo)
     _overview(wb, R, demo)
     _players(wb, R, demo)
     _mechanics(wb, R, demo)
@@ -137,10 +138,43 @@ def _tank(wb, R, demo):
         s.section("Лучшие киллы", f"Доля ударов, прикрытых кулдауном, у гильдий с лучшими киллами ({T['top'].get('kills')}).")
         s.table(["Удар", "У вас", "У лучших", "Чем прикрывают чаще всего"],
                 [[b["name"], f"{b['covered']} из {b['n']}", f"{top[str(b['id'])]['share']:.0%}",
-                  ", ".join(top[str(b["id"])].get("names") or [])] for b in T.get("busters") or [] if str(b["id"]) in top])
+                  ", ".join((T.get("en") and top[str(b["id"])].get("names_en")) or top[str(b["id"])].get("names") or [])] for b in T.get("busters") or [] if str(b["id"]) in top])
     if T.get("mrt"):
         s.section("Заметка MRT для танков")
         for line in T["mrt"].split("\n"):
+            s.cell(s.row, 1, line)
+            s.row += 1
+
+
+def _kicks(wb, R, demo):
+    K = (R.get("extras") or {}).get("kicks") or {}
+    if not K or K.get("error") or not (K.get("groups") or K.get("players")):
+        return
+    s = Sheet(wb, "Прерывания", demo, {"A": 26, "B": 22, "C": 10, "D": 10, "E": 10, "F": 34, "G": 30})
+    s.title("Прерывания", "Что враги кастуют и что прерывали, кто прерывал и очередь на следующий пулл.")
+    if K.get("hints"):
+        s.section("Главное")
+        for line in K["hints"]:
+            s.cell(s.row, 1, "• " + line)
+            s.row += 1
+        s.row += 1
+    G = K.get("groups") or []
+    s.section("Что прерывали")
+    s.table(["Способность", "Враг", "Кастов", "Прервано", "Прошло", "Кто прерывал", "Когда прошло"],
+            [[g["name"], g["npc"], g["casts"], g["kicked"], g["missed"],
+              ", ".join(f"{p['player']} ×{p['n']}" for p in g["by"]), ", ".join(g["missed_times"])] for g in G])
+    rot = [g for g in G if g.get("rotation")]
+    if rot:
+        s.section("Очередь на следующий пулл")
+        s.table(["Способность", "Враг", "Очередь", "Запас", "Между кастами"],
+                [[g["name"], g["npc"], " → ".join(f"{p['player']} ({p['kick']}, {p['cd']} с)" for p in g["rotation"]),
+                  (g.get("backup") or {}).get("player", ""), f"{g['gap']} с" if g.get("gap") else "—"] for g in rot])
+    s.section("Игроки")
+    s.table(["Игрок", "Прерывание", "Прервал", "Нажато", "Впустую"],
+            [[r["player"], r.get("kick") or "", r["kicks"], r["presses"], r["wasted"]] for r in K.get("players") or []])
+    if K.get("mrt"):
+        s.section("Заметка MRT для прерываний")
+        for line in K["mrt"].split("\n"):
             s.cell(s.row, 1, line)
             s.row += 1
 

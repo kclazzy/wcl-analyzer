@@ -239,3 +239,139 @@ jobs:
             WCL-Analyzer.apk
             wcl_analyzer-code.zip
             update.json
+
+  # После выпуска — обновление так, как его получают пользователи: ПРЕДЫДУЩАЯ опубликованная версия
+  # обновляется до только что вышедшей (настоящие файлы выпусков с GitHub)
+  update-pc:
+    needs: publish
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NEW_BUILD: ${{ github.run_number }}
+    steps:
+      - name: Прошлая версия .exe обновляется до новой (код и программа целиком)
+        shell: pwsh
+        run: |
+          $repo = $env:GITHUB_REPOSITORY
+          $prev = (gh release list --repo $repo --limit 5 --json tagName --jq '.[].tagName') | Where-Object { $_ -ne "v1.1.$env:NEW_BUILD" } | Select-Object -First 1
+          if (-not $prev) { Write-Host "Прошлого выпуска нет — проверять нечего"; exit 0 }
+          Write-Host "Прошлый выпуск: $prev, новый: v1.1.$env:NEW_BUILD"
+          function Wait-Build($port, $want, $sec) {
+            for ($i = 0; $i -lt $sec / 2; $i++) {
+              Start-Sleep 2
+              try { $x = Invoke-RestMethod "http://127.0.0.1:$port/api/version"; if ("$($x.build)" -eq "$want") { return $x } } catch {}
+            }
+            return $null
+          }
+          function Start-Old($name, $port) {
+            $dir = Join-Path $env:RUNNER_TEMP $name
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            gh release download $prev --repo $repo -p WCL-Analyzer.exe -D $dir --clobber
+            $env:WCL_DATA_DIR = Join-Path $dir "data"   # своя папка данных — как у нового пользователя
+            Start-Process -FilePath "$dir\WCL-Analyzer.exe" -ArgumentList "ui","--no-browser","--port","$port" | Out-Null
+            $v = $null
+            for ($i = 0; $i -lt 40 -and -not $v; $i++) { try { $v = Invoke-RestMethod "http://127.0.0.1:$port/api/version" } catch { Start-Sleep 1 } }
+            if (-not $v) { throw "Прошлая версия ($prev) не запустилась" }
+            Write-Host "$name : запущена сборка $($v.build)"
+            return @{dir = $dir; v = $v}
+          }
+          $hdr = @{ Origin = "http://127.0.0.1:8796" }
+          # 1) Обновление кода (так обновляется большинство выпусков): скачать, перезапуститься, работать новой сборкой
+          $a = Start-Old "upd-code" 8796
+          $c = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8796/api/update/check -ContentType "application/json" -Headers $hdr -Body '{}'
+          Write-Host "Проверка обновлений: $($c | ConvertTo-Json -Compress)"
+          if (-not $c.available -or "$($c.latest)" -ne "$env:NEW_BUILD") { throw "Прошлая версия не видит новую сборку $env:NEW_BUILD : $($c | ConvertTo-Json -Compress)" }
+          if ($c.kind -eq "code") {
+            $r = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8796/api/update/apply -ContentType "application/json" -Headers $hdr -Body '{"kind":"code"}' -TimeoutSec 600
+            if (-not $r.ok) { throw "Обновление кода не прошло: $($r | ConvertTo-Json -Compress)" }
+            $x = Wait-Build 8796 $env:NEW_BUILD 120
+            if (-not $x) { throw "После обновления кода программа не работает новой сборкой $env:NEW_BUILD" }
+            Write-Host "Обновление кода: $($a.v.build) -> $($x.build)"
+            Get-Process | Where-Object { $_.Path -like "$($a.dir)*" } | Stop-Process -Force
+          } else { Write-Host "Новой сборке нужна программа целиком — проверяется ниже" }
+          # 2) Программа целиком: .exe скачивает новую версию, заменяет себя и перезапускается
+          $b = Start-Old "upd-full" 8797
+          $before = (Get-FileHash "$($b.dir)\WCL-Analyzer.exe").Hash
+          $hdr = @{ Origin = "http://127.0.0.1:8797" }
+          $r = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8797/api/update/apply -ContentType "application/json" -Headers $hdr -Body '{"kind":"full"}' -TimeoutSec 600
+          if (-not $r.ok) { throw "Обновление целиком не началось: $($r | ConvertTo-Json -Compress)" }
+          $x = Wait-Build 8797 $env:NEW_BUILD 180
+          if (-not $x) { throw "После обновления целиком программа не перезапустилась новой сборкой $env:NEW_BUILD" }
+          if ((Get-FileHash "$($b.dir)\WCL-Analyzer.exe").Hash -eq $before) { throw ".exe не заменён" }
+          Write-Host "Обновление целиком: $($b.v.build) -> $($x.build)"
+          Get-Process | Where-Object { $_.Path -like "$($b.dir)*" } | Stop-Process -Force
+
+  update-phone:
+    needs: publish
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NEW_BUILD: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip, cache-dependency-path: requirements.txt}
+      - run: pip install -r requirements.txt
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: "17"}
+      - name: Прошлая версия приложения обновляет код до новой (загрузчик из APK)
+        run: |
+          set -e
+          NEW="v1.1.$NEW_BUILD"
+          PREV=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 5 --json tagName --jq '.[].tagName' | grep -vx "$NEW" | head -1)
+          if [ -z "$PREV" ]; then echo "Прошлого выпуска нет"; exit 0; fi
+          echo "Прошлый выпуск: $PREV, новый: $NEW"
+          body() { gh release view "$1" --repo "$GITHUB_REPOSITORY" --json body --jq .body | sed -n 's/.*<!--update \(.*\) -->.*/\1/p'; }
+          OLD_JSON=$(body "$PREV"); NEW_JSON=$(body "$NEW")
+          OLD_SHELL=$(echo "$OLD_JSON" | python -c "import json,sys; print(json.load(sys.stdin)['shell'])")
+          NEW_SHELL=$(echo "$NEW_JSON" | python -c "import json,sys; print(json.load(sys.stdin)['shell'])")
+          # Приложение как на телефоне: загрузчик wcl_boot и main.py из APK, код прошлой версии
+          APP=$RUNNER_TEMP/app; rm -rf "$APP"; mkdir -p "$APP" "$RUNNER_TEMP/dl"
+          gh release download "$PREV" --repo "$GITHUB_REPOSITORY" -p wcl_analyzer-code.zip -D "$RUNNER_TEMP/dl" --clobber
+          unzip -q "$RUNNER_TEMP/dl/wcl_analyzer-code.zip" -d "$APP"
+          cp android/main.py "$APP/"
+          sed "s/^SHELL_ID = \"dev\"/SHELL_ID = \"$OLD_SHELL\"/" wcl_boot.py > "$APP/wcl_boot.py"
+          export WCL_APP=android ANDROID_PRIVATE=$RUNNER_TEMP/private
+          mkdir -p "$ANDROID_PRIVATE"
+          start() { (cd "$APP" && python main.py > "$RUNNER_TEMP/app.log" 2>&1 &) ; for i in $(seq 1 40); do curl -sf http://127.0.0.1:8765/api/version && return 0; sleep 1; done; cat "$RUNNER_TEMP/app.log"; return 1; }
+          build() { curl -sf http://127.0.0.1:8765/api/version | python -c "import json,sys; print(json.load(sys.stdin)['build'])"; }
+          start; OLD_BUILD=$(build); echo; echo "Запущена сборка $OLD_BUILD"
+          if [ "$OLD_SHELL" = "$NEW_SHELL" ]; then
+            R=$(curl -sf -X POST -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8765" -d '{"kind":"code"}' http://127.0.0.1:8765/api/update/apply)
+            echo "$R"
+            echo "$R" | python -c "import json,sys; d=json.load(sys.stdin); assert d.get('ok'), d"
+            ok=""
+            for i in $(seq 1 40); do sleep 2; b=$(build 2>/dev/null || true); [ "$b" = "$NEW_BUILD" ] && ok=1 && break; done
+            if [ -z "$ok" ]; then   # мягкий перезапуск не сработал — как после закрытия и открытия приложения
+              pkill -f "python main.py" || true; sleep 2; start; b=$(build)
+              [ "$b" = "$NEW_BUILD" ] || { cat "$RUNNER_TEMP/app.log"; echo "::error::Код не обновился: работает сборка $b, а не $NEW_BUILD"; exit 1; }
+              echo "::warning::Новый код подключился только после перезапуска приложения"
+            fi
+            echo "Обновление кода на телефоне: $OLD_BUILD -> $NEW_BUILD"
+            pkill -f "python main.py" || true; sleep 2; start; b=$(build)
+            [ "$b" = "$NEW_BUILD" ] || { echo "::error::После перезапуска приложения снова старая сборка ($b)"; exit 1; }
+            echo "После перезапуска приложения — новая сборка $b"
+          else
+            echo "Оболочка изменилась ($OLD_SHELL -> $NEW_SHELL): телефону нужен новый APK — проверяется ниже"
+          fi
+          pkill -f "python main.py" || true
+      - name: Новый APK встаёт поверх прошлого (та же подпись, номер версии выше)
+        run: |
+          set -e
+          NEW="v1.1.$NEW_BUILD"
+          PREV=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 5 --json tagName --jq '.[].tagName' | grep -vx "$NEW" | head -1)
+          [ -n "$PREV" ] || exit 0
+          mkdir -p old new
+          gh release download "$PREV" --repo "$GITHUB_REPOSITORY" -p WCL-Analyzer.apk -D old --clobber
+          gh release download "$NEW" --repo "$GITHUB_REPOSITORY" -p WCL-Analyzer.apk -D new --clobber
+          AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt | tail -1); SIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
+          cert() { "$SIGNER" verify --print-certs "$1" | grep -i "SHA-256 digest" | head -1; }
+          vc() { "$AAPT" dump badging "$1" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p"; }
+          "$SIGNER" verify new/WCL-Analyzer.apk
+          O=$(cert old/WCL-Analyzer.apk); N=$(cert new/WCL-Analyzer.apk)
+          echo "Подпись прошлого: $O"; echo "Подпись нового:  $N"
+          [ "$O" = "$N" ] || { echo "::error::Подпись APK изменилась — поверх прошлой версии не установится"; exit 1; }
+          OV=$(vc old/WCL-Analyzer.apk); NV=$(vc new/WCL-Analyzer.apk)
+          echo "versionCode: $OV -> $NV"
+          [ "$NV" -gt "$OV" ] || { echo "::error::Номер версии APK не вырос ($OV -> $NV) — Android не поставит обновление"; exit 1; }
+          echo "Новый APK встанет поверх прошлого: подпись та же, номер версии $OV -> $NV"

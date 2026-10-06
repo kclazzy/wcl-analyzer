@@ -273,9 +273,14 @@ def tank_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, phases: 
     order = {"healer": 0, "tank": 1, "dps": 2}
     givers = sorted(players, key=lambda p: order.get(players[p].get("role"), 3))
 
+    log_names = [a.get("name") or "" for a in ((raw.get("report") or {}).get("masterData") or {}).get("abilities") or []]
+    latin = sum(1 for n in log_names if n.isascii()) > len(log_names) / 2   # лог на английском
+
     def label(g: int) -> str:
         n = nm(g)
-        return n if n and not n.startswith("Spell ") else base_of[g]["name"]
+        if n and not n.startswith("Spell "):
+            return n
+        return (base_of[g].get("en") if latin else None) or base_of[g]["name"]
 
     events = []
     for b in busters:
@@ -342,7 +347,7 @@ def tank_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, phases: 
                         "id": None, "name": "", "cd": None, "times": [], "time": "", "used": 0, "max_uses": None,
                         "on_hit": 0})
     T = {"busters": busters, "events": events, "cds": cds, "tanks": [p["name"] for p in tanks.values()],
-         "duration": round(dur, 1), "top": None, "site": site,
+         "duration": round(dur, 1), "top": None, "site": site, "en": latin,
          "light": [{"id": e["id"], "k": e["k"], "covered": e["covered"], "died": e["died"],
                     "cds": [x["id"] for x in e["own"] + e["ext"]], "cls": e["cls"]} for e in events],
          "_eff": {f"{pid}:{g}": eff(pid, g) for pid in players for g in owned[pid]},
@@ -431,7 +436,7 @@ def plan_tank(T: dict, players: dict, phases: list[dict]) -> None:
             (who, g), why = got
             row["why"] = why
             row["pick"] = {"player": players[who]["name"], "cls": players[who].get("cls"), "id": g,
-                           "name": base_of[g]["name"], "external": who != pid}
+                           "name": (T.get("en") and base_of[g].get("en")) or base_of[g]["name"], "external": who != pid}
             if why != "тот же кулдаун":
                 n = ph["n"] if ph and (ph.get("n") or 0) > 1 else None
                 line = mrt_line(press, "«" + e["ability"] + "»", [row["pick"]], n,
@@ -462,7 +467,8 @@ def refresh(T: dict) -> None:
         s = f"«{b['name']}»: ударов по танкам — {b['n']}, прикрыто кулдауном — {b['covered']}"
         tb = (top.get("abilities") or {}).get(str(b["id"]))
         if tb:
-            s += f"; у лучших киллов — {tb['share']:.0%}" + (f", чаще всего: {', '.join(tb['names'][:3])}" if tb.get("names") else "")
+            tn = (tb.get("names_en") if T.get("en") else None) or tb.get("names")   # на языке лога
+            s += f"; у лучших киллов — {tb['share']:.0%}" + (f", чаще всего: {', '.join(tn[:3])}" if tn else "")
             if b["n"] and b["covered"] / b["n"] < tb["share"] - 0.3:
                 keys.setdefault("top", f"Танки: «{b['name']}» прикрыт кулдауном в {b['covered']} из {b['n']} ударов, "
                                        f"у лучших киллов — в {tb['share']:.0%}")
@@ -504,7 +510,8 @@ def top_summary(kills: list[dict], table: dict | None = None) -> dict | None:
             for cid in e.get("cds") or []:
                 names[str(e["id"])][int(cid)] += 1
     abilities = {ab: {"share": round(sum(v) / len(v), 2), "n": len(v),
-                      "names": [table[c]["name"] for c, _ in names[ab].most_common(4) if c in table]}
+                      "names": [table[c]["name"] for c, _ in names[ab].most_common(4) if c in table],
+                      "names_en": [table[c].get("en") or table[c]["name"] for c, _ in names[ab].most_common(4) if c in table]}
                  for ab, v in per.items() if v}
     return {"kills": len(ks), "abilities": abilities,
             "cds": {ab: [c for c, _ in names[ab].most_common(6)] for ab in names}}

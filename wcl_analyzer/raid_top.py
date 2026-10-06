@@ -402,25 +402,34 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
     raid_keys = [k for k in cds if game_data.scope(k[1]) != "self"]
     heal_keys = [k for k in cds if game_data.scope(k[1]) == "self"]
 
+    def fit_at(st, k):
+        """Когда нажать кулдаун k на этот пик (None — нельзя): на один пик — разные игроки и разные способности:
+        два одинаковых кулдауна одного класса (два «Ободряющих клича», два гимна) не складываются в пользу рейда."""
+        if any(k == p[0] or k[1] == p[0][1] for p in st["picks"]) or k[0] in st["players"]:
+            return None
+        for lead in range(PRESS_WINDOW_S[1], PRESS_WINDOW_S[0] - 1, -1):
+            at = press_at(st["ev"], lead)
+            if free(k, at, anchor(st["ev"], at)):
+                return at
+        return None
+
+    def place(st, k, at, extra: bool = False) -> None:
+        assigned[k].append((at, anchor(st["ev"], at)))
+        st["players"].add(k[0])   # игрок — по id, а не по имени: тёзки с разных серверов — разные игроки
+        st["picks"].append((k, at))
+        if extra:
+            st.setdefault("extra", set()).add(k)
+
     def add_one(st, extra: bool = False) -> bool:
-        ev, pref, picks, players = st["ev"], st["pref"], st["picks"], st["players"]
+        pref = st["pref"]
         # Сначала кулдаун, который здесь жмёт топ; затем — реже назначенный и более сильный
         order = sorted(raid_keys, key=lambda k: (pref.index(k[1]) if k[1] in pref else 99, len(assigned[k]),
                                            -game_data.power(k[1]), cds[k]["cd"]))
         for k in order:
-            # на один пик — разные игроки и разные способности: два одинаковых кулдауна
-            # одного класса (два «Ободряющих клича», два гимна) не складываются в пользу рейда
-            if any(k == p[0] or k[1] == p[0][1] for p in picks) or k[0] in players:
-                continue
-            for lead in range(PRESS_WINDOW_S[1], PRESS_WINDOW_S[0] - 1, -1):
-                at = press_at(ev, lead)
-                if free(k, at, anchor(ev, at)):
-                    assigned[k].append((at, anchor(ev, at)))
-                    players.add(k[0])   # игрок — по id, а не по имени: тёзки с разных серверов — разные игроки
-                    picks.append((k, at))
-                    if extra:
-                        st.setdefault("extra", set()).add(k)
-                    return True
+            at = fit_at(st, k)
+            if at is not None:
+                place(st, k, at, extra)
+                return True
         return False
 
     # Сначала — по одному сейву на каждый пик, от самых тяжёлых к лёгким: иначе кулдауны уходят на ранние
@@ -437,12 +446,19 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
     # Все сейвы — в дело: кулдаун, который к пику откатан и иначе простоял бы весь бой, тоже ставится —
     # на самые тяжёлые пики первыми, по кругу, пока хоть что-то назначается (не больше MAX_FILL_PER_PEAK на пик).
     # Пики после конца вашего боя не добираются: их нет в заметке MRT
+    # Свободный кулдаун ставится на пик, где сейвов пока меньше всего (при равенстве — на более тяжёлый):
+    # иначе все откатанные к началу боя кулдауны собирались на первом пике (7 сейвов в одной строке MRT)
     real = [st for st in by_weight if not st["ev"].get("after_end")]
-    for _round in range(100):
+    for _round in range(400):
         moved = False
-        for st in real:
-            if len(st["picks"]) < MAX_FILL_PER_PEAK and add_one(st, extra=True):
+        for k in sorted(raid_keys, key=lambda k: (len(assigned[k]), -game_data.power(k[1]), cds[k]["cd"])):
+            opts = [(len(st["picks"]) + len(st.get("heal") or []), i, st, at) for i, st in enumerate(real)
+                    if len(st["picks"]) < MAX_FILL_PER_PEAK for at in [fit_at(st, k)] if at is not None]
+            if opts:
+                _load, _i, st, at = min(opts, key=lambda o: (o[0], o[1]))
+                place(st, k, at, extra=True)
                 moved = True
+                break
         if not moved:
             break
     # Кулдауны лекарей: самые тяжёлые пики первыми, на пик — до MAX_HEAL_PER_PEAK разных лекарей,
@@ -464,8 +480,8 @@ def make_plan(X: dict, ref: dict, late: list[dict], names: dict, phases: list[di
         st["heal"] = []
         while add_heal(st, MAX_HEAL_PER_PEAK):
             pass
-    for _round in range(100):   # кулдауны лекарей, которые иначе простояли бы, — тоже на тяжёлые пики
-        if not any([add_heal(st, MAX_HEAL_FILL) for st in real]):
+    for _round in range(100):   # кулдауны лекарей, которые иначе простояли бы, — на пики, где их меньше всего
+        if not any(add_heal(st, MAX_HEAL_FILL) for st in sorted(real, key=lambda st: len(st["heal"]) + len(st["picks"]))):
             break
     plan = []
     for st in sorted(states, key=lambda st: st["ev"]["t"]):

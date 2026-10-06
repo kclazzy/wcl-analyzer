@@ -23,6 +23,7 @@ FLASK_RE = re.compile(r"flask|phial|фиал|настой|флакон|alchemica
 FOOD_RE = re.compile(r"well fed|сытост|сытн|hearty|пищ|food|feast|пир", re.I)
 RUNE_RE = re.compile(r"augment|руна усиления|кристаллиз", re.I)
 CD_MERGE_S = 15             # такты канала и повторные события одного кулдауна в пределах 15 с — одно нажатие
+TREND_MIN_PULLS = 4          # тренд смертей «в последних пуллах» — от 4 пуллов
 SPIKE_GAP_S = 8              # пики урона ближе 8 с считаются одним
 HEAL_CD_LEAD = (8.0, 3.0)    # кулдаун лекаря засчитан, если нажат за 8 с до пика … 3 с после
 ADDS_LOW = 0.4               # доля кастов по аддам ниже 40% от медианы DPS
@@ -544,13 +545,17 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
         t = rel(ev)
         window = [(tt, ab, a) for tt, ab, a in last_hits[pid] if t - 5 <= tt <= t + 0.05]
         kab = ev.get("killingAbilityGameID") or (window[-1][1] if window else None)
+        if kab is None:   # в событии смерти нет способности и 5 с до неё без ударов — последний удар за 15 с
+            near = [h for h in last_hits[pid] if t - 15 <= h[0] <= t + 0.05]
+            kab = near[-1][1] if near else None
         src = Counter()
         for _, ab, a in window:
             src[ab] += a
         before = [nm(ab) for tt, ab in casts_by[pid] if t - 10 <= tt <= t][-5:]
         first_death.setdefault(pid, t)
         deaths.append({"t": _r(t), "time": _fmt_t(t), "player": players[pid]["name"], "id": pid,
-                       "role": players[pid]["role_ru"], "spec": players[pid]["spec"], "cls": players[pid]["cls"], "ability": nm(kab),
+                       "role": players[pid]["role_ru"], "spec": players[pid]["spec"], "cls": players[pid]["cls"],
+                       "ability": nm(kab) if kab is not None else "неизвестно (удара перед смертью в логе нет)",
                        "sources": [{"name": nm(ab), "damage": round(v)} for ab, v in src.most_common(3)],
                        "last_casts": before, "wipe_tail": (not kill) and t >= dur - WIPE_TAIL_S})
     for i, d in enumerate(deaths):
@@ -731,6 +736,13 @@ def analyze_raid(raw: dict, avoidable: set | None = None) -> dict:
         extras["tank"] = tank_analysis(raw, players, owner, rel, nm, dur, phases, deaths)
     except Exception as e:  # noqa: BLE001
         extras["tank"] = {"error": str(e)}
+    try:  # прерывания: кто и что прерывал, очередь на следующий пулл
+        from .raid_kicks import kick_analysis
+        _ln = [a.get("name") or "" for a in report["masterData"]["abilities"]]
+        extras["kicks"] = kick_analysis(raw, players, owner, rel, nm, dur, raw.get("site", "www"),
+                                        latin=sum(1 for n in _ln if n.isascii()) > len(_ln) / 2)
+    except Exception as e:  # noqa: BLE001
+        extras["kicks"] = {"error": str(e)}
     for sp in extras.get("spikes", []):  # фаза пика и время от её начала: следующая фаза может прийти раньше или позже
         ph = phase_at(phases, sp["t"])
         sp["phase"] = ph["n"] if ph else None
@@ -810,10 +822,12 @@ def _pull_trend(pulls: list[dict], death_abs: dict[int, list]) -> dict:
         r0 = rows[0]
         half = len(pulls) // 2
         first, last = sum(r0["counts"][:half]), sum(r0["counts"][half:])
-        trend = ("в последних пуллах реже" if last < first else "в последних пуллах не реже" if last == first
-                 else "в последних пуллах чаще")
+        # «в последних пуллах чаще/реже» — только от 4 пуллов: по двум-трём это случайность
+        trend = "" if len(pulls) < TREND_MIN_PULLS else (
+            ", в последних пуллах реже" if last < first else ", в последних пуллах не реже" if last == first
+            else ", в последних пуллах чаще")
         line = (f"Чаще всего рейд умирает от «{r0['name']}»: {_n(r0['total'], 'смерть', 'смерти', 'смертей')} "
-                f"в {r0['pulls_with']} из {len(pulls)} пуллов, {trend}")
+                f"в {r0['pulls_with']} из {len(pulls)} пуллов{trend}")
     return {"pulls": [p["n"] for p in pulls], "rows": rows, "line": line}
 
 
@@ -1186,7 +1200,10 @@ def _raid_brief(info, summary, issues, extras, deaths, kill) -> list[str]:
                    + (f", вне пиков урона — {len(off)}: " + ", ".join(f"{c['name']} ({c['player']}, {c['time']})" for c in off[:3])
                       if off else ", все — на пики урона"))
     mk = extras.get("missed_kicks") or []
-    if mk:
+    kk = (extras.get("kicks") or {}).get("key")
+    if kk:
+        out.append(kk)
+    elif mk:
         out.append("Пропущенные прерывания: " + ", ".join(f"«{m['name']}» ×{m['count']}" for m in mk[:3]))
     av = Counter()
     for a in extras.get("avoidable") or []:

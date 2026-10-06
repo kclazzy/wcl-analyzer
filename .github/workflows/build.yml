@@ -111,7 +111,7 @@ jobs:
           cat wcl_analyzer/_build.py
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with: {distribution: temurin, java-version: "17"}
       - name: Системные пакеты для сборки
         run: |
@@ -312,7 +312,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip, cache-dependency-path: requirements.txt}
       - run: pip install -r requirements.txt
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with: {distribution: temurin, java-version: "17"}
       - name: Прошлая версия приложения обновляет код до новой (загрузчик из APK)
         run: |
@@ -356,6 +356,8 @@ jobs:
           fi
           pkill -f "python main.py" || true
       - name: Новый APK встаёт поверх прошлого (та же подпись, номер версии выше)
+        env:
+          HAS_KEY: ${{ secrets.ANDROID_KEYSTORE != '' && secrets.ANDROID_KEY_PASS != '' }}
         run: |
           set -e
           NEW="v1.1.$NEW_BUILD"
@@ -370,7 +372,13 @@ jobs:
           "$SIGNER" verify new/WCL-Analyzer.apk
           O=$(cert old/WCL-Analyzer.apk); N=$(cert new/WCL-Analyzer.apk)
           echo "Подпись прошлого: $O"; echo "Подпись нового:  $N"
-          [ "$O" = "$N" ] || { echo "::error::Подпись APK изменилась — поверх прошлой версии не установится"; exit 1; }
+          if [ "$O" != "$N" ]; then
+            if [ "$HAS_KEY" != "true" ]; then   # постоянного ключа нет — каждая сборка подписана временным
+              echo "::warning title=Ключ подписи APK::Секреты ANDROID_KEYSTORE и ANDROID_KEY_PASS не заданы: у каждой сборки свой временный ключ, новый APK поверх прошлого не встанет. Обновление кода на телефоне работает."
+            else
+              echo "::error::Подпись APK изменилась — поверх прошлой версии не установится"; exit 1
+            fi
+          fi
           OV=$(vc old/WCL-Analyzer.apk); NV=$(vc new/WCL-Analyzer.apk)
           echo "versionCode: $OV -> $NV"
           [ "$NV" -gt "$OV" ] || { echo "::error::Номер версии APK не вырос ($OV -> $NV) — Android не поставит обновление"; exit 1; }

@@ -55,7 +55,8 @@ def heal_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, spikes: 
 
     # ---------------------------------------------- лечение в пики (график по времени)
     g = _unwrap_graph(raw.get("heal_graph"))
-    series = {int(x["id"]): x for x in g.get("series") or [] if x.get("id") is not None}
+    # в графике есть и строка «Total» (сумма) — только игроки, по числовому номеру
+    series = {int(x["id"]): x for x in g.get("series") or [] if str(x.get("id", "")).lstrip("-").isdigit()}
     g0 = float(g.get("startTime") or f0)
     peak_ratio: dict[int, float] = {}
     win = [(sp["t"] - PEAK_PRE, sp["t"] + 5 + PEAK_POST) for sp in spikes or []]

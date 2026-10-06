@@ -34,6 +34,7 @@ def write_raid_workbook(R: dict, path: str | Path, wb=None) -> Path:
     _vs_top(wb, R, demo)
     _burst(wb, R, demo)
     _tank(wb, R, demo)
+    _heal(wb, R, demo)
     _kicks(wb, R, demo)
     _overview(wb, R, demo)
     _players(wb, R, demo)
@@ -144,6 +145,34 @@ def _tank(wb, R, demo):
         for line in T["mrt"].split("\n"):
             s.cell(s.row, 1, line)
             s.row += 1
+
+
+def _heal(wb, R, demo):
+    H = (R.get("extras") or {}).get("heal") or {}
+    if not H or H.get("error") or not H.get("healers"):
+        return
+    s = Sheet(wb, "Лекари", demo, {"A": 22, "B": 14, "C": 10, "D": 10, "E": 10, "F": 16, "G": 10, "H": 12})
+    s.title("Лекари", "Лечение, оверхил, мана к концу боя, лечение в пики урона и внешние сейвы на игроков.")
+    if H.get("hints"):
+        s.section("Главное")
+        for line in H["hints"]:
+            s.cell(s.row, 1, "• " + line)
+            s.row += 1
+        s.row += 1
+    pc = lambda v: "—" if v is None else f"{v:.0%}"  # noqa: E731
+    s.section("Лекари")
+    s.table(["Лекарь", "Лечение", "HPS", "Доля", "Оверхил", "Мана к концу", "В пики", "Активность"],
+            [[f"{r['player']} ({r.get('spec') or ''})", _amt(r["healing"]), r["hps"], pc(r["share"]), pc(r["overheal"]),
+              (f"0% с {r['oom']}" if r.get("oom") else pc(r["mana_end"])),
+              "—" if r["peak"] is None else f"×{r['peak']:.1f}", pc(r["active"])] for r in H["healers"]])
+    if H.get("externals"):
+        s.section("Внешние сейвы на игроков")
+        s.table(["Когда", "Лекарь", "Сейв", "На кого", "Итог"],
+                [[u["time"], u["healer"], u["name"], u["target"], "умер" if u["died"] else "выжил"] for u in H["externals"]])
+    if H.get("missed"):
+        s.section("Смерть в пик урона со свободным сейвом")
+        s.table(["Когда", "Кто", "От чего", "Был свободен"],
+                [[m["time"], m["player"], m["ability"], ", ".join(m["free"])] for m in H["missed"]])
 
 
 def _kicks(wb, R, demo):

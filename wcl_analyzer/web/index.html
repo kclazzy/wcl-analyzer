@@ -1981,6 +1981,29 @@ function renderTank(T, el){
         `${Math.round(top[b.id].share*100)}%`, esc(((T.en && top[b.id].names_en) || top[b.id].names || []).join(", "))]))) : ""}`;
 }
 
+function renderHeal(H, el){
+  if (!el) return;
+  if (!H) { el.innerHTML = '<p class="empty">Нет данных о лекарях: разбор из прежней версии — разберите бой заново.</p>'; return; }
+  if (H.error) { el.innerHTML = `<p class="empty">Лекари не разобраны: ${esc(H.error)}</p>`; return; }
+  const rows = H.healers || [];
+  if (!rows.length) { el.innerHTML = '<p class="empty">В этом бою нет лекарей.</p>'; return; }
+  const manaCell = r => r.mana_end == null ? '<span style="color:var(--muted)">нет данных</span>'
+    : (r.oom ? `<span class="worse">0% с ${esc(r.oom)}</span>` : (r.mana_end < 0.1 ? `<span class="worse">${pct(r.mana_end,0)}</span>` : pct(r.mana_end,0)));
+  const peakCell = r => r.peak == null ? "—" : (r.peak < 1 ? `<span class="worse">×${num(r.peak,1)}</span>` : `×${num(r.peak,1)}`);
+  el.innerHTML = `
+    ${(H.hints||[]).length ? `<div class="box brief"><h3>Главное по лекарям</h3><ul class="lines">${H.hints.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
+    ${box("Лекари", "Лечение и доля в лечении лекарей; оверхил — доля лечения, ушедшая в полное здоровье; мана — к концу боя (красным — кончилась или меньше 10%); «в пики» — во сколько раз лекарь лечит сильнее обычного в пики урона по рейду.",
+      table(["Лекарь","Лечение","HPS","Доля","Оверхил","Мана к концу","В пики","Активность"], rows.map(r => [esc(r.player) + ` <span style="color:var(--muted);font-size:13px">${esc(who(r.cls, r.spec))}</span>`,
+        fmtAmt(r.healing), num(r.hps), pct(r.share,0), r.overheal == null ? "—" : pct(r.overheal,0), manaCell(r), peakCell(r), r.active == null ? "—" : pct(r.active,0)]),
+        {num:[1,2,3,4,6,7], flag: i => !!(rows[i].oom || (rows[i].peak != null && rows[i].peak < 1))}))}
+    ${box("Внешние сейвы на игроков", "Сейвы лекарей на одну цель (Pain Suppression, Guardian Spirit, Ironbark, Life Cocoon, Blessing of Sacrifice, Time Dilation…): кому и когда; «выжил» — цель прожила ещё 10 с.",
+      table(["Когда","Лекарь","Сейв","На кого","Итог"], (H.externals||[]).map(u => [esc(u.time), esc(u.healer), esc(u.name), esc(u.target),
+        u.died ? '<span class="worse">умер</span>' : "выжил"]), {empty: "Внешних сейвов на игроков не было."}))}
+    ${box("Смерть в пик урона со свободным сейвом", "Игрок умер в пик урона по рейду (или танк — в любой момент), а внешний сейв лекаря был откатан. Смерти в конце вайпа не считаются.",
+      table(["Когда","Кто","От чего","Был свободен"], (H.missed||[]).map(m => [esc(m.time), esc(m.player), esc(m.ability), esc(m.free.join(", "))]),
+        {empty: "Таких смертей нет.", flag: () => true}))}`;
+}
+
 function renderKicks(K, el){
   if (!el) return;
   if (!K) { el.innerHTML = '<p class="empty">Нет данных о прерываниях: разбор из прежней версии — разберите бой заново.</p>'; return; }
@@ -2012,7 +2035,7 @@ function renderRaid(R){
   charts.splice(0).forEach(c => c.destroy());
   const I = R.info, S = R.summary, fd = S.first_death;
   const outcome = I.kill ? "килл" : (I.boss_pct!=null ? `вайп на ${num(I.boss_pct,1)}% здоровья босса` : "вайп");
-  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-dmg","Нанесение урона"],["r-tank","Танки"],["r-kick","Прерывания"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
+  const tabs = [["r-sum","Обзор"],["r-cd","Полученный урон и сейвы"],["r-dmg","Нанесение урона"],["r-tank","Танки"],["r-heal","Лекари"],["r-kick","Прерывания"],["r-pl","Игроки"],["r-mech","Механики"],["r-death","Смерти"],["r-pull","Пуллы"]];
   const el = resEl();
   el.innerHTML = `
     ${I.demo?'<div class="demo-flag">Демо: синтетический рейд, не реальный лог</div>':""}
@@ -2100,6 +2123,7 @@ function renderRaid(R){
   lazy["r-dmg"] = () => renderBurst(X.burst, $("#p-r-dmg"));
   lazy["r-tank"] = () => renderTank(X.tank, $("#p-r-tank"));
   lazy["r-kick"] = () => renderKicks(X.kicks, $("#p-r-kick"));
+  lazy["r-heal"] = () => renderHeal(X.heal, $("#p-r-heal"));
   if (Object.keys(X).length) $("#p-r-sum").insertAdjacentHTML("beforeend", `<div class="grid2">
     <div>
       ${box("Прерывания", "Каст прошёл, хотя эту способность в бою прерывали.",

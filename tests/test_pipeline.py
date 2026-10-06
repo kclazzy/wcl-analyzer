@@ -1278,6 +1278,32 @@ def test_kicks():
     print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
 
 
+def test_healers():
+    """Лекари: мана кончилась (Вейла), оверхил выше остальных (Таргун), в пики лечит меньше обычного (Осирон),
+    внешний сейв на игрока, смерть в пик со свободным сейвом — только в пик (не от лужи), лист Excel."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    H = R["extras"]["heal"]
+    assert "error" not in H, H
+    by = {r["player"]: r for r in H["healers"]}
+    assert by["Вейла"]["oom"] and by["Вейла"]["mana_end"] == 0 and by["Элария"]["mana_end"] > 0.3, by
+    assert by["Таргун"]["overheal"] > by["Элария"]["overheal"] * 1.5, by
+    assert by["Осирон"]["peak"] < 1 < by["Элария"]["peak"], by
+    hs = " ".join(H["hints"])
+    assert "Вейла: закончилась мана" in hs and "Таргун: оверхил" in hs and "Осирон" in hs, H["hints"]
+    assert any(u["target"] == "Сайрена" and not u["died"] for u in H["externals"]), H["externals"]
+    assert [m["player"] for m in H["missed"]] == ["Лиана"], H["missed"]
+    assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
+
+
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
@@ -1300,6 +1326,7 @@ if __name__ == "__main__":
     test_guide_buster_weak_hits()
     test_potions_zero_details()
     test_kicks()
+    test_healers()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()
@@ -1501,6 +1528,32 @@ def test_kicks():
     assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
     assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
     print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
+
+
+def test_healers():
+    """Лекари: мана кончилась (Вейла), оверхил выше остальных (Таргун), в пики лечит меньше обычного (Осирон),
+    внешний сейв на игрока, смерть в пик со свободным сейвом — только в пик (не от лужи), лист Excel."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    H = R["extras"]["heal"]
+    assert "error" not in H, H
+    by = {r["player"]: r for r in H["healers"]}
+    assert by["Вейла"]["oom"] and by["Вейла"]["mana_end"] == 0 and by["Элария"]["mana_end"] > 0.3, by
+    assert by["Таргун"]["overheal"] > by["Элария"]["overheal"] * 1.5, by
+    assert by["Осирон"]["peak"] < 1 < by["Элария"]["peak"], by
+    hs = " ".join(H["hints"])
+    assert "Вейла: закончилась мана" in hs and "Таргун: оверхил" in hs and "Осирон" in hs, H["hints"]
+    assert any(u["target"] == "Сайрена" and not u["died"] for u in H["externals"]), H["externals"]
+    assert [m["player"] for m in H["missed"]] == ["Лиана"], H["missed"]
+    assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
 
 
 if __name__ == "__main__":
@@ -1731,6 +1784,32 @@ def test_kicks():
     print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
 
 
+def test_healers():
+    """Лекари: мана кончилась (Вейла), оверхил выше остальных (Таргун), в пики лечит меньше обычного (Осирон),
+    внешний сейв на игрока, смерть в пик со свободным сейвом — только в пик (не от лужи), лист Excel."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    H = R["extras"]["heal"]
+    assert "error" not in H, H
+    by = {r["player"]: r for r in H["healers"]}
+    assert by["Вейла"]["oom"] and by["Вейла"]["mana_end"] == 0 and by["Элария"]["mana_end"] > 0.3, by
+    assert by["Таргун"]["overheal"] > by["Элария"]["overheal"] * 1.5, by
+    assert by["Осирон"]["peak"] < 1 < by["Элария"]["peak"], by
+    hs = " ".join(H["hints"])
+    assert "Вейла: закончилась мана" in hs and "Таргун: оверхил" in hs and "Осирон" in hs, H["hints"]
+    assert any(u["target"] == "Сайрена" and not u["died"] for u in H["externals"]), H["externals"]
+    assert [m["player"] for m in H["missed"]] == ["Лиана"], H["missed"]
+    assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
+
+
 if __name__ == "__main__":
     test_analysis_quality()
 
@@ -1903,6 +1982,32 @@ def test_kicks():
     assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
     assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
     print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
+
+
+def test_healers():
+    """Лекари: мана кончилась (Вейла), оверхил выше остальных (Таргун), в пики лечит меньше обычного (Осирон),
+    внешний сейв на игрока, смерть в пик со свободным сейвом — только в пик (не от лужи), лист Excel."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    H = R["extras"]["heal"]
+    assert "error" not in H, H
+    by = {r["player"]: r for r in H["healers"]}
+    assert by["Вейла"]["oom"] and by["Вейла"]["mana_end"] == 0 and by["Элария"]["mana_end"] > 0.3, by
+    assert by["Таргун"]["overheal"] > by["Элария"]["overheal"] * 1.5, by
+    assert by["Осирон"]["peak"] < 1 < by["Элария"]["peak"], by
+    hs = " ".join(H["hints"])
+    assert "Вейла: закончилась мана" in hs and "Таргун: оверхил" in hs and "Осирон" in hs, H["hints"]
+    assert any(u["target"] == "Сайрена" and not u["died"] for u in H["externals"]), H["externals"]
+    assert [m["player"] for m in H["missed"]] == ["Лиана"], H["missed"]
+    assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
 
 
 if __name__ == "__main__":
@@ -2515,6 +2620,32 @@ def test_kicks():
     assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
     assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
     print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
+
+
+def test_healers():
+    """Лекари: мана кончилась (Вейла), оверхил выше остальных (Таргун), в пики лечит меньше обычного (Осирон),
+    внешний сейв на игрока, смерть в пик со свободным сейвом — только в пик (не от лужи), лист Excel."""
+    import tempfile
+    from pathlib import Path
+    from openpyxl import load_workbook
+    from wcl_analyzer.excel_raid import write_raid_workbook
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    H = R["extras"]["heal"]
+    assert "error" not in H, H
+    by = {r["player"]: r for r in H["healers"]}
+    assert by["Вейла"]["oom"] and by["Вейла"]["mana_end"] == 0 and by["Элария"]["mana_end"] > 0.3, by
+    assert by["Таргун"]["overheal"] > by["Элария"]["overheal"] * 1.5, by
+    assert by["Осирон"]["peak"] < 1 < by["Элария"]["peak"], by
+    hs = " ".join(H["hints"])
+    assert "Вейла: закончилась мана" in hs and "Таргун: оверхил" in hs and "Осирон" in hs, H["hints"]
+    assert any(u["target"] == "Сайрена" and not u["died"] for u in H["externals"]), H["externals"]
+    assert [m["player"] for m in H["missed"]] == ["Лиана"], H["missed"]
+    assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
+    with tempfile.TemporaryDirectory() as d:
+        assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
 
 
 if __name__ == "__main__":

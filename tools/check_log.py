@@ -47,7 +47,12 @@ def potion_diag(raw):
     for ev in raw.get("combatant") or []:
         for a in {(x.get("name") or names.get(int(x.get("ability") or 0)) or str(x.get("ability"))) for x in ev.get("auras") or []}:
             au[a] += 1
-    return {"potionUse": pu[:40], "common_casts": common, "auras": au.most_common(40)}
+    ints = [e for e in raw.get("interrupts") or [] if e.get("type") == "interrupt"]
+    ex = {int(e.get("extraAbilityGameID") or 0) for e in ints}
+    bc = [{k: e.get(k) for k in ("timestamp", "type", "sourceID", "sourceInstance", "abilityGameID")}
+          for e in raw.get("boss_casts") or [] if int(e.get("abilityGameID", 0)) in ex][:12]
+    return {"interrupts": [{k: e.get(k) for k in ("timestamp", "sourceID", "targetID", "targetInstance", "abilityGameID", "extraAbilityGameID")} for e in ints[:8]],
+            "boss_casts_kickable": bc}
 
 for c in pick_fights(rep, difficulties=None):
     f = c["fight"]

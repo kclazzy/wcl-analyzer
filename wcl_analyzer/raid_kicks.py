@@ -12,7 +12,7 @@ from . import game_data
 from .compare import _fmt_t
 from .raid_burst import _key
 
-CAST_WINDOW_S = 6.0     # каст считается прерванным, если прерывание пришло в течение 6 с от начала каста
+CAST_WINDOW_S = 15.0    # прерывание или завершение каста — до 15 с от начала (и до следующего каста этого врага)
 MAX_KICKERS = 5         # больше пяти человек в одной очереди — уже нужен стан или контроль, а не очередь
 WASTED_MIN = 3          # «прерывание впустую» в подсказках — от трёх нажатий
 
@@ -55,7 +55,8 @@ def kick_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, site: st
         src = owner(int(ev.get("sourceID", -1)))
         ab = int(ev.get("extraAbilityGameID") or 0)
         if src in players and ab:
-            kicks.append((rel(ev), src, int(ev.get("targetID", -1)), ab, int(ev.get("abilityGameID") or 0)))
+            kicks.append((rel(ev), src, (int(ev.get("targetID", -1)), int(ev.get("targetInstance") or 0)), ab,
+                          int(ev.get("abilityGameID") or 0)))
     # прерываемая — любая способность, которую в бою прервали (в том числе не игрок: питомец без хозяина, NPC)
     kickable = {int(ev.get("extraAbilityGameID") or 0) for ev in raw.get("interrupts") or []
                 if ev.get("type") == "interrupt" and ev.get("extraAbilityGameID")}
@@ -78,7 +79,8 @@ def kick_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, site: st
         ab = int(ev.get("abilityGameID", 0))
         if ab not in kickable:
             continue
-        key = (int(ev.get("sourceID", -1)), ab)
+        # одинаковые адды — один sourceID, разный sourceInstance: каждый — отдельный враг
+        key = ((int(ev.get("sourceID", -1)), int(ev.get("sourceInstance") or 0)), ab)
         if ev.get("type") == "begincast":
             begins[key].append(rel(ev))
         elif ev.get("type") == "cast":
@@ -89,7 +91,7 @@ def kick_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, site: st
 
     groups: dict[tuple, dict] = {}   # (тип врага, способность) → сводка
     for key in set(begins) | set(done) | set(kicked_at):
-        src, ab = key
+        (src, _inst), ab = key
         a = actors.get(src) or {}
         gk = (int(a.get("gameID") or src), ab)
         g = groups.setdefault(gk, {"id": ab, "name": nm(ab), "npc": a.get("name") or "—", "attempts": [],

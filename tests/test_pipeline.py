@@ -1301,6 +1301,20 @@ def test_healers():
     assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
     with tempfile.TemporaryDirectory() as d:
         assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    # мана кончилась, но вернулась (зелье) — «без маны N с», а не «до конца боя»; Spellwarding — не от физического урона
+    from wcl_analyzer.raid_heal import heal_analysis
+    pl = {1: {"name": "Хил", "cls": "Paladin", "spec": "Holy", "role": "healer"},
+          2: {"name": "Танк", "cls": "Warrior", "spec": "Protection", "role": "dps"}}
+    seq = [(10, 0.5), (60, 0.03), (80, 0.02), (90, 0.4), (200, 0.2)]
+    raw = {"fight": {"startTime": 0}, "heal_table": {"data": {"entries": [{"id": 1, "total": 1000, "overheal": 100}]}},
+           "heal_res": {1: [{"timestamp": t * 1000, "classResources": [{"type": 0, "amount": v * 100, "max": 100}]} for t, v in seq]},
+           "report": {"masterData": {"abilities": [{"gameID": 5, "name": "Smash", "type": 1}]}}, "casts": []}
+    H2 = heal_analysis(raw, pl, lambda x: x, lambda ev: float(ev["timestamp"]) / 1000, lambda ab: f"Spell {ab}", 240.0,
+                       [{"t": 100.0}], [{"id": 2, "t": 103.0, "time": "1:43", "player": "Танк", "ability": "Smash"}])
+    r = H2["healers"][0]
+    assert r["oom"] == "1:00" and r["oom_s"] == 30 and not r["oom_to_end"], r
+    assert any("без маны 30 с" in h for h in H2["hints"]), H2["hints"]
+    assert H2["missed"] and not any("Spellwarding" in f for f in H2["missed"][0]["free"]), H2["missed"]
     print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
 
 
@@ -1595,6 +1609,20 @@ def test_healers():
     assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
     with tempfile.TemporaryDirectory() as d:
         assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    # мана кончилась, но вернулась (зелье) — «без маны N с», а не «до конца боя»; Spellwarding — не от физического урона
+    from wcl_analyzer.raid_heal import heal_analysis
+    pl = {1: {"name": "Хил", "cls": "Paladin", "spec": "Holy", "role": "healer"},
+          2: {"name": "Танк", "cls": "Warrior", "spec": "Protection", "role": "dps"}}
+    seq = [(10, 0.5), (60, 0.03), (80, 0.02), (90, 0.4), (200, 0.2)]
+    raw = {"fight": {"startTime": 0}, "heal_table": {"data": {"entries": [{"id": 1, "total": 1000, "overheal": 100}]}},
+           "heal_res": {1: [{"timestamp": t * 1000, "classResources": [{"type": 0, "amount": v * 100, "max": 100}]} for t, v in seq]},
+           "report": {"masterData": {"abilities": [{"gameID": 5, "name": "Smash", "type": 1}]}}, "casts": []}
+    H2 = heal_analysis(raw, pl, lambda x: x, lambda ev: float(ev["timestamp"]) / 1000, lambda ab: f"Spell {ab}", 240.0,
+                       [{"t": 100.0}], [{"id": 2, "t": 103.0, "time": "1:43", "player": "Танк", "ability": "Smash"}])
+    r = H2["healers"][0]
+    assert r["oom"] == "1:00" and r["oom_s"] == 30 and not r["oom_to_end"], r
+    assert any("без маны 30 с" in h for h in H2["hints"]), H2["hints"]
+    assert H2["missed"] and not any("Spellwarding" in f for f in H2["missed"][0]["free"]), H2["missed"]
     print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
 
 
@@ -1889,6 +1917,20 @@ def test_healers():
     assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
     with tempfile.TemporaryDirectory() as d:
         assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    # мана кончилась, но вернулась (зелье) — «без маны N с», а не «до конца боя»; Spellwarding — не от физического урона
+    from wcl_analyzer.raid_heal import heal_analysis
+    pl = {1: {"name": "Хил", "cls": "Paladin", "spec": "Holy", "role": "healer"},
+          2: {"name": "Танк", "cls": "Warrior", "spec": "Protection", "role": "dps"}}
+    seq = [(10, 0.5), (60, 0.03), (80, 0.02), (90, 0.4), (200, 0.2)]
+    raw = {"fight": {"startTime": 0}, "heal_table": {"data": {"entries": [{"id": 1, "total": 1000, "overheal": 100}]}},
+           "heal_res": {1: [{"timestamp": t * 1000, "classResources": [{"type": 0, "amount": v * 100, "max": 100}]} for t, v in seq]},
+           "report": {"masterData": {"abilities": [{"gameID": 5, "name": "Smash", "type": 1}]}}, "casts": []}
+    H2 = heal_analysis(raw, pl, lambda x: x, lambda ev: float(ev["timestamp"]) / 1000, lambda ab: f"Spell {ab}", 240.0,
+                       [{"t": 100.0}], [{"id": 2, "t": 103.0, "time": "1:43", "player": "Танк", "ability": "Smash"}])
+    r = H2["healers"][0]
+    assert r["oom"] == "1:00" and r["oom_s"] == 30 and not r["oom_to_end"], r
+    assert any("без маны 30 с" in h for h in H2["hints"]), H2["hints"]
+    assert H2["missed"] and not any("Spellwarding" in f for f in H2["missed"][0]["free"]), H2["missed"]
     print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
 
 
@@ -2129,6 +2171,20 @@ def test_healers():
     assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
     with tempfile.TemporaryDirectory() as d:
         assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    # мана кончилась, но вернулась (зелье) — «без маны N с», а не «до конца боя»; Spellwarding — не от физического урона
+    from wcl_analyzer.raid_heal import heal_analysis
+    pl = {1: {"name": "Хил", "cls": "Paladin", "spec": "Holy", "role": "healer"},
+          2: {"name": "Танк", "cls": "Warrior", "spec": "Protection", "role": "dps"}}
+    seq = [(10, 0.5), (60, 0.03), (80, 0.02), (90, 0.4), (200, 0.2)]
+    raw = {"fight": {"startTime": 0}, "heal_table": {"data": {"entries": [{"id": 1, "total": 1000, "overheal": 100}]}},
+           "heal_res": {1: [{"timestamp": t * 1000, "classResources": [{"type": 0, "amount": v * 100, "max": 100}]} for t, v in seq]},
+           "report": {"masterData": {"abilities": [{"gameID": 5, "name": "Smash", "type": 1}]}}, "casts": []}
+    H2 = heal_analysis(raw, pl, lambda x: x, lambda ev: float(ev["timestamp"]) / 1000, lambda ab: f"Spell {ab}", 240.0,
+                       [{"t": 100.0}], [{"id": 2, "t": 103.0, "time": "1:43", "player": "Танк", "ability": "Smash"}])
+    r = H2["healers"][0]
+    assert r["oom"] == "1:00" and r["oom_s"] == 30 and not r["oom_to_end"], r
+    assert any("без маны 30 с" in h for h in H2["hints"]), H2["hints"]
+    assert H2["missed"] and not any("Spellwarding" in f for f in H2["missed"][0]["free"]), H2["missed"]
     print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
 
 
@@ -2807,6 +2863,20 @@ def test_healers():
     assert any("закончилась мана" in l for l in R["brief"]), R["brief"]
     with tempfile.TemporaryDirectory() as d:
         assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
+    # мана кончилась, но вернулась (зелье) — «без маны N с», а не «до конца боя»; Spellwarding — не от физического урона
+    from wcl_analyzer.raid_heal import heal_analysis
+    pl = {1: {"name": "Хил", "cls": "Paladin", "spec": "Holy", "role": "healer"},
+          2: {"name": "Танк", "cls": "Warrior", "spec": "Protection", "role": "dps"}}
+    seq = [(10, 0.5), (60, 0.03), (80, 0.02), (90, 0.4), (200, 0.2)]
+    raw = {"fight": {"startTime": 0}, "heal_table": {"data": {"entries": [{"id": 1, "total": 1000, "overheal": 100}]}},
+           "heal_res": {1: [{"timestamp": t * 1000, "classResources": [{"type": 0, "amount": v * 100, "max": 100}]} for t, v in seq]},
+           "report": {"masterData": {"abilities": [{"gameID": 5, "name": "Smash", "type": 1}]}}, "casts": []}
+    H2 = heal_analysis(raw, pl, lambda x: x, lambda ev: float(ev["timestamp"]) / 1000, lambda ab: f"Spell {ab}", 240.0,
+                       [{"t": 100.0}], [{"id": 2, "t": 103.0, "time": "1:43", "player": "Танк", "ability": "Smash"}])
+    r = H2["healers"][0]
+    assert r["oom"] == "1:00" and r["oom_s"] == 30 and not r["oom_to_end"], r
+    assert any("без маны 30 с" in h for h in H2["hints"]), H2["hints"]
+    assert H2["missed"] and not any("Spellwarding" in f for f in H2["missed"][0]["free"]), H2["missed"]
     print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
 
 

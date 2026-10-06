@@ -1846,8 +1846,10 @@ function renderSaves(R){
           ${(b.top_kills||[]).length ? ` · сравнение: ${b.top_kills.length} ${plural(b.top_kills.length,"лучший килл","лучших килла","лучших киллов")}` : ""}</p>
         ${(b.saves_brief||[]).length ? `<ul class="lines">${b.saves_brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : ""}
         ${(b.plan||[]).length ? planTable(b.plan, b.boss, b.phases) : '<p class="empty">Пиков урона по рейду, на которые нужны сейвы, не найдено.</p>'}
+        ${discordBox(b.discord)}
       </div></div>`).join("")}
-    ${(R.skipped||[]).length ? box("Не получилось", "", `<ul class="lines">${R.skipped.map(x=>`<li>${esc(x.boss)} (${esc(x.difficulty)}): ${esc(x.reason)}</li>`).join("")}</ul>`) : ""}`;
+    ${(R.skipped||[]).length ? box("Не получилось", "", `<ul class="lines">${R.skipped.map(x=>`<li>${esc(x.boss)} (${esc(x.difficulty)}): ${esc(x.reason)}</li>`).join("")}</ul>`) : ""}
+    ${(R.discord||[]).length ? box("Итоги вечера для Discord", "По каждому боссу — исход и главное; ссылка на лог в конце.", discordBox(R.discord, "Итоги вечера — вставить в канал гильдии.")) : ""}`;
   el.hidden = false;
   el.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
     el.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
@@ -1981,6 +1983,17 @@ function renderTank(T, el){
         `${Math.round(top[b.id].share*100)}%`, esc(((T.en && top[b.id].names_en) || top[b.id].names || []).join(", "))]))) : ""}`;
 }
 
+/* Текст для Discord: кнопка «Скопировать» и сам текст (тот же обработчик, что у заметок MRT) */
+function discordBox(texts, hint){
+  texts = (Array.isArray(texts) ? texts : [texts]).filter(Boolean);
+  if (!texts.length) return "";
+  return `<div class="discord" style="margin-top:12px">${texts.map((t, i) => `<div class="mrt" style="margin-top:${i ? 8 : 0}px">
+    <button type="button" class="mini mrtbtn" data-mrt data-label="${texts.length > 1 ? `Скопировать для Discord (${i + 1} из ${texts.length})` : "Скопировать для Discord"}">${texts.length > 1 ? `Скопировать для Discord (${i + 1} из ${texts.length})` : "Скопировать для Discord"}</button>
+    ${i ? "" : `<span class="hint" style="margin-left:8px">${esc(hint || "Короткая сводка — вставить в канал гильдии.")}${texts.length > 1 ? " Discord принимает до 2000 символов в сообщении, поэтому сводка разбита на части." : ""}</span>`}
+    <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:13.5px">Текст</summary>
+      <textarea readonly rows="${Math.min(14, t.split("\n").length + 1)}" style="width:100%;margin-top:6px;font:12.5px/1.45 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;box-sizing:border-box">${esc(t)}</textarea></details></div>`).join("")}</div>`;
+}
+
 function renderHeal(H, el){
   if (!el) return;
   if (!H) { el.innerHTML = '<p class="empty">Нет данных о лекарях: разбор из прежней версии — разберите бой заново.</p>'; return; }
@@ -2062,6 +2075,7 @@ function renderRaid(R){
     <div class="box brief">
       <h3>Главное по бою</h3>
       ${(R.brief||[]).length ? `<ul class="lines">${R.brief.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : '<p class="empty">Явных проблем не найдено.</p>'}
+      ${discordBox((R.extras||{}).discord)}
       ${(R.extras||{}).damage_timeline ? `<p class="hint" style="margin:12px 0 0">График урона по рейду, план сейвов на следующий пулл и сравнение с лучшими киллами — во вкладке «Полученный урон и сейвы».</p>` : ""}
       ${topIssues(R.issues).length ? `<h3 style="margin-top:16px">Кому что поправить</h3>` + topIssues(R.issues).map(i=>`<div class="issue"><div class="who"><b>${esc(i.player)}</b><span>${esc(i.role)}, ${esc(who(i.cls, i.spec))}</span></div>
           <div class="gwrap">${guideText(i.text, R.guide_links, R.guide_videos, R.guide_info)}${guideDesc(i.text, R.guide_info)}</div><span class="sev s${i.severity}">${i.kind?esc(i.kind):""}</span></div>`).join("") : ""}

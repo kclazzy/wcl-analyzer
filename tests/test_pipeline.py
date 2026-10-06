@@ -1304,6 +1304,26 @@ def test_healers():
     print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
 
 
+def test_discord():
+    """Сводка для Discord: без отсылок к вкладкам, ссылка без превью, разметка в именах экранирована,
+    длинный вечер — на несколько сообщений, каждое до 2000 символов."""
+    from wcl_analyzer.discord import boss_text, evening_messages
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    t = R["extras"]["discord"]
+    assert t.startswith("**Демо-босс**") and "во вкладке" not in t and "<https://" in t and len(t) <= 1900, t
+    assert boss_text({"info": {"boss": "Snake_Boss*"}, "brief": ["x_y"]}).startswith("**Snake\\_Boss\\***")
+    S = {"info": {"title": "Вечер", "url": "https://www.warcraftlogs.com/reports/X"},
+         "bosses": [{"boss": f"Босс {i}", "kill": i % 2 == 0, "boss_pct": 12.3, "duration": "5:00", "pulls": 3,
+                     "brief": ["Первая смерть: " + "а" * 150, "Пики урона: " + "б" * 150]} for i in range(12)]}
+    msgs = evening_messages(S)
+    assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
+    assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
+    assert sum(m.count("**Босс ") for m in msgs) == 12
+    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+
+
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
@@ -1327,6 +1347,7 @@ if __name__ == "__main__":
     test_potions_zero_details()
     test_kicks()
     test_healers()
+    test_discord()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()
@@ -1554,6 +1575,26 @@ def test_healers():
     with tempfile.TemporaryDirectory() as d:
         assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
     print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
+
+
+def test_discord():
+    """Сводка для Discord: без отсылок к вкладкам, ссылка без превью, разметка в именах экранирована,
+    длинный вечер — на несколько сообщений, каждое до 2000 символов."""
+    from wcl_analyzer.discord import boss_text, evening_messages
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    t = R["extras"]["discord"]
+    assert t.startswith("**Демо-босс**") and "во вкладке" not in t and "<https://" in t and len(t) <= 1900, t
+    assert boss_text({"info": {"boss": "Snake_Boss*"}, "brief": ["x_y"]}).startswith("**Snake\\_Boss\\***")
+    S = {"info": {"title": "Вечер", "url": "https://www.warcraftlogs.com/reports/X"},
+         "bosses": [{"boss": f"Босс {i}", "kill": i % 2 == 0, "boss_pct": 12.3, "duration": "5:00", "pulls": 3,
+                     "brief": ["Первая смерть: " + "а" * 150, "Пики урона: " + "б" * 150]} for i in range(12)]}
+    msgs = evening_messages(S)
+    assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
+    assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
+    assert sum(m.count("**Босс ") for m in msgs) == 12
+    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
 
 
 if __name__ == "__main__":
@@ -1810,6 +1851,26 @@ def test_healers():
     print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
 
 
+def test_discord():
+    """Сводка для Discord: без отсылок к вкладкам, ссылка без превью, разметка в именах экранирована,
+    длинный вечер — на несколько сообщений, каждое до 2000 символов."""
+    from wcl_analyzer.discord import boss_text, evening_messages
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    t = R["extras"]["discord"]
+    assert t.startswith("**Демо-босс**") and "во вкладке" not in t and "<https://" in t and len(t) <= 1900, t
+    assert boss_text({"info": {"boss": "Snake_Boss*"}, "brief": ["x_y"]}).startswith("**Snake\\_Boss\\***")
+    S = {"info": {"title": "Вечер", "url": "https://www.warcraftlogs.com/reports/X"},
+         "bosses": [{"boss": f"Босс {i}", "kill": i % 2 == 0, "boss_pct": 12.3, "duration": "5:00", "pulls": 3,
+                     "brief": ["Первая смерть: " + "а" * 150, "Пики урона: " + "б" * 150]} for i in range(12)]}
+    msgs = evening_messages(S)
+    assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
+    assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
+    assert sum(m.count("**Босс ") for m in msgs) == 12
+    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+
+
 if __name__ == "__main__":
     test_analysis_quality()
 
@@ -2008,6 +2069,26 @@ def test_healers():
     with tempfile.TemporaryDirectory() as d:
         assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
     print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
+
+
+def test_discord():
+    """Сводка для Discord: без отсылок к вкладкам, ссылка без превью, разметка в именах экранирована,
+    длинный вечер — на несколько сообщений, каждое до 2000 символов."""
+    from wcl_analyzer.discord import boss_text, evening_messages
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    t = R["extras"]["discord"]
+    assert t.startswith("**Демо-босс**") and "во вкладке" not in t and "<https://" in t and len(t) <= 1900, t
+    assert boss_text({"info": {"boss": "Snake_Boss*"}, "brief": ["x_y"]}).startswith("**Snake\\_Boss\\***")
+    S = {"info": {"title": "Вечер", "url": "https://www.warcraftlogs.com/reports/X"},
+         "bosses": [{"boss": f"Босс {i}", "kill": i % 2 == 0, "boss_pct": 12.3, "duration": "5:00", "pulls": 3,
+                     "brief": ["Первая смерть: " + "а" * 150, "Пики урона: " + "б" * 150]} for i in range(12)]}
+    msgs = evening_messages(S)
+    assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
+    assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
+    assert sum(m.count("**Босс ") for m in msgs) == 12
+    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
 
 
 if __name__ == "__main__":
@@ -2646,6 +2727,26 @@ def test_healers():
     with tempfile.TemporaryDirectory() as d:
         assert "Лекари" in load_workbook(write_raid_workbook(R, Path(d) / "r.xlsx")).sheetnames
     print("OK лекари: мана, оверхил, лечение в пики, внешние сейвы, смерть в пик со свободным сейвом, Excel")
+
+
+def test_discord():
+    """Сводка для Discord: без отсылок к вкладкам, ссылка без превью, разметка в именах экранирована,
+    длинный вечер — на несколько сообщений, каждое до 2000 символов."""
+    from wcl_analyzer.discord import boss_text, evening_messages
+    from wcl_analyzer.raid import run_raid
+    from wcl_analyzer.raid_demo import DEMO_URL, FakeRaidClient
+    R = run_raid(FakeRaidClient(), DEMO_URL, None, log=lambda m: None, talent_data=[], save_talents=False)
+    t = R["extras"]["discord"]
+    assert t.startswith("**Демо-босс**") and "во вкладке" not in t and "<https://" in t and len(t) <= 1900, t
+    assert boss_text({"info": {"boss": "Snake_Boss*"}, "brief": ["x_y"]}).startswith("**Snake\\_Boss\\***")
+    S = {"info": {"title": "Вечер", "url": "https://www.warcraftlogs.com/reports/X"},
+         "bosses": [{"boss": f"Босс {i}", "kill": i % 2 == 0, "boss_pct": 12.3, "duration": "5:00", "pulls": 3,
+                     "brief": ["Первая смерть: " + "а" * 150, "Пики урона: " + "б" * 150]} for i in range(12)]}
+    msgs = evening_messages(S)
+    assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
+    assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
+    assert sum(m.count("**Босс ") for m in msgs) == 12
+    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
 
 
 if __name__ == "__main__":

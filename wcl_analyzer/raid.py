@@ -946,6 +946,11 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
     TK = R["extras"].get("tank") or {}
     for k in ("_eff", "_owned", "light"):   # служебное (план и сравнение с топом) — странице не нужно
         TK.pop(k, None)
+    try:  # короткая сводка для Discord
+        from .discord import boss_text
+        R["extras"]["discord"] = boss_text(R)
+    except Exception:  # noqa: BLE001
+        pass
     if hasattr(client, "points_left"):
         left = client.points_left()
         if left is not None:

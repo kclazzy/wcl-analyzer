@@ -678,9 +678,16 @@ class WCLClient:
         fnames = list(fields or {})   # готовые поля отчёта, например «playerDetails(fightIDs: $fid)»
         for i, name in enumerate(fnames):
             parts.append(f"f{i}: {fields[name]}")
-        q = ("query($code: String!, $fid: [Int]) { reportData { report(code: $code) { "
-             + " ".join(parts) + " } } }")
-        rep = self.query(q, {"code": code, "fid": [fight_id]})["reportData"]["report"] or {}
+        body = " ".join(parts)
+        # GraphQL не принимает объявленную, но неиспользуемую переменную: у выборок по другим пуллам
+        # (fightIDs: [n]) $fid не нужен — без этого запрос «смерти в других пуллах» всегда отклонялся
+        if "$fid" in body:
+            q = "query($code: String!, $fid: [Int]) { reportData { report(code: $code) { " + body + " } } }"
+            v = {"code": code, "fid": [fight_id]}
+        else:
+            q = "query($code: String!) { reportData { report(code: $code) { " + body + " } } }"
+            v = {"code": code}
+        rep = self.query(q, v)["reportData"]["report"] or {}
         out: dict = {}
         more = {}
         for i, name in enumerate(names):

@@ -17,9 +17,8 @@ jobs:
           WCL_CLIENT_ID: ${{ secrets.WCL_CLIENT_ID }}
           WCL_CLIENT_SECRET: ${{ secrets.WCL_CLIENT_SECRET }}
           WCL_GAME_DATA: bundled
-        run: |
-          i=0; while read -r u; do i=$((i+1)); python tools/check_log.py "$u" "debug_log_out_$i.json" || true; done < debug_url.txt
+        run: python tools/cost.py || true
       - name: commit
         run: |
           git config user.name bot; git config user.email bot@users.noreply.github.com
-          git add debug_log_out_*.json && git commit -m "log" && git push
+          git add debug_cost.json && git commit -m "log" && git push

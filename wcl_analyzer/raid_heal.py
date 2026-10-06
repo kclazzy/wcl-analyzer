@@ -83,11 +83,15 @@ def heal_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, spikes: 
         total, over = float(e.get("total") or 0), float(e.get("overheal") or 0)
         m = mana.get(pid) or []
         oom = next((t for t, v in m if v < OOM), None)
+        # сколько был без маны: до первого каста, где маны снова больше 10% (зелье, Озарение, реген), или до конца
+        back = next((t for t, v in m if oom is not None and t > oom and v >= 2 * OOM), None) if oom is not None else None
+        oom_s = ((back if back is not None else dur) - oom) if oom is not None else None
         rows.append({"pid": pid, "player": p["name"], "cls": p.get("cls"), "spec": p.get("spec"),
                      "healing": round(total), "hps": round(total / dur) if dur else 0, "share": round(total / tot_heal, 3),
                      "overheal": round(over / (total + over), 3) if total + over else None,
                      "mana_end": round(m[-1][1], 3) if m else None, "mana_min": round(min(v for _, v in m), 3) if m else None,
                      "oom_t": round(oom, 1) if oom is not None else None, "oom": _fmt_t(oom) if oom is not None else "",
+                     "oom_s": round(oom_s) if oom_s is not None else None, "oom_to_end": oom is not None and back is None,
                      "peak": round(peak_ratio[pid], 2) if pid in peak_ratio else None,
                      "active": round(float(e["activeTime"]) / 1000 / dur, 3) if e.get("activeTime") and dur else None})
     rows.sort(key=lambda r: -r["healing"])
@@ -129,6 +133,14 @@ def heal_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, spikes: 
     for (pid, ab) in presses:
         owned[pid].add(ab)
 
+    from .raid_tank import _school_ok
+    school_by_name = {}
+    for a in ((raw.get("report") or {}).get("masterData") or {}).get("abilities") or []:
+        try:
+            school_by_name.setdefault(a.get("name"), int(a.get("type") or 0))
+        except (TypeError, ValueError):
+            pass
+
     def ready(pid, ab, t):
         cd = float(ext[ab]["cd"])
         return all(not (x <= t < x + cd) for x in presses.get((pid, ab), []))
@@ -144,11 +156,13 @@ def heal_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, spikes: 
         tank = players.get(int(d["id"]), {}).get("role") == "tank"
         if not tank and not any(a <= t <= b for a, b in win):
             continue
+        sch = school_by_name.get(d.get("ability"), 0)   # Blessing of Spellwarding — только от магии
         free = [(pid, ab) for pid, abs_ in owned.items() for ab in abs_
-                if pid != int(d["id"]) and alive(pid, t) and ready(pid, ab, t - READY_LOOKBACK_S) and ready(pid, ab, t)]
+                if pid != int(d["id"]) and alive(pid, t) and _school_ok(ext[ab], sch)
+                and ready(pid, ab, t - READY_LOOKBACK_S) and ready(pid, ab, t)]
         if free:
             missed.append({"t": round(t, 1), "time": d.get("time") or _fmt_t(t), "player": d["player"],
-                           "ability": d.get("ability") or "", "free": [f"{label(ext[ab])} ({healers[pid]['name']})" for pid, ab in free[:3]]})
+                           "ability": d.get("ability") or "", "free": [f"{label(ext[ab])} ({healers[pid]['name']})" for pid, ab in free[:2]]})
 
     H = {"healers": rows, "externals": uses, "missed": missed, "spikes": len(spikes or []),
          "has_mana": bool(mana), "has_graph": bool(peak_ratio)}
@@ -161,9 +175,10 @@ def heal_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, spikes: 
 def _hints(H: dict, dur: float, kill: bool) -> tuple[list[str], str | None]:
     out, key = [], None
     rows = H["healers"]
-    ooms = [r for r in rows if r["oom_t"] is not None and r["oom_t"] < dur - 5]
+    ooms = [r for r in rows if r["oom_t"] is not None and r["oom_t"] < dur - 5 and (r["oom_s"] or 0) >= 5]
     for r in ooms:
-        out.append(f"{r['player']}: закончилась мана в {r['oom']} — до конца боя {_fmt_t(dur - r['oom_t'])} без маны")
+        out.append(f"{r['player']}: закончилась мана в {r['oom']} — " +
+                   (f"до конца боя {_fmt_t(r['oom_s'])} без маны" if r["oom_to_end"] else f"без маны {r['oom_s']} с"))
     if ooms:
         key = "Лекари: закончилась мана — " + ", ".join(f"{r['player']} ({r['oom']})" for r in ooms[:2]) \
             + " (подробно — во вкладке «Лекари»)"

@@ -416,6 +416,18 @@ dialog label.check input{width:auto;margin:0}
         <button class="btn" id="liveBtn" type="button" title="Отчёт пишется прямо сейчас (Warcraft Logs Uploader в режиме Live Log): программа раз в минуту смотрит, не появился ли новый пулл, и сама разбирает его — урон, сейвы, смерти, танки, лекари, прерывания (без ротации, чтобы хватило лимита). Страницу держите открытой">Следить за логом</button>
         <span class="pickinfo" id="liveInfo" aria-live="polite"></span>
       </div>
+      <div class="runrow" id="dcRow" style="margin-top:4px">
+        <input id="dcHook" type="password" aria-label="Ссылка вебхука Discord" autocomplete="off" spellcheck="false" placeholder="Ссылка вебхука Discord: https://discord.com/api/webhooks/…"
+          title="В Discord: настройки канала → Интеграции → Вебхуки → Новый вебхук → Копировать URL. Ссылка хранится только на этом устройстве"
+          style="flex:1 1 260px;min-width:200px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit">
+        <select id="dcWhat" aria-label="Что отправлять в Discord" title="«Кому что поправить» — ошибки конкретных игроков: их увидят все в канале">
+          <option value="full" selected>Итог пулла и «Кому что поправить»</option>
+          <option value="short">Только итог пулла</option>
+        </select>
+        <button class="btn" id="dcBtn" type="button" aria-pressed="false" title="Пока включено, итог каждого нового пулла из живого лога уходит в канал Discord. Если слежение за логом ещё не запущено — запустится">Начать отправку в Discord</button>
+        <button class="mini" id="dcTest" type="button">Пробное сообщение</button>
+        <span class="pickinfo" id="dcInfo" aria-live="polite"></span>
+      </div>
     </div>
     <div class="error" id="err" role="alert" hidden></div>
     <div class="okmsg" id="okmsg" role="status" hidden></div>
@@ -843,6 +855,7 @@ let LIVE = null;
 function liveStatus(text){ $("#liveInfo").textContent = text || ""; }
 function liveStop(why){
   if (!LIVE) return;
+  if (DC.on) dcStop("Отправка в Discord остановлена вместе со слежением");
   clearTimeout(LIVE.timer); LIVE = null;
   $("#liveBtn").textContent = "Следить за логом"; $("#liveBtn").setAttribute("aria-pressed", "false");
   liveStatus(why || "");
@@ -882,6 +895,7 @@ async function livePoll(){
     try {
       await run({mode: "fight", url: me.url, fight: String(f.id), actor: "all", ref: "none", pick: null, mythic: false, wait: false});
       liveNotify(`${f.name}: ${f.kill ? "килл" : f.pct != null ? `вайп ${String(f.pct).replace(".", ",")}%` : "вайп"} — разбор готов`);
+      if (DC.on) await dcSendPull(f);
     } catch(e) {}
     if (LIVE !== me) return;
   }
@@ -891,6 +905,52 @@ async function livePoll(){
     (me.done ? ` · разобрано новых: ${me.done}` : " · новый пулл разберётся сам"));
   me.timer = setTimeout(livePoll, LIVE_POLL_S * 1000);
 }
+/* ---------- Отправка итогов пуллов в Discord (вебхук канала): кнопки «Начать отправку» / «Остановить» ---------- */
+const DC = {on: false, sent: 0};
+const DC_RE = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/api\/(?:v\d+\/)?webhooks\/\d{5,25}\/[\w-]{20,200}$/;
+try { $("#dcHook").value = localStorage.getItem("wclDiscordHook") || ""; $("#dcWhat").value = localStorage.getItem("wclDiscordWhat") || "full"; } catch(e){}
+$("#dcHook").addEventListener("change", () => { try { localStorage.setItem("wclDiscordHook", $("#dcHook").value.trim()); } catch(e){} });
+$("#dcWhat").addEventListener("change", () => { try { localStorage.setItem("wclDiscordWhat", $("#dcWhat").value); } catch(e){} });
+function dcInfo(t){ $("#dcInfo").textContent = t || ""; }
+function dcHook(){
+  const h = $("#dcHook").value.trim();
+  if (!DC_RE.test(h)) { dcInfo("Вставьте ссылку вебхука Discord: настройки канала → Интеграции → Вебхуки → Копировать URL"); $("#dcHook").focus(); return null; }
+  return h;
+}
+function dcStop(why){
+  DC.on = false; $("#dcBtn").textContent = "Начать отправку в Discord"; $("#dcBtn").setAttribute("aria-pressed", "false");
+  dcInfo(why || `Отправка в Discord остановлена${DC.sent ? ` (отправлено: ${DC.sent})` : ""}`);
+}
+async function dcSendPull(f){
+  const R = (FIGHT_STATE.R && FIGHT_STATE.R.parts && FIGHT_STATE.R.parts.raid) || null;
+  const E = R && R.extras && R.extras.discord_embed;
+  if (!E) { dcInfo(`${f.name}: нет итога для Discord — разбор не готов`); return; }
+  const h = dcHook(); if (!h) return;
+  try {
+    await api("/api/discord", {webhook: h, payload: E[$("#dcWhat").value] || E.full}, 30);
+    DC.sent += 1;
+    dcInfo(`Отправлено в Discord: ${f.name}, ${f.kill ? "килл" : f.pct != null ? `вайп ${String(f.pct).replace(".", ",")}%` : "вайп"} · всего: ${DC.sent}`);
+  } catch(e) { dcInfo(`Не ушло в Discord: ${e.message || e}`); }
+}
+$("#dcBtn").onclick = () => {
+  if (DC.on) return dcStop();
+  const h = dcHook(); if (!h) return;
+  try { localStorage.setItem("wclDiscordHook", h); } catch(e){}
+  if (!LIVE) {
+    if (!inspected) { dcInfo("Сначала «Найти бой» по ссылке на отчёт, который пишется сейчас"); return; }
+    $("#liveBtn").click();
+  }
+  DC.on = true; DC.sent = 0;
+  $("#dcBtn").textContent = "Остановить отправку в Discord"; $("#dcBtn").setAttribute("aria-pressed", "true");
+  dcInfo("Отправка в Discord включена: итог каждого нового пулла уйдёт в канал");
+};
+$("#dcTest").onclick = async () => {
+  const h = dcHook(); if (!h) return;
+  try { localStorage.setItem("wclDiscordHook", h); } catch(e){}
+  dcInfo("Отправляю пробное сообщение…");
+  try { await api("/api/discord", {webhook: h, test: true}, 30); dcInfo("Пробное сообщение ушло — проверьте канал"); }
+  catch(e) { dcInfo(`Не ушло: ${e.message || e}`); }
+};
 $("#liveBtn").onclick = () => {
   if (LIVE) return liveStop("Слежение остановлено");
   if (!inspected) return showErr("Сначала нажмите «Найти бой» по ссылке на отчёт, который пишется сейчас.");

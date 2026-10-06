@@ -951,8 +951,10 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
     for k in ("_eff", "_owned", "light"):   # служебное (план и сравнение с топом) — странице не нужно
         TK.pop(k, None)
     try:  # короткая сводка для Discord
-        from .discord import boss_text
+        from .discord import boss_text, pull_embed
         R["extras"]["discord"] = boss_text(R)
+        # карточки для вебхука (живой лог): с «Кому что поправить» и только итог
+        R["extras"]["discord_embed"] = {"full": pull_embed(R, True), "short": pull_embed(R, False)}
     except Exception:  # noqa: BLE001
         pass
     if hasattr(client, "points_left"):

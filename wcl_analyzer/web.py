@@ -1394,6 +1394,20 @@ _SPELL_LOCK = threading.Lock()
 SPELL_PER_MIN = 30   # публичный сервер: не больше 30 описаний в минуту с одного адреса
 
 
+DISCORD_PER_MIN = 10   # публичный сервер: не больше 10 сообщений в Discord в минуту с одного адреса
+_DISCORD_HITS: dict = {}
+
+
+def _discord_rate_ok(ip: str) -> bool:
+    now = time.time()
+    hits = [t for t in _DISCORD_HITS.get(ip, []) if now - t < 60]
+    ok = len(hits) < DISCORD_PER_MIN
+    if ok:
+        hits.append(now)
+    _DISCORD_HITS[ip] = hits
+    return ok
+
+
 LIVE_POLL_MAX_AGE_S = 45   # слежение за логом: список боёв не старше 45 с (страница спрашивает раз в минуту)
 
 
@@ -1675,6 +1689,22 @@ class Handler(BaseHTTPRequestHandler):
                     cl = cl.for_site(site_of_url(body.get("url")))
                 cl = _limited(cl, 0)  # поиск боя не ждёт сброса лимита: сразу объясняем, что случилось
                 return self._json(inspect_report(cl, body["url"], body.get("fight")))
+            if path == "/api/discord":
+                # Сообщение в канал Discord по вебхуку пользователя (живой лог): ссылка — только вебхук Discord,
+                # упоминания выключены, размер — в пределах Discord
+                from .discord import check_webhook, send_webhook, test_payload
+                hook = check_webhook(str(body.get("webhook") or ""))
+                if SERVER["public"] and not _discord_rate_ok(self.client_address[0]):
+                    raise ValueError("Слишком много сообщений в Discord за минуту — подождите")
+                payload = test_payload() if body.get("test") else body.get("payload")
+                if not isinstance(payload, dict) or not isinstance(payload.get("embeds"), list) \
+                        or not 1 <= len(payload["embeds"]) <= 2 or len(json.dumps(payload, ensure_ascii=False)) > 9000:
+                    raise ValueError("Нет сообщения для Discord")
+                try:
+                    send_webhook(hook, {"username": "WCL Analyzer", "embeds": payload["embeds"]})
+                except RuntimeError as e:
+                    return self._json({"error": str(e)}, 502)
+                return self._json({"ok": True})
             if path == "/api/live":
                 # Слежение за живым логом: свежий список боёв (не старше LIVE_POLL_MAX_AGE_S) — новые пуллы
                 from .config import site_of_url

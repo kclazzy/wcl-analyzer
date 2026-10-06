@@ -1335,7 +1335,49 @@ def test_discord():
     assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
     assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
     assert sum(m.count("**Босс ") for m in msgs) == 12
-    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+    # вебхук: карточка пулла — заголовок со ссылкой, цвет по исходу, «Кому что поправить», без упоминаний
+    from wcl_analyzer import discord as dc
+    E = R["extras"]["discord_embed"]
+    full, short = E["full"]["embeds"][0], E["short"]["embeds"][0]
+    assert full["title"].startswith("Демо-босс") and full["url"].startswith("https://") and full["color"] == dc.COLOR_KILL, full
+    assert full["fields"] and full["fields"][0]["name"] == "Кому что поправить" and "**" in full["fields"][0]["value"], full["fields"]
+    assert not short["fields"] and short["description"] == full["description"]
+    assert E["full"]["allowed_mentions"] == {"parse": []}
+    size = len(full["title"]) + len(full["description"]) + sum(len(f["value"]) + len(f["name"]) for f in full["fields"])
+    assert size < 6000 and all(len(f["value"]) <= 1024 for f in full["fields"]) and len(full["description"]) <= 4096
+    many = {"info": {"boss": "B", "kill": False, "boss_pct": 12.5, "url": "https://x"}, "brief": ["x" * 900] * 9,
+            "issues": [{"player": f"P{i}", "severity": 5, "text": "@everyone " + "y" * 600, "cls": "Monk", "spec": "Windwalker", "role": "DPS"}
+                       for i in range(9)]}
+    m = dc.pull_embed(many)["embeds"][0]
+    assert len(m["fields"]) >= 2 and all(len(f["value"]) <= 1024 for f in m["fields"]) and m["color"] == dc.COLOR_WIPE
+    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"], m["fields"][0]["value"][:200]
+    for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
+        try:
+            dc.check_webhook(bad)
+            raise AssertionError(bad)
+        except ValueError:
+            pass
+    hook = "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz_-0123"
+    import requests as _rq
+    sent = {}
+
+    class _Resp:
+        def __init__(self, code):
+            self.status_code, self.text = code, ""
+    orig = _rq.post
+    try:
+        _rq.post = lambda url, json=None, timeout=None, params=None: (sent.update(url=url, json=json), _Resp(204))[1]
+        dc.send_webhook(hook, {"embeds": [{"title": "t"}], "allowed_mentions": {"parse": ["everyone"]}})
+        assert sent["url"] == hook and sent["json"]["allowed_mentions"] == {"parse": []}, sent
+        _rq.post = lambda *a, **k: _Resp(404)
+        try:
+            dc.send_webhook(hook, {"embeds": []})
+            raise AssertionError("404 не замечен")
+        except RuntimeError as e:
+            assert "вебхук" in str(e)
+    finally:
+        _rq.post = orig
+    print("OK Discord: сводка боя и вечера, деление на сообщения, карточка пулла для вебхука без упоминаний")
 
 
 def test_events_multi_no_unused_var():
@@ -1643,7 +1685,49 @@ def test_discord():
     assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
     assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
     assert sum(m.count("**Босс ") for m in msgs) == 12
-    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+    # вебхук: карточка пулла — заголовок со ссылкой, цвет по исходу, «Кому что поправить», без упоминаний
+    from wcl_analyzer import discord as dc
+    E = R["extras"]["discord_embed"]
+    full, short = E["full"]["embeds"][0], E["short"]["embeds"][0]
+    assert full["title"].startswith("Демо-босс") and full["url"].startswith("https://") and full["color"] == dc.COLOR_KILL, full
+    assert full["fields"] and full["fields"][0]["name"] == "Кому что поправить" and "**" in full["fields"][0]["value"], full["fields"]
+    assert not short["fields"] and short["description"] == full["description"]
+    assert E["full"]["allowed_mentions"] == {"parse": []}
+    size = len(full["title"]) + len(full["description"]) + sum(len(f["value"]) + len(f["name"]) for f in full["fields"])
+    assert size < 6000 and all(len(f["value"]) <= 1024 for f in full["fields"]) and len(full["description"]) <= 4096
+    many = {"info": {"boss": "B", "kill": False, "boss_pct": 12.5, "url": "https://x"}, "brief": ["x" * 900] * 9,
+            "issues": [{"player": f"P{i}", "severity": 5, "text": "@everyone " + "y" * 600, "cls": "Monk", "spec": "Windwalker", "role": "DPS"}
+                       for i in range(9)]}
+    m = dc.pull_embed(many)["embeds"][0]
+    assert len(m["fields"]) >= 2 and all(len(f["value"]) <= 1024 for f in m["fields"]) and m["color"] == dc.COLOR_WIPE
+    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"], m["fields"][0]["value"][:200]
+    for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
+        try:
+            dc.check_webhook(bad)
+            raise AssertionError(bad)
+        except ValueError:
+            pass
+    hook = "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz_-0123"
+    import requests as _rq
+    sent = {}
+
+    class _Resp:
+        def __init__(self, code):
+            self.status_code, self.text = code, ""
+    orig = _rq.post
+    try:
+        _rq.post = lambda url, json=None, timeout=None, params=None: (sent.update(url=url, json=json), _Resp(204))[1]
+        dc.send_webhook(hook, {"embeds": [{"title": "t"}], "allowed_mentions": {"parse": ["everyone"]}})
+        assert sent["url"] == hook and sent["json"]["allowed_mentions"] == {"parse": []}, sent
+        _rq.post = lambda *a, **k: _Resp(404)
+        try:
+            dc.send_webhook(hook, {"embeds": []})
+            raise AssertionError("404 не замечен")
+        except RuntimeError as e:
+            assert "вебхук" in str(e)
+    finally:
+        _rq.post = orig
+    print("OK Discord: сводка боя и вечера, деление на сообщения, карточка пулла для вебхука без упоминаний")
 
 
 def test_events_multi_no_unused_var():
@@ -1951,7 +2035,49 @@ def test_discord():
     assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
     assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
     assert sum(m.count("**Босс ") for m in msgs) == 12
-    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+    # вебхук: карточка пулла — заголовок со ссылкой, цвет по исходу, «Кому что поправить», без упоминаний
+    from wcl_analyzer import discord as dc
+    E = R["extras"]["discord_embed"]
+    full, short = E["full"]["embeds"][0], E["short"]["embeds"][0]
+    assert full["title"].startswith("Демо-босс") and full["url"].startswith("https://") and full["color"] == dc.COLOR_KILL, full
+    assert full["fields"] and full["fields"][0]["name"] == "Кому что поправить" and "**" in full["fields"][0]["value"], full["fields"]
+    assert not short["fields"] and short["description"] == full["description"]
+    assert E["full"]["allowed_mentions"] == {"parse": []}
+    size = len(full["title"]) + len(full["description"]) + sum(len(f["value"]) + len(f["name"]) for f in full["fields"])
+    assert size < 6000 and all(len(f["value"]) <= 1024 for f in full["fields"]) and len(full["description"]) <= 4096
+    many = {"info": {"boss": "B", "kill": False, "boss_pct": 12.5, "url": "https://x"}, "brief": ["x" * 900] * 9,
+            "issues": [{"player": f"P{i}", "severity": 5, "text": "@everyone " + "y" * 600, "cls": "Monk", "spec": "Windwalker", "role": "DPS"}
+                       for i in range(9)]}
+    m = dc.pull_embed(many)["embeds"][0]
+    assert len(m["fields"]) >= 2 and all(len(f["value"]) <= 1024 for f in m["fields"]) and m["color"] == dc.COLOR_WIPE
+    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"], m["fields"][0]["value"][:200]
+    for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
+        try:
+            dc.check_webhook(bad)
+            raise AssertionError(bad)
+        except ValueError:
+            pass
+    hook = "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz_-0123"
+    import requests as _rq
+    sent = {}
+
+    class _Resp:
+        def __init__(self, code):
+            self.status_code, self.text = code, ""
+    orig = _rq.post
+    try:
+        _rq.post = lambda url, json=None, timeout=None, params=None: (sent.update(url=url, json=json), _Resp(204))[1]
+        dc.send_webhook(hook, {"embeds": [{"title": "t"}], "allowed_mentions": {"parse": ["everyone"]}})
+        assert sent["url"] == hook and sent["json"]["allowed_mentions"] == {"parse": []}, sent
+        _rq.post = lambda *a, **k: _Resp(404)
+        try:
+            dc.send_webhook(hook, {"embeds": []})
+            raise AssertionError("404 не замечен")
+        except RuntimeError as e:
+            assert "вебхук" in str(e)
+    finally:
+        _rq.post = orig
+    print("OK Discord: сводка боя и вечера, деление на сообщения, карточка пулла для вебхука без упоминаний")
 
 
 def test_events_multi_no_unused_var():
@@ -2205,7 +2331,49 @@ def test_discord():
     assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
     assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
     assert sum(m.count("**Босс ") for m in msgs) == 12
-    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+    # вебхук: карточка пулла — заголовок со ссылкой, цвет по исходу, «Кому что поправить», без упоминаний
+    from wcl_analyzer import discord as dc
+    E = R["extras"]["discord_embed"]
+    full, short = E["full"]["embeds"][0], E["short"]["embeds"][0]
+    assert full["title"].startswith("Демо-босс") and full["url"].startswith("https://") and full["color"] == dc.COLOR_KILL, full
+    assert full["fields"] and full["fields"][0]["name"] == "Кому что поправить" and "**" in full["fields"][0]["value"], full["fields"]
+    assert not short["fields"] and short["description"] == full["description"]
+    assert E["full"]["allowed_mentions"] == {"parse": []}
+    size = len(full["title"]) + len(full["description"]) + sum(len(f["value"]) + len(f["name"]) for f in full["fields"])
+    assert size < 6000 and all(len(f["value"]) <= 1024 for f in full["fields"]) and len(full["description"]) <= 4096
+    many = {"info": {"boss": "B", "kill": False, "boss_pct": 12.5, "url": "https://x"}, "brief": ["x" * 900] * 9,
+            "issues": [{"player": f"P{i}", "severity": 5, "text": "@everyone " + "y" * 600, "cls": "Monk", "spec": "Windwalker", "role": "DPS"}
+                       for i in range(9)]}
+    m = dc.pull_embed(many)["embeds"][0]
+    assert len(m["fields"]) >= 2 and all(len(f["value"]) <= 1024 for f in m["fields"]) and m["color"] == dc.COLOR_WIPE
+    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"], m["fields"][0]["value"][:200]
+    for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
+        try:
+            dc.check_webhook(bad)
+            raise AssertionError(bad)
+        except ValueError:
+            pass
+    hook = "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz_-0123"
+    import requests as _rq
+    sent = {}
+
+    class _Resp:
+        def __init__(self, code):
+            self.status_code, self.text = code, ""
+    orig = _rq.post
+    try:
+        _rq.post = lambda url, json=None, timeout=None, params=None: (sent.update(url=url, json=json), _Resp(204))[1]
+        dc.send_webhook(hook, {"embeds": [{"title": "t"}], "allowed_mentions": {"parse": ["everyone"]}})
+        assert sent["url"] == hook and sent["json"]["allowed_mentions"] == {"parse": []}, sent
+        _rq.post = lambda *a, **k: _Resp(404)
+        try:
+            dc.send_webhook(hook, {"embeds": []})
+            raise AssertionError("404 не замечен")
+        except RuntimeError as e:
+            assert "вебхук" in str(e)
+    finally:
+        _rq.post = orig
+    print("OK Discord: сводка боя и вечера, деление на сообщения, карточка пулла для вебхука без упоминаний")
 
 
 def test_events_multi_no_unused_var():
@@ -2897,7 +3065,49 @@ def test_discord():
     assert len(msgs) >= 2 and all(len(m) <= 1900 for m in msgs), [len(m) for m in msgs]
     assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
     assert sum(m.count("**Босс ") for m in msgs) == 12
-    print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+    # вебхук: карточка пулла — заголовок со ссылкой, цвет по исходу, «Кому что поправить», без упоминаний
+    from wcl_analyzer import discord as dc
+    E = R["extras"]["discord_embed"]
+    full, short = E["full"]["embeds"][0], E["short"]["embeds"][0]
+    assert full["title"].startswith("Демо-босс") and full["url"].startswith("https://") and full["color"] == dc.COLOR_KILL, full
+    assert full["fields"] and full["fields"][0]["name"] == "Кому что поправить" and "**" in full["fields"][0]["value"], full["fields"]
+    assert not short["fields"] and short["description"] == full["description"]
+    assert E["full"]["allowed_mentions"] == {"parse": []}
+    size = len(full["title"]) + len(full["description"]) + sum(len(f["value"]) + len(f["name"]) for f in full["fields"])
+    assert size < 6000 and all(len(f["value"]) <= 1024 for f in full["fields"]) and len(full["description"]) <= 4096
+    many = {"info": {"boss": "B", "kill": False, "boss_pct": 12.5, "url": "https://x"}, "brief": ["x" * 900] * 9,
+            "issues": [{"player": f"P{i}", "severity": 5, "text": "@everyone " + "y" * 600, "cls": "Monk", "spec": "Windwalker", "role": "DPS"}
+                       for i in range(9)]}
+    m = dc.pull_embed(many)["embeds"][0]
+    assert len(m["fields"]) >= 2 and all(len(f["value"]) <= 1024 for f in m["fields"]) and m["color"] == dc.COLOR_WIPE
+    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"], m["fields"][0]["value"][:200]
+    for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
+        try:
+            dc.check_webhook(bad)
+            raise AssertionError(bad)
+        except ValueError:
+            pass
+    hook = "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz_-0123"
+    import requests as _rq
+    sent = {}
+
+    class _Resp:
+        def __init__(self, code):
+            self.status_code, self.text = code, ""
+    orig = _rq.post
+    try:
+        _rq.post = lambda url, json=None, timeout=None, params=None: (sent.update(url=url, json=json), _Resp(204))[1]
+        dc.send_webhook(hook, {"embeds": [{"title": "t"}], "allowed_mentions": {"parse": ["everyone"]}})
+        assert sent["url"] == hook and sent["json"]["allowed_mentions"] == {"parse": []}, sent
+        _rq.post = lambda *a, **k: _Resp(404)
+        try:
+            dc.send_webhook(hook, {"embeds": []})
+            raise AssertionError("404 не замечен")
+        except RuntimeError as e:
+            assert "вебхук" in str(e)
+    finally:
+        _rq.post = orig
+    print("OK Discord: сводка боя и вечера, деление на сообщения, карточка пулла для вебхука без упоминаний")
 
 
 def test_events_multi_no_unused_var():

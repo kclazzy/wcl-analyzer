@@ -144,9 +144,13 @@ def fetch_raid_raw(client, url: str, fight=None, log=print, pull_deaths: bool = 
                     batched.update(client.events_multi(code, fid, s, e, small))
             if other:
                 log(f"Смерти в других пуллах ({len(other)})…")
-                batched.update(client.events_multi(code, fid, s, e, {
-                    f"pull_{x['id']}": {"data_type": "Deaths", "fight_id": int(x["id"]),
-                                        "start": float(x["startTime"]), "end": float(x["endTime"])} for x in other}))
+                pspecs = {f"pull_{x['id']}": {"data_type": "Deaths", "fight_id": int(x["id"]),
+                                              "start": float(x["startTime"]), "end": float(x["endTime"])} for x in other}
+                try:
+                    batched.update(client.events_multi(code, fid, s, e, pspecs))
+                except WCLError:   # не выключать пакетные запросы для всего разбора из-за одной выборки
+                    for k, p in pspecs.items():
+                        batched[k] = client.events(code, p["fight_id"], p["start"], p["end"], "Deaths")
         except WCLError:
             client._no_batch = True
             batched = None

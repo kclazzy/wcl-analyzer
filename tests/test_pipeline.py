@@ -1324,6 +1324,26 @@ def test_discord():
     print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
 
 
+def test_events_multi_no_unused_var():
+    """Выборки по другим пуллам (fightIDs: [n]) — без объявленной, но неиспользуемой переменной $fid:
+    иначе GraphQL отклоняет запрос и программа до конца разбора качала всё по одному."""
+    from wcl_analyzer.api import MemoryCache, WCLClient
+    cl = WCLClient("id", "secret", MemoryCache(5))
+    seen = []
+
+    def fake_query(q, v=None, **kw):
+        seen.append((q, v))
+        return {"reportData": {"report": {"e0": {"data": [{"type": "death"}], "nextPageTimestamp": None}}}}
+    cl.query = fake_query
+    out = cl.events_multi("CODE", 5, 0, 1000, {"pull_4": {"data_type": "Deaths", "fight_id": 4, "start": 0, "end": 10}})
+    q, v = seen[0]
+    assert "$fid" not in q and "fid" not in v and out["pull_4"] == [{"type": "death"}], (q, v)
+    cl.events_multi("CODE", 5, 0, 1000, {"casts": {"data_type": "Casts"}})
+    q, v = seen[1]
+    assert "$fid: [Int]" in q and v["fid"] == [5], (q, v)
+    print("OK пакетный запрос: без неиспользуемой переменной $fid")
+
+
 if __name__ == "__main__":
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
@@ -1348,6 +1368,7 @@ if __name__ == "__main__":
     test_kicks()
     test_healers()
     test_discord()
+    test_events_multi_no_unused_var()
     test_wowhead_uses_requests()
     test_cache_prune()
     test_plan_healer_cds()
@@ -1595,6 +1616,26 @@ def test_discord():
     assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
     assert sum(m.count("**Босс ") for m in msgs) == 12
     print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+
+
+def test_events_multi_no_unused_var():
+    """Выборки по другим пуллам (fightIDs: [n]) — без объявленной, но неиспользуемой переменной $fid:
+    иначе GraphQL отклоняет запрос и программа до конца разбора качала всё по одному."""
+    from wcl_analyzer.api import MemoryCache, WCLClient
+    cl = WCLClient("id", "secret", MemoryCache(5))
+    seen = []
+
+    def fake_query(q, v=None, **kw):
+        seen.append((q, v))
+        return {"reportData": {"report": {"e0": {"data": [{"type": "death"}], "nextPageTimestamp": None}}}}
+    cl.query = fake_query
+    out = cl.events_multi("CODE", 5, 0, 1000, {"pull_4": {"data_type": "Deaths", "fight_id": 4, "start": 0, "end": 10}})
+    q, v = seen[0]
+    assert "$fid" not in q and "fid" not in v and out["pull_4"] == [{"type": "death"}], (q, v)
+    cl.events_multi("CODE", 5, 0, 1000, {"casts": {"data_type": "Casts"}})
+    q, v = seen[1]
+    assert "$fid: [Int]" in q and v["fid"] == [5], (q, v)
+    print("OK пакетный запрос: без неиспользуемой переменной $fid")
 
 
 if __name__ == "__main__":
@@ -1871,6 +1912,26 @@ def test_discord():
     print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
 
 
+def test_events_multi_no_unused_var():
+    """Выборки по другим пуллам (fightIDs: [n]) — без объявленной, но неиспользуемой переменной $fid:
+    иначе GraphQL отклоняет запрос и программа до конца разбора качала всё по одному."""
+    from wcl_analyzer.api import MemoryCache, WCLClient
+    cl = WCLClient("id", "secret", MemoryCache(5))
+    seen = []
+
+    def fake_query(q, v=None, **kw):
+        seen.append((q, v))
+        return {"reportData": {"report": {"e0": {"data": [{"type": "death"}], "nextPageTimestamp": None}}}}
+    cl.query = fake_query
+    out = cl.events_multi("CODE", 5, 0, 1000, {"pull_4": {"data_type": "Deaths", "fight_id": 4, "start": 0, "end": 10}})
+    q, v = seen[0]
+    assert "$fid" not in q and "fid" not in v and out["pull_4"] == [{"type": "death"}], (q, v)
+    cl.events_multi("CODE", 5, 0, 1000, {"casts": {"data_type": "Casts"}})
+    q, v = seen[1]
+    assert "$fid: [Int]" in q and v["fid"] == [5], (q, v)
+    print("OK пакетный запрос: без неиспользуемой переменной $fid")
+
+
 if __name__ == "__main__":
     test_analysis_quality()
 
@@ -2089,6 +2150,26 @@ def test_discord():
     assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
     assert sum(m.count("**Босс ") for m in msgs) == 12
     print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+
+
+def test_events_multi_no_unused_var():
+    """Выборки по другим пуллам (fightIDs: [n]) — без объявленной, но неиспользуемой переменной $fid:
+    иначе GraphQL отклоняет запрос и программа до конца разбора качала всё по одному."""
+    from wcl_analyzer.api import MemoryCache, WCLClient
+    cl = WCLClient("id", "secret", MemoryCache(5))
+    seen = []
+
+    def fake_query(q, v=None, **kw):
+        seen.append((q, v))
+        return {"reportData": {"report": {"e0": {"data": [{"type": "death"}], "nextPageTimestamp": None}}}}
+    cl.query = fake_query
+    out = cl.events_multi("CODE", 5, 0, 1000, {"pull_4": {"data_type": "Deaths", "fight_id": 4, "start": 0, "end": 10}})
+    q, v = seen[0]
+    assert "$fid" not in q and "fid" not in v and out["pull_4"] == [{"type": "death"}], (q, v)
+    cl.events_multi("CODE", 5, 0, 1000, {"casts": {"data_type": "Casts"}})
+    q, v = seen[1]
+    assert "$fid: [Int]" in q and v["fid"] == [5], (q, v)
+    print("OK пакетный запрос: без неиспользуемой переменной $fid")
 
 
 if __name__ == "__main__":
@@ -2747,6 +2828,26 @@ def test_discord():
     assert msgs[0].startswith("**Вечер**") and msgs[-1].endswith("<https://www.warcraftlogs.com/reports/X>"), msgs[-1][-80:]
     assert sum(m.count("**Босс ") for m in msgs) == 12
     print("OK Discord: сводка боя и вечера, ссылки без превью, деление на сообщения до 2000 символов")
+
+
+def test_events_multi_no_unused_var():
+    """Выборки по другим пуллам (fightIDs: [n]) — без объявленной, но неиспользуемой переменной $fid:
+    иначе GraphQL отклоняет запрос и программа до конца разбора качала всё по одному."""
+    from wcl_analyzer.api import MemoryCache, WCLClient
+    cl = WCLClient("id", "secret", MemoryCache(5))
+    seen = []
+
+    def fake_query(q, v=None, **kw):
+        seen.append((q, v))
+        return {"reportData": {"report": {"e0": {"data": [{"type": "death"}], "nextPageTimestamp": None}}}}
+    cl.query = fake_query
+    out = cl.events_multi("CODE", 5, 0, 1000, {"pull_4": {"data_type": "Deaths", "fight_id": 4, "start": 0, "end": 10}})
+    q, v = seen[0]
+    assert "$fid" not in q and "fid" not in v and out["pull_4"] == [{"type": "death"}], (q, v)
+    cl.events_multi("CODE", 5, 0, 1000, {"casts": {"data_type": "Casts"}})
+    q, v = seen[1]
+    assert "$fid: [Int]" in q and v["fid"] == [5], (q, v)
+    print("OK пакетный запрос: без неиспользуемой переменной $fid")
 
 
 if __name__ == "__main__":

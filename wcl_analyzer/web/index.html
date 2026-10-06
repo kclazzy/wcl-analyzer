@@ -1987,7 +1987,7 @@ function renderKicks(K, el){
   if (K.error) { el.innerHTML = `<p class="empty">Прерывания не разобраны: ${esc(K.error)}</p>`; return; }
   const G = K.groups || [];
   const ppl = a => (a||[]).map(p => esc(p.player) + (p.n != null ? ` ×${p.n}` : "")).join(", ");
-  const rot = g => (g.rotation||[]).map(p => `${esc(p.player)} <span style="color:var(--muted);font-size:13px">${esc(p.kick)}, ${p.cd} с</span>`).join(" → ")
+  const rot = g => (g.rotation||[]).map(p => `${esc(p.player)} <span style="color:var(--muted);font-size:13px">${esc(p.kick)}, ${p.cd} с</span>`).join(g.multi ? ", " : " → ")
     + (g.backup ? ` <span style="color:var(--muted);font-size:13px">запас: ${esc(g.backup.player)}</span>` : "");
   const mrt = K.mrt ? `<div class="mrt" style="margin-top:12px">
     <button type="button" class="mini mrtbtn" data-mrt data-label="Скопировать для MRT (прерывания)">Скопировать для MRT (прерывания)</button>
@@ -2002,7 +2002,7 @@ function renderKicks(K, el){
         {num:[2,3,4], empty:"Прерываемых кастов не было.", flag: i => !!G[i].missed}))}
     ${G.some(g => (g.rotation||[]).length) ? box("Очередь на следующий пулл", "Кто за кем прерывает. Сначала — кто прерывал эту способность в бою, затем — у кого прерывание откатано. Откат — по таблице или по факту, если игрок жал чаще.",
       table(["Способность","Враг","Очередь","Между кастами"], G.filter(g => (g.rotation||[]).length).map(g => [esc(g.name), esc(g.npc),
-        rot(g) + (g.uncovered ? ` <span class="worse">не успевают: ${g.uncovered}</span>` : ""), g.gap ? `${g.gap} с` : "—"])) + mrt) : ""}
+        rot(g) + (g.uncovered ? ` <span class="worse">не успевают: ${g.uncovered}</span>` : ""), g.multi ? `врагов сразу: до ${g.enemies}` : g.gap ? `${g.gap} с` : "—"])) + mrt) : ""}
     ${box("Игроки", "Сколько раз прервали каст и сколько нажали всего; «впустую» — каст уже сбит другим или закончился.",
       table(["Игрок","Прерывание","Прервал","Нажато","Впустую"], (K.players||[]).map(r => [esc(r.player), esc(r.kick||""), num(r.kicks), num(r.presses),
         r.wasted >= 3 ? `<span class="worse">${num(r.wasted)}</span>` : num(r.wasted)]), {num:[2,3,4], empty:"Прерываний не было."}))}`;

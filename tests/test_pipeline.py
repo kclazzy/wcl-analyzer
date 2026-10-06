@@ -1261,7 +1261,21 @@ def test_kicks():
     assert g2["casts"] == 18 and g2["kicked"] == 6 and g2["missed"] == 12, g2
     assert len(g2["rotation"]) == 3 and g2["rotation"][0]["player"] == "P1" and g2["uncovered"] == 0, g2["rotation"]
     assert "P1" in K2["mrt"] and " > " in K2["mrt"], K2["mrt"]
-    print("OK прерывания: прервано/прошло, очередь по откатам, заметка MRT, лист Excel")
+    # два адда кастуют одновременно каждые 3 с, каждого прерывает свой — не «не успевают», а список прерывавших
+    raw3 = {"report": {"masterData": {"actors": [{"id": 60, "gameID": 888, "name": "Add", "type": "NPC"},
+                                                  {"id": 61, "gameID": 888, "name": "Add", "type": "NPC"}], "abilities": []}},
+            "fight": {"name": "Test"}, "boss_casts": [], "interrupts": [], "casts": []}
+    for src, kicker in ((60, 1), (61, 2)):
+        for t in range(10, 40, 16):
+            raw3["boss_casts"].append({"type": "begincast", "timestamp": f0 + t * 1000, "sourceID": src, "abilityGameID": 4343})
+            raw3["interrupts"].append({"type": "interrupt", "timestamp": f0 + t * 1000 + 300, "sourceID": kicker,
+                                       "targetID": src, "abilityGameID": 1766, "extraAbilityGameID": 4343})
+    K3 = kick_analysis(raw3, players, lambda x: x, lambda ev: (float(ev["timestamp"]) - f0) / 1000,
+                       lambda ab: f"Spell {ab}", 60.0)
+    g3 = K3["groups"][0]
+    assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
+    assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
+    print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
 
 
 if __name__ == "__main__":
@@ -1472,7 +1486,21 @@ def test_kicks():
     assert g2["casts"] == 18 and g2["kicked"] == 6 and g2["missed"] == 12, g2
     assert len(g2["rotation"]) == 3 and g2["rotation"][0]["player"] == "P1" and g2["uncovered"] == 0, g2["rotation"]
     assert "P1" in K2["mrt"] and " > " in K2["mrt"], K2["mrt"]
-    print("OK прерывания: прервано/прошло, очередь по откатам, заметка MRT, лист Excel")
+    # два адда кастуют одновременно каждые 3 с, каждого прерывает свой — не «не успевают», а список прерывавших
+    raw3 = {"report": {"masterData": {"actors": [{"id": 60, "gameID": 888, "name": "Add", "type": "NPC"},
+                                                  {"id": 61, "gameID": 888, "name": "Add", "type": "NPC"}], "abilities": []}},
+            "fight": {"name": "Test"}, "boss_casts": [], "interrupts": [], "casts": []}
+    for src, kicker in ((60, 1), (61, 2)):
+        for t in range(10, 40, 16):
+            raw3["boss_casts"].append({"type": "begincast", "timestamp": f0 + t * 1000, "sourceID": src, "abilityGameID": 4343})
+            raw3["interrupts"].append({"type": "interrupt", "timestamp": f0 + t * 1000 + 300, "sourceID": kicker,
+                                       "targetID": src, "abilityGameID": 1766, "extraAbilityGameID": 4343})
+    K3 = kick_analysis(raw3, players, lambda x: x, lambda ev: (float(ev["timestamp"]) - f0) / 1000,
+                       lambda ab: f"Spell {ab}", 60.0)
+    g3 = K3["groups"][0]
+    assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
+    assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
+    print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
 
 
 if __name__ == "__main__":
@@ -1686,7 +1714,21 @@ def test_kicks():
     assert g2["casts"] == 18 and g2["kicked"] == 6 and g2["missed"] == 12, g2
     assert len(g2["rotation"]) == 3 and g2["rotation"][0]["player"] == "P1" and g2["uncovered"] == 0, g2["rotation"]
     assert "P1" in K2["mrt"] and " > " in K2["mrt"], K2["mrt"]
-    print("OK прерывания: прервано/прошло, очередь по откатам, заметка MRT, лист Excel")
+    # два адда кастуют одновременно каждые 3 с, каждого прерывает свой — не «не успевают», а список прерывавших
+    raw3 = {"report": {"masterData": {"actors": [{"id": 60, "gameID": 888, "name": "Add", "type": "NPC"},
+                                                  {"id": 61, "gameID": 888, "name": "Add", "type": "NPC"}], "abilities": []}},
+            "fight": {"name": "Test"}, "boss_casts": [], "interrupts": [], "casts": []}
+    for src, kicker in ((60, 1), (61, 2)):
+        for t in range(10, 40, 16):
+            raw3["boss_casts"].append({"type": "begincast", "timestamp": f0 + t * 1000, "sourceID": src, "abilityGameID": 4343})
+            raw3["interrupts"].append({"type": "interrupt", "timestamp": f0 + t * 1000 + 300, "sourceID": kicker,
+                                       "targetID": src, "abilityGameID": 1766, "extraAbilityGameID": 4343})
+    K3 = kick_analysis(raw3, players, lambda x: x, lambda ev: (float(ev["timestamp"]) - f0) / 1000,
+                       lambda ab: f"Spell {ab}", 60.0)
+    g3 = K3["groups"][0]
+    assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
+    assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
+    print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
 
 
 if __name__ == "__main__":
@@ -1846,7 +1888,21 @@ def test_kicks():
     assert g2["casts"] == 18 and g2["kicked"] == 6 and g2["missed"] == 12, g2
     assert len(g2["rotation"]) == 3 and g2["rotation"][0]["player"] == "P1" and g2["uncovered"] == 0, g2["rotation"]
     assert "P1" in K2["mrt"] and " > " in K2["mrt"], K2["mrt"]
-    print("OK прерывания: прервано/прошло, очередь по откатам, заметка MRT, лист Excel")
+    # два адда кастуют одновременно каждые 3 с, каждого прерывает свой — не «не успевают», а список прерывавших
+    raw3 = {"report": {"masterData": {"actors": [{"id": 60, "gameID": 888, "name": "Add", "type": "NPC"},
+                                                  {"id": 61, "gameID": 888, "name": "Add", "type": "NPC"}], "abilities": []}},
+            "fight": {"name": "Test"}, "boss_casts": [], "interrupts": [], "casts": []}
+    for src, kicker in ((60, 1), (61, 2)):
+        for t in range(10, 40, 16):
+            raw3["boss_casts"].append({"type": "begincast", "timestamp": f0 + t * 1000, "sourceID": src, "abilityGameID": 4343})
+            raw3["interrupts"].append({"type": "interrupt", "timestamp": f0 + t * 1000 + 300, "sourceID": kicker,
+                                       "targetID": src, "abilityGameID": 1766, "extraAbilityGameID": 4343})
+    K3 = kick_analysis(raw3, players, lambda x: x, lambda ev: (float(ev["timestamp"]) - f0) / 1000,
+                       lambda ab: f"Spell {ab}", 60.0)
+    g3 = K3["groups"][0]
+    assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
+    assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
+    print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
 
 
 if __name__ == "__main__":
@@ -2444,7 +2500,21 @@ def test_kicks():
     assert g2["casts"] == 18 and g2["kicked"] == 6 and g2["missed"] == 12, g2
     assert len(g2["rotation"]) == 3 and g2["rotation"][0]["player"] == "P1" and g2["uncovered"] == 0, g2["rotation"]
     assert "P1" in K2["mrt"] and " > " in K2["mrt"], K2["mrt"]
-    print("OK прерывания: прервано/прошло, очередь по откатам, заметка MRT, лист Excel")
+    # два адда кастуют одновременно каждые 3 с, каждого прерывает свой — не «не успевают», а список прерывавших
+    raw3 = {"report": {"masterData": {"actors": [{"id": 60, "gameID": 888, "name": "Add", "type": "NPC"},
+                                                  {"id": 61, "gameID": 888, "name": "Add", "type": "NPC"}], "abilities": []}},
+            "fight": {"name": "Test"}, "boss_casts": [], "interrupts": [], "casts": []}
+    for src, kicker in ((60, 1), (61, 2)):
+        for t in range(10, 40, 16):
+            raw3["boss_casts"].append({"type": "begincast", "timestamp": f0 + t * 1000, "sourceID": src, "abilityGameID": 4343})
+            raw3["interrupts"].append({"type": "interrupt", "timestamp": f0 + t * 1000 + 300, "sourceID": kicker,
+                                       "targetID": src, "abilityGameID": 1766, "extraAbilityGameID": 4343})
+    K3 = kick_analysis(raw3, players, lambda x: x, lambda ev: (float(ev["timestamp"]) - f0) / 1000,
+                       lambda ab: f"Spell {ab}", 60.0)
+    g3 = K3["groups"][0]
+    assert g3["multi"] and g3["enemies"] == 2 and not g3["uncovered"] and {p["player"] for p in g3["rotation"]} == {"P1", "P2"}, g3
+    assert not any("не успевают" in h for h in K3["hints"]), K3["hints"]
+    print("OK прерывания: прервано/прошло, очередь по откатам, несколько аддов сразу, заметка MRT, лист Excel")
 
 
 if __name__ == "__main__":

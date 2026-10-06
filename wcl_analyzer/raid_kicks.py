@@ -56,7 +56,9 @@ def kick_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, site: st
         ab = int(ev.get("extraAbilityGameID") or 0)
         if src in players and ab:
             kicks.append((rel(ev), src, int(ev.get("targetID", -1)), ab, int(ev.get("abilityGameID") or 0)))
-    kickable = {k[3] for k in kicks}
+    # прерываемая — любая способность, которую в бою прервали (в том числе не игрок: питомец без хозяина, NPC)
+    kickable = {int(ev.get("extraAbilityGameID") or 0) for ev in raw.get("interrupts") or []
+                if ev.get("type") == "interrupt" and ev.get("extraAbilityGameID")}
     # нажатия прерываний игроками (в том числе впустую: каст уже сбит или кончился)
     presses: dict[int, list] = defaultdict(list)
     for ev in raw.get("casts") or []:
@@ -91,13 +93,15 @@ def kick_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, site: st
         a = actors.get(src) or {}
         gk = (int(a.get("gameID") or src), ab)
         g = groups.setdefault(gk, {"id": ab, "name": nm(ab), "npc": a.get("name") or "—", "attempts": [],
-                                   "kicked": 0, "missed": 0, "missed_t": [], "by": Counter()})
+                                   "kicked": 0, "missed": 0, "missed_t": [], "by": Counter(), "spans": []})
         ks = sorted(kicked_at.get(key, []))
         fin = sorted(done.get(key, []))
         starts = sorted(begins.get(key, []))
         if not starts:   # касты без начала (мгновенные или лог без begincast): попытка = прерывание или прошедший каст
             starts = sorted([t for t, _ in ks] + fin)
         used_k, used_f = set(), set()
+        if starts:
+            g["spans"].append((starts[0], starts[-1]))
         for i, t in enumerate(starts):
             end = min(starts[i + 1] if i + 1 < len(starts) else t + CAST_WINDOW_S, t + CAST_WINDOW_S) + 0.05
             k = next((j for j, (kt, _) in enumerate(ks) if j not in used_k and t - 0.05 <= kt <= end), None)
@@ -153,6 +157,10 @@ def kick_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, site: st
     load = Counter()
     for gk, g in sorted(groups.items(), key=lambda kv: (-len(kv[1]["attempts"]), kv[1]["name"])):
         times = sorted(g["attempts"])
+        # несколько врагов этого типа кастуют одновременно (адды) — на каждого свой человек, общая очередь
+        # не годится: в план — те, кто их прерывал, без проверки «успевают ли по кругу»
+        sp = sorted(g["spans"])
+        multi = any(b[0] < a[1] for a, b in zip(sp, sp[1:]))
         # сначала — кто прерывал эту способность в бою, потом — кто прерывал вообще, потом — у кого прерывание есть
         pref = [pid for pid, _ in g["by"].most_common() if pid in kick_of]
         pref += sorted((pid for pid in kick_of if pid not in pref and presses.get(pid)),
@@ -160,7 +168,10 @@ def kick_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, site: st
         pref += sorted((pid for pid in kick_of if pid not in pref),
                        key=lambda pid: (load[pid], players[pid].get("role") == "tank", players[pid]["name"]))
         rot, local, miss = [], [], len(times)
-        for pid in pref:
+        if multi:
+            rot = [pid for pid, _ in g["by"].most_common() if pid in kick_of][:MAX_KICKERS + 1] or pref[:2]
+            local, miss = [], 0
+        for pid in ([] if multi else pref):
             if miss == 0 or len(rot) >= MAX_KICKERS:
                 break
             trial, m = simulate(rot + [pid], times)
@@ -180,7 +191,8 @@ def kick_analysis(raw: dict, players: dict, owner, rel, nm, dur: float, site: st
             "missed": g["missed"], "missed_times": [_fmt_t(t) for t in g["missed_t"][:8]],
             "by": [{"player": players[pid]["name"], "cls": players[pid].get("cls"), "n": n} for pid, n in g["by"].most_common()],
             "rotation": [who(pid) for pid in rot], "backup": who(backup) if backup is not None else None,
-            "uncovered": miss, "gap": round(min((b - a for a, b in zip(times, times[1:])), default=0.0), 1)})
+            "uncovered": miss, "multi": multi, "enemies": len(sp),
+            "gap": round(min((b - a for a, b in zip(times, times[1:])), default=0.0), 1) if not multi else None})
 
     # ---------------------------------------------- игроки
     done_by = Counter(k[1] for k in kicks)
@@ -211,7 +223,8 @@ def mrt_kicks(K: dict, title: str = "") -> str:
     for g in K.get("groups") or []:
         if not g["rotation"] or (g["casts"] < 2 and not g["missed"]):
             continue
-        s = f"{{spell:{g['id']}}} {g['npc']}: " + " > ".join(nm(p) for p in g["rotation"])
+        # один враг — очередь по порядку (>); несколько сразу — список, каждый на своего
+        s = f"{{spell:{g['id']}}} {g['npc']}: " + (", " if g.get("multi") else " > ").join(nm(p) for p in g["rotation"])
         if g.get("backup"):
             s += f" (запас: {nm(g['backup'])})"
         lines.append(s)
@@ -232,6 +245,8 @@ def _hints(K: dict) -> tuple[list[str], str | None]:
             if rot:
                 s += f"; очередь на следующий пулл: {rot}"
             out.append(s)
+        if g["multi"] and g["missed"] and rot:
+            out[-1] = out[-1].replace("; очередь на следующий пулл:", "; врагов несколько сразу — на каждого свой человек, прерывали:")
         if g["uncovered"]:
             out.append(f"«{g['name']}» ({g['npc']}): касты идут чаще, чем успевают прерывания даже у {len(g['rotation'])} игроков "
                        f"(между кастами {g['gap']} с) — нужны станы, контроль или больше людей на этом враге")

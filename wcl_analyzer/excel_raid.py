@@ -168,7 +168,7 @@ def _kicks(wb, R, demo):
         s.section("Очередь на следующий пулл")
         s.table(["Способность", "Враг", "Очередь", "Запас", "Между кастами"],
                 [[g["name"], g["npc"], " → ".join(f"{p['player']} ({p['kick']}, {p['cd']} с)" for p in g["rotation"]),
-                  (g.get("backup") or {}).get("player", ""), f"{g['gap']} с" if g.get("gap") else "—"] for g in rot])
+                  (g.get("backup") or {}).get("player", ""), ("несколько врагов сразу" if g.get("multi") else f"{g['gap']} с" if g.get("gap") else "—")] for g in rot])
     s.section("Игроки")
     s.table(["Игрок", "Прерывание", "Прервал", "Нажато", "Впустую"],
             [[r["player"], r.get("kick") or "", r["kicks"], r["presses"], r["wasted"]] for r in K.get("players") or []])

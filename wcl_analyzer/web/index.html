@@ -178,8 +178,9 @@ td .imp{font-size:13.5px}
 .tpgrid > div{min-width:0}
 @media (max-width:960px){.tpgrid{grid-template-columns:1fr 1fr}}
 @media (max-width:720px){.tpgrid{grid-template-columns:1fr}}
-.ftabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
-.ftabs button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:10px 18px;font-weight:600;font-size:15px;color:var(--muted);cursor:pointer}
+.ftabs{display:flex;flex-wrap:wrap;gap:12px;margin:0 0 20px}
+.ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:15px 28px;min-height:56px;font-weight:700;font-size:18px;color:var(--muted);cursor:pointer}
+@media (max-width:600px){.ftabs button{flex:1 1 auto;padding:14px 18px;font-size:17px}}
 .ftabs button:hover{color:var(--ink);border-color:var(--ink)}
 .ftabs button[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
 .fbar{height:10px;background:var(--soft);border-radius:99px;overflow:hidden;margin-top:6px}

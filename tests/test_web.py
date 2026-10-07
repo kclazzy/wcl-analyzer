@@ -98,6 +98,28 @@ def main():
     assert st == 200 and isinstance(s["fights"], list) and s["fights"] and {"id", "name", "kill", "pct"} <= set(s["fights"][0]), s
     assert anna.req("POST", "/api/live", {"url": "not a link"})[0] == 400
 
+    # Discord: только ссылка вебхука Discord, сообщение уходит (отправка подменена), ошибка Discord — понятным текстом
+    import wcl_analyzer.discord as _dc
+    hook = "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz_-0123"
+    got = []
+    _orig_send = _dc.send_webhook
+    _dc.send_webhook = lambda url, payload, timeout=15: got.append((url, payload))
+    try:
+        assert anna.req("POST", "/api/discord", {"webhook": "https://evil.com/x", "test": True})[0] == 400
+        st, s = anna.req("POST", "/api/discord", {"webhook": hook, "test": True})
+        assert st == 200 and s["ok"] and got[-1][0] == hook and got[-1][1]["embeds"], (st, s)
+        st, s = anna.req("POST", "/api/discord", {"webhook": hook, "payload": {"embeds": [{"title": "Пулл"}]}})
+        assert st == 200 and got[-1][1]["embeds"][0]["title"] == "Пулл"
+        assert anna.req("POST", "/api/discord", {"webhook": hook, "payload": {"embeds": []}})[0] == 400
+
+        def _fail(url, payload, timeout=15):
+            raise RuntimeError("Discord не принял вебхук: ссылка неверная или вебхук удалён")
+        _dc.send_webhook = _fail
+        st, s = anna.req("POST", "/api/discord", {"webhook": hook, "test": True})
+        assert st == 502 and "вебхук" in s["error"], s
+    finally:
+        _dc.send_webhook = _orig_send
+
     # Обновление программы: на публичном сервере его нет
     st, s = anna.req("GET", "/api/version")
     assert st == 200 and s["updates"] is False and s["build"], s

@@ -87,7 +87,8 @@ for c in pick_fights(rep, difficulties=None):
             "consumables": X.get("consumables"),
             "deaths": [(d["time"], d["player"], d["ability"], d.get("wipe_tail")) for d in R.get("deaths") or []],
             "top": {"n": (X.get("vs_top") or {}).get("n")},
-            "kicks": X.get("kicks"), "heal": X.get("heal"), "discord": X.get("discord"),
+            "kicks": X.get("kicks"), "heal": X.get("heal"), "discord": X.get("discord"), "links": X.get("ability_links"),
+            "embed": X.get("discord_embed"),
         })
     except Exception as e:
         item["error"] = f"{type(e).__name__}: {e}"

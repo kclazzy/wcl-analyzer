@@ -46,6 +46,8 @@ def boss_entry(R: dict, c: dict) -> dict:
         "top_kills": V.get("kills") or [], "top_cover": V.get("top_cover"), "my_cover": V.get("my_cover"),
         "roster": len({x["player"] for x in X.get("roster_cds") or []}),
         "brief": (R.get("brief") or [])[:3], "discord": X.get("discord") or "",
+        "links": {k: v for k, v in (X.get("ability_links") or {}).items()
+                  if any(f"«{k}»" in b for b in (R.get("brief") or [])[:3])},
     }
 
 

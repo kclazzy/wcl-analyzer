@@ -19,6 +19,47 @@ def _clean(line: str) -> str:
     return _MD.sub(r"\\\1", _TAB.sub("", line or "")).strip()
 
 
+_QUOTE = re.compile(r"«([^»]+)»")
+
+
+def ability_links(R: dict, master: dict) -> dict:
+    """{название способности: ссылка} для всех «…» в главном по бою и «Кому что поправить»:
+    гайд Mythic Trap (как на странице), иначе Wowhead по номеру способности из лога."""
+    from .wowhead import page_url
+    texts = list(R.get("brief") or []) + [i.get("text", "") for i in R.get("issues") or []]
+    want = {m for t in texts for m in _QUOTE.findall(t or "")}
+    guide = R.get("guide_links") or {}
+    ids: dict = {}
+    for a in master.get("abilities") or []:
+        n, gid = a.get("name"), a.get("gameID")
+        if n in want and gid and int(gid) > 1:
+            ids.setdefault(n, int(gid))   # одинаковое имя у разных номеров — первый, как на странице
+    out = {}
+    for n in want:
+        if guide.get(n):
+            out[n] = guide[n]
+        elif n in ids:
+            out[n] = page_url(ids[n])
+        else:
+            m = re.search(r"#(\d+)$", n)   # «Unknown Ability #123»
+            if m:
+                out[n] = page_url(int(m.group(1)))
+    return out
+
+
+def _linked(line: str, links: dict, preview: bool = True) -> str:
+    """Строка для Discord: «Название» — ссылкой (preview=False — в угловых скобках, без карточки-превью
+    под сообщением); остальной текст — без случайной разметки."""
+    out = []
+    for k, part in enumerate(_QUOTE.split(line or "")):
+        if k % 2 == 0:
+            out.append(_MD.sub(r"\\\1", part))   # без обрезки пробелов: они стоят вокруг ссылок
+        else:
+            name, url = _MD.sub(r"\\\1", part), (links or {}).get(part)
+            out.append(f"«[{name}]({url if preview else '<' + url + '>'})»" if url else f"«{name}»")
+    return _TAB.sub("", "".join(out)).strip()
+
+
 def _outcome(I: dict) -> str:
     if I.get("kill"):
         return "килл"
@@ -33,8 +74,9 @@ def boss_text(R: dict, lines: int = BOSS_LINES) -> str:
     if S.get("pull_n") and S.get("pulls"):
         head += f" (пулл {S['pull_n']} из {S['pulls']})"
     out = [head]
+    links = (R.get("extras") or {}).get("ability_links") or {}
     for line in (R.get("brief") or [])[:lines]:
-        out.append("• " + _clean(line))
+        out.append("• " + _linked(line, links, preview=False))
     if I.get("url"):
         out.append(f"<{I['url']}>")
     return _fit("\n".join(out))
@@ -51,7 +93,7 @@ def evening_messages(S: dict) -> list[str]:
         res = "килл" if b.get("kill") else (f"вайп, босс на {b['boss_pct']:.1f}%".replace(".", ",") if b.get("boss_pct") is not None else "вайп")
         pulls = f", пуллов: {b['pulls']}" if b.get("pulls") else ""
         lines = [f"**{_clean(b.get('boss', ''))}** — {res}, {b.get('duration', '')}{pulls}"]
-        lines += ["• " + _clean(x) for x in (b.get("brief") or [])[:EVENING_LINES]]
+        lines += ["• " + _linked(x, b.get("links") or {}, preview=False) for x in (b.get("brief") or [])[:EVENING_LINES]]
         blocks.append("\n".join(lines))
     for s in S.get("skipped") or []:
         blocks.append(f"**{_clean(s.get('boss', ''))}** — не разобран: {_clean(s.get('reason', ''))}")
@@ -99,9 +141,8 @@ def top_issues(issues: list[dict], n: int = TOP_ISSUES) -> list[dict]:
 
 
 def _who(i: dict) -> str:
-    from .names_ru import cls_ru, spec_ru
-    c, sp = cls_ru(i.get("cls") or ""), spec_ru(i.get("cls") or "", i.get("spec") or "")
-    w = f"{sp} ({c})" if sp and c else (sp or c)
+    from .names_ru import spec_ru
+    w = spec_ru(i.get("cls") or "", i.get("spec") or "")   # уже с классом: «Тьма (жрец)»
     return ", ".join(x for x in (i.get("role") or "", w) if x)
 
 
@@ -110,7 +151,8 @@ def pull_embed(R: dict, issues: bool = True) -> dict:
     «Кому что поправить» (если issues) и номер пулла. Упоминания (@everyone, роли, игроки) выключены."""
     I, S = R.get("info") or {}, R.get("summary") or {}
     title = f"{I.get('boss', '')} — {I.get('difficulty', '')}, {_outcome(I)}, {I.get('duration', '')}"
-    lines = ["• " + _clean(x) for x in (R.get("brief") or [])[:BOSS_LINES]]
+    links = (R.get("extras") or {}).get("ability_links") or {}
+    lines = ["• " + _linked(x, links) for x in (R.get("brief") or [])[:BOSS_LINES]]
     desc = ""
     for ln in lines:
         if len(desc) + len(ln) + 1 > EMBED_DESC:
@@ -123,7 +165,9 @@ def pull_embed(R: dict, issues: bool = True) -> dict:
     if issues:
         cur = ""
         for i in top_issues(R.get("issues") or []):
-            item = f"**{_clean(i.get('player', ''))}** — {_clean(_who(i))}\n{_clean(i.get('text', ''))}"[:FIELD]
+            item = f"**{_clean(i.get('player', ''))}** — {_clean(_who(i))}\n{_linked(i.get('text', ''), links)}"
+            if len(item) > FIELD:   # длинная строка — без ссылок, но целиком (обрезанная ссылка ломает разметку)
+                item = f"**{_clean(i.get('player', ''))}** — {_clean(_who(i))}\n{_clean(i.get('text', ''))}"[:FIELD]
             if cur and len(cur) + 2 + len(item) > FIELD:
                 fields.append(cur)
                 cur = item

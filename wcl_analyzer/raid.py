@@ -951,7 +951,9 @@ def run_raid(client, url: str, fight=None, log=print, avoidable: set | None = No
     for k in ("_eff", "_owned", "light"):   # служебное (план и сравнение с топом) — странице не нужно
         TK.pop(k, None)
     try:  # короткая сводка для Discord
-        from .discord import boss_text, pull_embed
+        from .discord import ability_links, boss_text, pull_embed
+        # ссылки на способности для Discord: гайд Mythic Trap, если есть, иначе Wowhead по номеру из лога
+        R["extras"]["ability_links"] = ability_links(R, (raw.get("report") or {}).get("masterData") or {})
         R["extras"]["discord"] = boss_text(R)
         # карточки для вебхука (живой лог): с «Кому что поправить» и только итог
         R["extras"]["discord_embed"] = {"full": pull_embed(R, True), "short": pull_embed(R, False)}

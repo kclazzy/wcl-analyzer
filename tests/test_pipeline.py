@@ -1350,7 +1350,16 @@ def test_discord():
                        for i in range(9)]}
     m = dc.pull_embed(many)["embeds"][0]
     assert len(m["fields"]) >= 2 and all(len(f["value"]) <= 1024 for f in m["fields"]) and m["color"] == dc.COLOR_WIPE
-    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"], m["fields"][0]["value"][:200]
+    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"] and "(монах) (монах)" not in m["fields"][0]["value"], \
+        m["fields"][0]["value"][:200]
+    # способности — ссылками: в карточке и в тексте (там — без превью, в угловых скобках)
+    L = R["extras"]["ability_links"]
+    assert L.get("Ледяная волна", "").startswith("https://"), L
+    assert "«[Ледяная волна](https://" in full["description"] and "«[Ледяная волна](<https://" in t, (full["description"][:300], t[:300])
+    assert any("«[" in f["value"] for f in full["fields"]), full["fields"]
+    lk = dc._linked("Танки: «Сокрушение» прикрыт (подробно — во вкладке «Танки»)", {"Сокрушение": "https://x/1"})
+    assert lk == "Танки: «[Сокрушение](https://x/1)» прикрыт", lk
+    assert dc._linked("от «A_b» — первая", {}) == "от «A\\_b» — первая"
     for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
         try:
             dc.check_webhook(bad)
@@ -1700,7 +1709,16 @@ def test_discord():
                        for i in range(9)]}
     m = dc.pull_embed(many)["embeds"][0]
     assert len(m["fields"]) >= 2 and all(len(f["value"]) <= 1024 for f in m["fields"]) and m["color"] == dc.COLOR_WIPE
-    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"], m["fields"][0]["value"][:200]
+    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"] and "(монах) (монах)" not in m["fields"][0]["value"], \
+        m["fields"][0]["value"][:200]
+    # способности — ссылками: в карточке и в тексте (там — без превью, в угловых скобках)
+    L = R["extras"]["ability_links"]
+    assert L.get("Ледяная волна", "").startswith("https://"), L
+    assert "«[Ледяная волна](https://" in full["description"] and "«[Ледяная волна](<https://" in t, (full["description"][:300], t[:300])
+    assert any("«[" in f["value"] for f in full["fields"]), full["fields"]
+    lk = dc._linked("Танки: «Сокрушение» прикрыт (подробно — во вкладке «Танки»)", {"Сокрушение": "https://x/1"})
+    assert lk == "Танки: «[Сокрушение](https://x/1)» прикрыт", lk
+    assert dc._linked("от «A_b» — первая", {}) == "от «A\\_b» — первая"
     for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
         try:
             dc.check_webhook(bad)
@@ -2050,7 +2068,16 @@ def test_discord():
                        for i in range(9)]}
     m = dc.pull_embed(many)["embeds"][0]
     assert len(m["fields"]) >= 2 and all(len(f["value"]) <= 1024 for f in m["fields"]) and m["color"] == dc.COLOR_WIPE
-    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"], m["fields"][0]["value"][:200]
+    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"] and "(монах) (монах)" not in m["fields"][0]["value"], \
+        m["fields"][0]["value"][:200]
+    # способности — ссылками: в карточке и в тексте (там — без превью, в угловых скобках)
+    L = R["extras"]["ability_links"]
+    assert L.get("Ледяная волна", "").startswith("https://"), L
+    assert "«[Ледяная волна](https://" in full["description"] and "«[Ледяная волна](<https://" in t, (full["description"][:300], t[:300])
+    assert any("«[" in f["value"] for f in full["fields"]), full["fields"]
+    lk = dc._linked("Танки: «Сокрушение» прикрыт (подробно — во вкладке «Танки»)", {"Сокрушение": "https://x/1"})
+    assert lk == "Танки: «[Сокрушение](https://x/1)» прикрыт", lk
+    assert dc._linked("от «A_b» — первая", {}) == "от «A\\_b» — первая"
     for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
         try:
             dc.check_webhook(bad)
@@ -2346,7 +2373,16 @@ def test_discord():
                        for i in range(9)]}
     m = dc.pull_embed(many)["embeds"][0]
     assert len(m["fields"]) >= 2 and all(len(f["value"]) <= 1024 for f in m["fields"]) and m["color"] == dc.COLOR_WIPE
-    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"], m["fields"][0]["value"][:200]
+    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"] and "(монах) (монах)" not in m["fields"][0]["value"], \
+        m["fields"][0]["value"][:200]
+    # способности — ссылками: в карточке и в тексте (там — без превью, в угловых скобках)
+    L = R["extras"]["ability_links"]
+    assert L.get("Ледяная волна", "").startswith("https://"), L
+    assert "«[Ледяная волна](https://" in full["description"] and "«[Ледяная волна](<https://" in t, (full["description"][:300], t[:300])
+    assert any("«[" in f["value"] for f in full["fields"]), full["fields"]
+    lk = dc._linked("Танки: «Сокрушение» прикрыт (подробно — во вкладке «Танки»)", {"Сокрушение": "https://x/1"})
+    assert lk == "Танки: «[Сокрушение](https://x/1)» прикрыт", lk
+    assert dc._linked("от «A_b» — первая", {}) == "от «A\\_b» — первая"
     for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
         try:
             dc.check_webhook(bad)
@@ -3080,7 +3116,16 @@ def test_discord():
                        for i in range(9)]}
     m = dc.pull_embed(many)["embeds"][0]
     assert len(m["fields"]) >= 2 and all(len(f["value"]) <= 1024 for f in m["fields"]) and m["color"] == dc.COLOR_WIPE
-    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"], m["fields"][0]["value"][:200]
+    assert "Танцующий с ветром (монах)" in m["fields"][0]["value"] and "(монах) (монах)" not in m["fields"][0]["value"], \
+        m["fields"][0]["value"][:200]
+    # способности — ссылками: в карточке и в тексте (там — без превью, в угловых скобках)
+    L = R["extras"]["ability_links"]
+    assert L.get("Ледяная волна", "").startswith("https://"), L
+    assert "«[Ледяная волна](https://" in full["description"] and "«[Ледяная волна](<https://" in t, (full["description"][:300], t[:300])
+    assert any("«[" in f["value"] for f in full["fields"]), full["fields"]
+    lk = dc._linked("Танки: «Сокрушение» прикрыт (подробно — во вкладке «Танки»)", {"Сокрушение": "https://x/1"})
+    assert lk == "Танки: «[Сокрушение](https://x/1)» прикрыт", lk
+    assert dc._linked("от «A_b» — первая", {}) == "от «A\\_b» — первая"
     for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
         try:
             dc.check_webhook(bad)

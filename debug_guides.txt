@@ -1,0 +1,36 @@
+The Venomous Abyss (venomous-abyss): боссов 10
+  Nymrissa Wavecaller: mythic 9, heroic 6, normal 6
+  Nek'zali the Soulcoiler: mythic 14, heroic 13, normal 11
+  Entombed Sentinels: mythic 10, heroic 9, normal 7
+  Vashnik the Malignant: mythic 12, heroic 11, normal 10
+  The Lost Explorers: mythic 13, heroic 13, normal 12
+  Sszorak: mythic 12, heroic 10, normal 9
+  The Twin Fangs: mythic 15, heroic 12, normal 12
+  The Coiled Altar: mythic 21, heroic 19, normal 18
+  Ula'tek: mythic 22, heroic 22, normal 22
+  Kith'ix: mythic 18, heroic 18, normal 16
+Siege of Orgrimmar (siege-of-orgrimmar): боссов 14
+  Immerseus: mythic 9, heroic 9, normal 7
+  Fallen Protectors: mythic 17, heroic 17, normal 15
+  Norushen: mythic 11, heroic 11, normal 11
+  Sha of Pride: mythic 11, heroic 11, normal 9
+  Galakras: mythic 18, heroic 18, normal 18
+  Iron Juggernaut: mythic 12, heroic 12, normal 10
+  Kor'kron Dark Shaman: mythic 13, heroic 13, normal 11
+  General Nazgrim: mythic 14, heroic 14, normal 12
+  Malkorok: mythic 11, heroic 11, normal 10
+  Spoils of Pandaria: mythic 26, heroic 26, normal 25
+  Thok the Bloodthirsty: mythic 12, heroic 12, normal 10
+  Siegecrafter Blackfuse: mythic 10, heroic 10, normal 10
+  Paragons of the Klaxxi: mythic 36, heroic 36, normal 35
+  Garrosh Hellscream: mythic 21, heroic 21, normal 17
+Wowhead: способностей 365, запрошено 27, с описанием 356
+
+Рейдов 2, боссов 24, записей способностей 1044.
+Изменения:
+  Новый босс: The Venomous Abyss / Kith'ix
+  Ссылок «Share link» на способности: 992 → 1044
+  Русских описаний с Wowhead: 347 → 365
+  Нет перевода советов Mythic Trap: 19 (в программе — по-английски): Blow up beetles slowly; Bulwarks will be smaller each time; Collect a mote; Collide with Null Gates; Dodge circles; Fear dispel; Heal absorb; Kill the boss; Kill the boss within 1 minute; Liadrin debuff; Motes; Move out with fear; Player Buff; Safe space; Soak Fragments …
+::notice title=Ссылки на гайды: обновлены::- Новый босс: The Venomous Abyss / Kith'ix%0A- Ссылок «Share link» на способности: 992 → 1044%0A- Русских описаний с Wowhead: 347 → 365%0A- Нет перевода советов Mythic Trap: 19 (в программе — по-английски): Blow up beetles slowly; Bulwarks will be smaller each time; Collect a mote; Collide with Null Gates; Dodge circles; Fear dispel; Heal absorb; Kill the boss; Kill the boss within 1 minute; Liadrin debuff; Motes; Move out with fear; Player Buff; Safe space; Soak Fragments …%0AThe Venomous Abyss / Nymrissa Wavecaller: mythic 9 (share 9), heroic 6 (share 6), normal 6 (share 6)%0AThe Venomous Abyss / Nek'zali the Soulcoiler: mythic 14 (share 14), heroic 13 (share 13), normal 11 (share 11)%0AThe Venomous Abyss / Entombed Sentinels: mythic 10 (share 10), heroic 9 (share 9), normal 7 (share 7)%0AThe Venomous Abyss / Vashnik the Malignant: mythic 12 (share 12), heroic 11 (share 11), normal 10 (share 10)%0AThe Venomous Abyss / The Lost Explorers: mythic 13 (share 13), heroic 13 (share 13), normal 12 (share 12)%0AThe Venomous Abyss / Sszorak: mythic 12 (share 12), heroic 10 (share 10), normal 9 (share 9)%0AThe Venomous Abyss / The Twin Fangs: mythic 15 (share 15), heroic 12 (share 12), normal 12 (share 12)%0AThe Venomous Abyss / The Coiled Altar: mythic 21 (share 21), heroic 19 (share 19), normal 18 (share 18)%0AThe Venomous Abyss / Ula'tek: mythic 22 (share 22), heroic 22 (share 22), normal 22 (share 22)%0AThe Venomous Abyss / Kith'ix: mythic 18 (share 18), heroic 18 (share 18), normal 16 (share 16)%0ASiege of Orgrimmar / Immerseus: mythic 9 (share 9), heroic 9 (share 9), normal 7 (share 7)%0ASiege of Orgrimmar / Fallen Protectors: mythic 17 (share 17), heroic 17 (share 17), normal 15 (share 15)%0ASiege of Orgrimmar / Norushen: mythic 11 (share 11), heroic 11 (share 11), normal 11 (share 11)%0ASiege of Orgrimmar / Sha of Pride: mythic 11 (share 11), heroic 11 (share 11), normal 9 (share 9)%0ASiege of Orgrimmar / Galakras: mythic 18 (share 18), heroic 18 (share 18), normal 18 (share 18)%0ASiege of Orgrimmar / Iron Juggernaut: mythic 12 (share 12), heroic 12 (share 12), normal 10 (share 10)%0ASiege of Orgrimmar / Kor'kron Dark Shaman: mythic 13 (share 13), heroic 13 (share 13), normal 11 (share 11)%0ASiege of Orgrimmar / General Nazgrim: mythic 14 (share 14), heroic 14 (share 14), normal 12 (share 12)%0ASiege of Orgrimmar / Malkorok: mythic 11 (share 11), heroic 11 (share 11), normal 10 (share 10)%0ASiege of Orgrimmar / Spoils of Pandaria: mythic 26 (share 26), heroic 26 (share 26), normal 25 (share 25)%0ASiege of Orgrimmar / Thok the Bloodthirsty: mythic 12 (share 12), heroic 12 (share 12), normal 10 (share 10)%0ASiege of Orgrimmar / Siegecrafter Blackfuse: mythic 10 (share 10), heroic 10 (share 10), normal 10 (share 10)%0ASiege of Orgrimmar / Paragons of the Klaxxi: mythic 36 (share 36), heroic 36 (share 36), normal 35 (share 35)%0ASiege of Orgrimmar / Garrosh Hellscream: mythic 21 (share 21), heroic 21 (share 21), normal 17 (share 17)
+Записано: wcl_analyzer/data/guides.json

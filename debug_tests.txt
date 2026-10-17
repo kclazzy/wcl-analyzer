@@ -1,0 +1,9 @@
+OK план сейвов: одна способность на пик не дублируется (два воина — клич на разные пики)
+OK общие данные боя — один раз на всех игроков, без событий урона в облегчённом режиме
+Traceback (most recent call last):
+  File "/home/runner/work/wcl-analyzer/wcl-analyzer/tests/test_pipeline.py", line 1417, in <module>
+    test_guides()
+  File "/home/runner/work/wcl-analyzer/wcl-analyzer/tests/test_pipeline.py", line 1074, in test_guides
+    assert sum(1 for r, _ in guides.bosses() if r["slug"] == "venomous-abyss") == 9
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

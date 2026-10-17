@@ -12,14 +12,14 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install -r requirements.txt
-      - name: Разбор лога
+      - name: Гайды и тесты
         env:
-          WCL_CLIENT_ID: ${{ secrets.WCL_CLIENT_ID }}
-          WCL_CLIENT_SECRET: ${{ secrets.WCL_CLIENT_SECRET }}
           WCL_GAME_DATA: bundled
         run: |
-          i=0; while read -r u; do i=$((i+1)); python tools/check_log.py "$u" "debug_log_out_$i.json" || true; done < debug_url.txt
+          python tools/update_guides.py > debug_guides.txt 2>&1 || true
+          cp wcl_analyzer/data/guides.json debug_guides.json; cp wcl_analyzer/data/guides_ru.json debug_guides_ru.json
+          python tests/test_pipeline.py > debug_tests.txt 2>&1 || true
       - name: commit
         run: |
           git config user.name bot; git config user.email bot@users.noreply.github.com
-          git add debug_log_out_*.json && git commit -m "log" && git push
+          git add -f debug_guides.txt debug_guides.json debug_guides_ru.json debug_tests.txt && git commit -m "guides" && git push

@@ -1360,6 +1360,8 @@ def test_discord():
     lk = dc._linked("Танки: «Сокрушение» прикрыт (подробно — во вкладке «Танки»)", {"Сокрушение": "https://x/1"})
     assert lk == "Танки: «[Сокрушение](https://x/1)» прикрыт", lk
     assert dc._linked("от «A_b» — первая", {}) == "от «A\\_b» — первая"
+    ml = dc.ability_links({"brief": ["Смерть от «Melee»"], "issues": [], "guide_links": {"Melee": "https://www.wowhead.com/ru/spell=1"}}, {})
+    assert ml == {}, ml
     for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
         try:
             dc.check_webhook(bad)
@@ -1719,6 +1721,8 @@ def test_discord():
     lk = dc._linked("Танки: «Сокрушение» прикрыт (подробно — во вкладке «Танки»)", {"Сокрушение": "https://x/1"})
     assert lk == "Танки: «[Сокрушение](https://x/1)» прикрыт", lk
     assert dc._linked("от «A_b» — первая", {}) == "от «A\\_b» — первая"
+    ml = dc.ability_links({"brief": ["Смерть от «Melee»"], "issues": [], "guide_links": {"Melee": "https://www.wowhead.com/ru/spell=1"}}, {})
+    assert ml == {}, ml
     for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
         try:
             dc.check_webhook(bad)
@@ -2078,6 +2082,8 @@ def test_discord():
     lk = dc._linked("Танки: «Сокрушение» прикрыт (подробно — во вкладке «Танки»)", {"Сокрушение": "https://x/1"})
     assert lk == "Танки: «[Сокрушение](https://x/1)» прикрыт", lk
     assert dc._linked("от «A_b» — первая", {}) == "от «A\\_b» — первая"
+    ml = dc.ability_links({"brief": ["Смерть от «Melee»"], "issues": [], "guide_links": {"Melee": "https://www.wowhead.com/ru/spell=1"}}, {})
+    assert ml == {}, ml
     for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
         try:
             dc.check_webhook(bad)
@@ -2383,6 +2389,8 @@ def test_discord():
     lk = dc._linked("Танки: «Сокрушение» прикрыт (подробно — во вкладке «Танки»)", {"Сокрушение": "https://x/1"})
     assert lk == "Танки: «[Сокрушение](https://x/1)» прикрыт", lk
     assert dc._linked("от «A_b» — первая", {}) == "от «A\\_b» — первая"
+    ml = dc.ability_links({"brief": ["Смерть от «Melee»"], "issues": [], "guide_links": {"Melee": "https://www.wowhead.com/ru/spell=1"}}, {})
+    assert ml == {}, ml
     for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
         try:
             dc.check_webhook(bad)
@@ -3126,6 +3134,8 @@ def test_discord():
     lk = dc._linked("Танки: «Сокрушение» прикрыт (подробно — во вкладке «Танки»)", {"Сокрушение": "https://x/1"})
     assert lk == "Танки: «[Сокрушение](https://x/1)» прикрыт", lk
     assert dc._linked("от «A_b» — первая", {}) == "от «A\\_b» — первая"
+    ml = dc.ability_links({"brief": ["Смерть от «Melee»"], "issues": [], "guide_links": {"Melee": "https://www.wowhead.com/ru/spell=1"}}, {})
+    assert ml == {}, ml
     for bad in ("https://evil.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456/abcdefghijklmnopqrstuvwxyz", ""):
         try:
             dc.check_webhook(bad)

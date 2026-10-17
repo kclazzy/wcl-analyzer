@@ -44,7 +44,8 @@ def ability_links(R: dict, master: dict) -> dict:
             m = re.search(r"#(\d+)$", n)   # «Unknown Ability #123»
             if m:
                 out[n] = page_url(int(m.group(1)))
-    return out
+    # ближний бой (spell=1) — не способность, страницы о нём нет
+    return {n: u for n, u in out.items() if not re.search(r"spell=1$", u)}
 
 
 def _linked(line: str, links: dict, preview: bool = True) -> str:

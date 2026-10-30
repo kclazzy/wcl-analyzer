@@ -1071,7 +1071,7 @@ def test_guides():
     assert "/nekzali-the-soulcoiler/heroic" in guides.link(None, "Uncoiled Rage", 4)
     assert "/mythic" in guides.link(1293212, None, 4)      # только на эпохальной — ведём туда
     assert guides.link(None, "Ледяная волна", 5) is None and guides.link(42, "Fireball", 5) is None
-    assert sum(1 for r, _ in guides.bosses() if r["slug"] == "venomous-abyss") == 9
+    assert sum(1 for r, _ in guides.bosses() if r["slug"] == "venomous-abyss") >= 10
     g = guides.find(None, "Venomous Surge", 4, "Sszorak")
     assert g and g["url"] and (g["video"] is None or g["video"].endswith(".mp4")), g
     # краткое описание: русское название и описание (Wowhead), тип и совет Mythic Trap — по-русски

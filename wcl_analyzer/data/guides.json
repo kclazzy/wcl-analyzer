@@ -8,7 +8,7 @@
   "heroic": "/heroic",
   "normal": ""
  },
- "updated": "2026-10-04",
+ "updated": "2026-10-17",
  "raids": [
   {
    "slug": "venomous-abyss",
@@ -2849,6 +2849,428 @@
         "type": "Interrupt",
         "todo": "Interrupt",
         "share": "https://www.mythictrap.com/venomous-abyss/ulatek/normal?ability=ulatekVicEch"
+       }
+      ]
+     }
+    },
+    {
+     "slug": "kithix",
+     "name": "Kith'ix",
+     "abilities": {
+      "mythic": [
+       {
+        "name": "Extinguish",
+        "id": 1304424,
+        "type": "Motes",
+        "todo": "Collect a mote",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiExtin",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/extinguish.mp4"
+       },
+       {
+        "name": "Voidswarm",
+        "id": 1301511,
+        "type": "Positioning",
+        "todo": "Tank boss and adds apart",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=undefined",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/voidswarm.mp4"
+       },
+       {
+        "name": "Venomous Hulk",
+        "id": 1302884,
+        "type": "Add",
+        "todo": "Dodge",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiVenHul",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/venomousHulk.mp4"
+       },
+       {
+        "name": "Voidweaver",
+        "id": 1302333,
+        "type": "Add",
+        "todo": "Heal through",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiVoiWea",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/voidweaver.mp4"
+       },
+       {
+        "name": "Bomber Beetle",
+        "id": 1302117,
+        "type": "Add",
+        "todo": "Blow up beetles slowly",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiBomBee",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/bomberBeetle.mp4"
+       },
+       {
+        "name": "Incubation",
+        "id": 1307407,
+        "type": "Eggs",
+        "todo": "Kill eggs",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiIncu",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/incubation.mp4"
+       },
+       {
+        "name": "Overwhelming Fear",
+        "id": 1304046,
+        "type": "Fear dispel",
+        "todo": "Move out with fear",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiOvFea",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/overwhelmingFear.mp4"
+       },
+       {
+        "name": "Twisted Appendage",
+        "id": 1303681,
+        "type": "Dodge",
+        "todo": "Dodge circles",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiTwiApp",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/twistedAppendage.mp4"
+       },
+       {
+        "name": "Dark Devastation",
+        "id": 1304930,
+        "type": "Tankbuster",
+        "todo": "Tankbuster circle",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiDarDev",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/darkDevastation.mp4"
+       },
+       {
+        "name": "Voidscar",
+        "id": 1304950,
+        "type": "Avoid",
+        "todo": "Watch out for Voidscar",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiVoiSc",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/voidscar.mp4"
+       },
+       {
+        "name": "Suffocating Darkness",
+        "id": 1302951,
+        "type": "Safe space",
+        "todo": "Stay inside",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiSufDar",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/suffocatingDarkness.mp4"
+       },
+       {
+        "name": "Eclipse Fragment",
+        "id": 1308674,
+        "type": "Soak",
+        "todo": "Soak Fragments",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiP1EcFr",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/eclipseFragment.mp4"
+       },
+       {
+        "name": "Abyssal Grasp",
+        "id": 1303406,
+        "type": "Heal absorb",
+        "todo": "Heal through",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiAbyGra",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/abyssalGrasp.mp4"
+       },
+       {
+        "name": "Divine Radiance",
+        "id": 1303169,
+        "type": "Liadrin debuff",
+        "todo": "Bulwarks will be smaller each time",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiDivRad"
+       },
+       {
+        "name": "Eightfold Eclipse",
+        "id": 1301479,
+        "type": "Enrage",
+        "todo": "Kill the boss within 1 minute",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiEigEcl",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/eightfoldEclipse.mp4"
+       },
+       {
+        "name": "Null Gate",
+        "id": 1308873,
+        "type": "Dodge",
+        "todo": "Dodge",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiNulGat",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/nullGate.mp4"
+       },
+       {
+        "name": "Negation",
+        "id": 1318467,
+        "type": "Tank mechanic",
+        "todo": "Collide with Null Gates",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiNega",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/negation.mp4"
+       },
+       {
+        "name": "Last Light",
+        "id": 1305427,
+        "type": "Player Buff",
+        "todo": "Kill the boss",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/mythic?ability=kithiLasLig"
+       }
+      ],
+      "heroic": [
+       {
+        "name": "Extinguish",
+        "id": 1304424,
+        "type": "Motes",
+        "todo": "Collect a mote",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiExtin",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/extinguish.mp4"
+       },
+       {
+        "name": "Voidswarm",
+        "id": 1301511,
+        "type": "Positioning",
+        "todo": "Tank boss and adds apart",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=undefined",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/voidswarm.mp4"
+       },
+       {
+        "name": "Venomous Hulk",
+        "id": 1302884,
+        "type": "Add",
+        "todo": "Dodge",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiVenHul",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/venomousHulk.mp4"
+       },
+       {
+        "name": "Voidweaver",
+        "id": 1302333,
+        "type": "Add",
+        "todo": "Heal through",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiVoiWea",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/voidweaver.mp4"
+       },
+       {
+        "name": "Bomber Beetle",
+        "id": 1302117,
+        "type": "Add",
+        "todo": "Blow up beetles slowly",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiBomBee",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/bomberBeetle.mp4"
+       },
+       {
+        "name": "Incubation",
+        "id": 1307407,
+        "type": "Eggs",
+        "todo": "Kill eggs",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiIncu",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/incubation.mp4"
+       },
+       {
+        "name": "Overwhelming Fear",
+        "id": 1304046,
+        "type": "Fear dispel",
+        "todo": "Move out with fear",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiOvFea",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/overwhelmingFear.mp4"
+       },
+       {
+        "name": "Twisted Appendage",
+        "id": 1303681,
+        "type": "Dodge",
+        "todo": "Dodge circles",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiTwiApp",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/twistedAppendage.mp4"
+       },
+       {
+        "name": "Dark Devastation",
+        "id": 1304930,
+        "type": "Tankbuster",
+        "todo": "Tankbuster circle",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiDarDev",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/darkDevastation.mp4"
+       },
+       {
+        "name": "Voidscar",
+        "id": 1304950,
+        "type": "Avoid",
+        "todo": "Watch out for Voidscar",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiVoiSc",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/voidscar.mp4"
+       },
+       {
+        "name": "Suffocating Darkness",
+        "id": 1302951,
+        "type": "Safe space",
+        "todo": "Stay inside",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiSufDar",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/suffocatingDarkness.mp4"
+       },
+       {
+        "name": "Eclipse Fragment",
+        "id": 1308674,
+        "type": "Soak",
+        "todo": "Soak Fragments",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiP1EcFr",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/eclipseFragment.mp4"
+       },
+       {
+        "name": "Abyssal Grasp",
+        "id": 1303406,
+        "type": "Heal absorb",
+        "todo": "Heal through",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiAbyGra",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/abyssalGrasp.mp4"
+       },
+       {
+        "name": "Divine Radiance",
+        "id": 1303169,
+        "type": "Liadrin debuff",
+        "todo": "Bulwarks will be smaller each time",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiDivRad"
+       },
+       {
+        "name": "Eightfold Eclipse",
+        "id": 1301479,
+        "type": "Enrage",
+        "todo": "Kill the boss within 1 minute",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiEigEcl",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/eightfoldEclipse.mp4"
+       },
+       {
+        "name": "Null Gate",
+        "id": 1308873,
+        "type": "Dodge",
+        "todo": "Dodge",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiNulGat",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/nullGate.mp4"
+       },
+       {
+        "name": "Negation",
+        "id": 1318467,
+        "type": "Tank mechanic",
+        "todo": "Collide with Null Gates",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiNega",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/negation.mp4"
+       },
+       {
+        "name": "Last Light",
+        "id": 1305427,
+        "type": "Player Buff",
+        "todo": "Kill the boss",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/heroic?ability=kithiLasLig"
+       }
+      ],
+      "normal": [
+       {
+        "name": "Extinguish",
+        "id": 1304424,
+        "type": "Motes",
+        "todo": "Collect a mote",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiExtin",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/extinguish.mp4"
+       },
+       {
+        "name": "Voidswarm",
+        "id": 1301511,
+        "type": "Positioning",
+        "todo": "Tank boss and adds apart",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=undefined",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/voidswarm.mp4"
+       },
+       {
+        "name": "Venomous Hulk",
+        "id": 1302884,
+        "type": "Add",
+        "todo": "Dodge",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiVenHul",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/venomousHulk.mp4"
+       },
+       {
+        "name": "Voidweaver",
+        "id": 1302333,
+        "type": "Add",
+        "todo": "Heal through",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiVoiWea",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/voidweaver.mp4"
+       },
+       {
+        "name": "Bomber Beetle",
+        "id": 1302117,
+        "type": "Add",
+        "todo": "Blow up beetles slowly",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiBomBee",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/bomberBeetle.mp4"
+       },
+       {
+        "name": "Overwhelming Fear",
+        "id": 1304046,
+        "type": "Fear dispel",
+        "todo": "Move out with fear",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiOvFea",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/overwhelmingFear.mp4"
+       },
+       {
+        "name": "Twisted Appendage",
+        "id": 1303681,
+        "type": "Dodge",
+        "todo": "Dodge circles",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiTwiApp",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/twistedAppendage.mp4"
+       },
+       {
+        "name": "Dark Devastation",
+        "id": 1304930,
+        "type": "Tankbuster",
+        "todo": "Tankbuster circle",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiDarDev",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/darkDevastation.mp4"
+       },
+       {
+        "name": "Suffocating Darkness",
+        "id": 1302951,
+        "type": "Safe space",
+        "todo": "Stay inside",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiSufDar",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/suffocatingDarkness.mp4"
+       },
+       {
+        "name": "Eclipse Fragment",
+        "id": 1308674,
+        "type": "Soak",
+        "todo": "Soak Fragments",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiP1EcFr",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/eclipseFragment.mp4"
+       },
+       {
+        "name": "Abyssal Grasp",
+        "id": 1303406,
+        "type": "Heal absorb",
+        "todo": "Heal through",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiAbyGra",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/abyssalGrasp.mp4"
+       },
+       {
+        "name": "Divine Radiance",
+        "id": 1303169,
+        "type": "Liadrin debuff",
+        "todo": "Bulwarks will be smaller each time",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiDivRad"
+       },
+       {
+        "name": "Eightfold Eclipse",
+        "id": 1301479,
+        "type": "Enrage",
+        "todo": "Kill the boss within 1 minute",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiEigEcl",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/eightfoldEclipse.mp4"
+       },
+       {
+        "name": "Null Gate",
+        "id": 1308873,
+        "type": "Dodge",
+        "todo": "Dodge",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiNulGat",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/nullGate.mp4"
+       },
+       {
+        "name": "Negation",
+        "id": 1318467,
+        "type": "Tank mechanic",
+        "todo": "Collide with Null Gates",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiNega",
+        "video": "https://assets2.mythictrap.com/videos/venomous-abyss/kithix/negation.mp4"
+       },
+       {
+        "name": "Last Light",
+        "id": 1305427,
+        "type": "Player Buff",
+        "todo": "Kill the boss",
+        "share": "https://www.mythictrap.com/venomous-abyss/kithix/normal?ability=kithiLasLig"
        }
       ]
      }
@@ -8083,25 +8505,81 @@
    "name": "Хватающие клыки",
    "desc": "Злочешуйный страж вонзает клыки в случайных игроков, нанося 166681 ед. урона от сил природы раз в 2 сек. и снижая их скорость передвижения на 45%, пока действует эффект «Хватающие клыки». Сломав клыки, цель получает «Вливание гнили»."
   },
+  "1301479": {
+   "name": "Восьмикратное затмение",
+   "desc": "Кит'икс начинает ритуал, погружающий его врагов в вечную тьму. Он вызывает серию затмений, наносящих игрокам 791736 ед. урона от темной магии. Когда Кит'икс призывает последнее затмение, сила затмений обрушивается на леди Лиадрин, гася ее Свет и мгновенно убивая игроков."
+  },
   "1301510": {
    "name": "Обвивание добычи",
    "desc": "Ула'тек уничтожает часть платформы и вынуждает добычу приблизиться, нанося 2500220 ед. урона от сил природы и отбрасывая игроков в радиусе 13 м. Кроме того, игроки на расстоянии более 13 м получают 625055 ед. урона от сил природы."
+  },
+  "1301511": {
+   "name": "Рой Бездны",
+   "desc": "Кит'икс в течение 6 сек. открывает порталы Бездны, нанося 400035 ед. урона от темной магии раз в 2 сек. и призывая акиров-прислужников."
+  },
+  "1302117": {
+   "name": "Убийственные внутренности",
+   "desc": "Бомбожуки взрываются спустя 30 сек. или при контакте с игроком, и их «Пищеварительные соки» покрывают всех игроков. При этом жук погибает."
+  },
+  "1302333": {
+   "name": "Плетение Бездны",
+   "desc": "Ткач Бездны призывает сферу нестабильной Бездны и направляет ее энергию в случайных игроков, нанося 100009 ед. урона от темной магии раз в 1 сек. в течение 8 сек."
+  },
+  "1302884": {
+   "name": "Ядовитый рык",
+   "desc": "Ядовитый великан яростно ревет, нанося игрокам в секторе перед собой 1250110 ед. урона от сил природы и 1250110 ед. физического урона, а также отбрасывая их."
+  },
+  "1302951": {
+   "name": "Удушающий мрак",
+   "desc": "Накопив 100 ед. энергии, Кит'икс создает вихрящуюся бурю тьмы, которая смыкается вокруг игроков, нанося 83341 ед. урона от темной магии раз в 1 сек. и применяя к выжившим акирам эффект «Темное безумие»."
   },
   "1302982": {
    "name": "Заразный плевок",
    "desc": "Ула'тек плюется ядом в нескольких направлениях, нанося 918489 ед. урона от сил природы игрокам в радиусе 4 м."
   },
+  "1303169": {
+   "name": "Божественное сияние",
+   "desc": "Накопив 100 ед. энергии, Лиадрин выпускает вспышку Света, сжигающую весь удушающий мрак и оглушающую Кит'икса на 8 сек."
+  },
   "1303230": {
    "name": "Поток крови",
    "desc": "Итраз забрызгивает цель потоком крови, раз в 1 сек. в течение 5 сек. применяя эффект, поглощающий 426295 ед. исцеления. Эффект суммируется. Каждый «Едкий комок» впитывает эту кровь, образуя «Шипастый бастион»."
+  },
+  "1303406": {
+   "name": "Хватка Бездны",
+   "desc": "Из темноты появляются щупальца Бездны, которые хватают случайных игроков, постепенно затягивая их во тьму и поглощая 781541 ед. исцеления. Если эффект не снять, через 8 сек. пораженных игроков мгновенно затягивает во тьму."
+  },
+  "1303681": {
+   "name": "Искаженный отросток",
+   "desc": "Кит'икс создает темные щупальца, которые хлещут ближайших игроков и наносят пораженным целям 1000088 ед. урона от темной магии."
   },
   "1304012": {
    "name": "Зов змеи",
    "desc": "Ула'тек ревет, обрушивая с потолка свое потомство, наносящее игрокам в радиусе 4 м от мест приземления 916747 ед. урона от сил природы."
   },
+  "1304046": {
+   "name": "Неодолимый страх",
+   "desc": "В ужасе от эффекта Кит'икса «Неописуемый ужас», длящегося до 6 сек. По истечении времени действия или после рассеивания эффекта издает пронзительный крик, наносящий игрокам 708396 ед. урона от темной магии. Чем дальше цель, тем меньше получаемый ею урон."
+  },
+  "1304424": {
+   "name": "Гашение",
+   "desc": "Кит'икс накапливает заряд, а затем выпускает разрушительную взрывную волну, наносящую игрокам 2500220 ед. урона от темной магии и снимающую эффект «Объятия света»."
+  },
   "1304459": {
    "name": "Пагубность",
    "desc": "Тотем испускает волну яда, наносящую игрокам 666725 ед. урона от сил природы сразу и еще 208352 ед. урона от сил природы раз в 2 сек. в течение 1 мин. Эффект суммируется."
+  },
+  "1304930": {
+   "name": "Темное опустошение",
+   "desc": "Кит'икс швыряет в текущую цель огромный сгусток тьмы, наносящий игрокам в радиусе 15 м от места удара 1500132 ед. урона от темной магии и 2250198 ед. физического урона, а также применяющий эффект «Опустошение»."
+  },
+  "1304950": {
+   "name": "Шрам Бездны",
+   "desc": "Бурлящий сгусток энергии Бездны, при контакте наносящий игрокам 250022 ед. урона от темной магии и отбрасывающий их."
+  },
+  "1305427": {
+   "name": "Последний отблеск",
+   "desc": "Непоколебимая сила воли Лиадрин позволяет ей стать проводником чистого Света, полностью исцеляющего игроков и применяющего к ним эффект «Сияющая благодать»."
   },
   "1305650": {
    "name": "Крик страдания",
@@ -8139,6 +8617,10 @@
    "name": "Чумное рассечение",
    "desc": "Зул'джан совершает разрушительный рассекающий удар, нанося игрокам в секторе перед собой 833407 ед. урона от темной магии. Этот удар также увеличивает урон, получаемый от эффекта «Чумное рассечение», на 600% на 45 сек. и применяет эффект «Умертвие»."
   },
+  "1307407": {
+   "name": "Инкубация",
+   "desc": "Этот акир несет яйца мыслежальщиков, которые проклевываются после его гибели."
+  },
   "1308356": {
    "name": "Пробуждение выводка",
    "desc": "Итраз мечется в глубинах, призывая на поверхность несколько своих детенышей, и выпускает кольцо крови, наносящее игрокам 208352 ед. урона от темной магии."
@@ -8146,6 +8628,14 @@
   "1308583": {
    "name": "Расплетенный гнев",
    "desc": "Когда Вексул или Итраз погибает, оставшегося в живых змея обуревает жажда мести, увеличивающая наносимый урон на 30% раз в 3 сек. Эффект суммируется."
+  },
+  "1308674": {
+   "name": "Фрагмент затмения",
+   "desc": "«Удушающий мрак» заряжает эффекты «Шрам Бездны» силой, в результате чего они выпускают крупицы усиленной энергии Бездны, медленно двигающиеся к Лиадрин."
+  },
+  "1308873": {
+   "name": "Нуль-врата",
+   "desc": "Кит'икс в течение 5 сек. направляет энергию Бездны в случайных игроков, а затем открывает рядом с ними нуль-врата, наносящие 458374 ед. урона от темной магии и применяющие к другим игрокам в радиусе 5 м эффект «Уничтожение»."
   },
   "1309105": {
    "name": "Духовный щит",
@@ -8194,6 +8684,10 @@
   "1313531": {
    "name": "Кислотное исторжение",
    "desc": "Морочешуйник изрыгает яд, нанося игрокам 125011 ед. урона от сил природы сразу и еще 25002 ед. урона от сил природы раз в 1 сек. в течение 35 сек."
+  },
+  "1318467": {
+   "name": "Отрицание",
+   "desc": "Кит'икс заражает цель энергией Бездны, ослабляющей связь с физическим миром. Скорость передвижения цели повышается на 100%, получаемый ею физический урон увеличивается на 100%, и цель получает невосприимчивость к эффекту «Нуль-частицы» на 12 сек. По окончании времени действия…"
   },
   "133042": {
    "name": "Сосредоточение внимания",

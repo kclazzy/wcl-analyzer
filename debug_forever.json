@@ -11,5 +11,805 @@
  "sod.warcraftlogs.com": "403  title=Just a moment...",
  "vanilla.warcraftlogs.com": "403  title=Just a moment...",
  "wowforever.warcraftlogs.com": "no dns",
- "www.warcraftlogs.com": "403  title=Just a moment..."
+ "www.warcraftlogs.com": "403  title=Just a moment...",
+ "api_classic": [
+  {
+   "exp": 1001,
+   "name": "The Burning Crusade",
+   "zones": [
+    [
+     1010,
+     "SSC / TK",
+     [
+      "Normal"
+     ],
+     [
+      "Hydross the Unstable",
+      "The Lurker Below",
+      "Leotheras the Blind",
+      "Fathom-Lord Karathress",
+      "Morogrim Tidewalker",
+      "Lady Vashj",
+      "Al'ar",
+      "Void Reaver",
+      "High Astromancer Solarian",
+      "Kael'thas Sunstrider"
+     ]
+    ],
+    [
+     1008,
+     "Gruul / Magtheridon",
+     [
+      "Normal"
+     ],
+     [
+      "High King Maulgar",
+      "Gruul the Dragonkiller",
+      "Magtheridon"
+     ]
+    ],
+    [
+     1047,
+     "Karazhan",
+     [
+      "Normal"
+     ],
+     [
+      "Attumen the Huntsman",
+      "Moroes",
+      "Maiden of Virtue",
+      "Opera Hall",
+      "The Curator",
+      "Terestian Illhoof",
+      "Shade of Aran",
+      "Netherspite",
+      "Prince Malchezaar",
+      "Nightbane"
+     ]
+    ],
+    [
+     1012,
+     "Zul'Aman",
+     [
+      "Normal"
+     ],
+     [
+      "Akil'zon",
+      "Nalorakk",
+      "Jan'alai",
+      "Halazzi",
+      "Hex Lord Malacrass",
+      "Daakara"
+     ]
+    ],
+    [
+     1007,
+     "Karazhan",
+     [
+      "Normal"
+     ],
+     [
+      "Attumen the Huntsman",
+      "Moroes",
+      "Maiden of Virtue",
+      "Opera Hall",
+      "The Curator",
+      "Terestian Illhoof",
+      "Shade of Aran",
+      "Netherspite",
+      "Prince Malchezaar",
+      "Nightbane"
+     ]
+    ],
+    [
+     1009,
+     "Heroic Dungeons",
+     [
+      "Dungeon"
+     ],
+     [
+      "Hellfire Ramparts",
+      "The Blood Furnace",
+      "The Shattered Halls",
+      "The Slave Pens",
+      "The Underbog",
+      "The Steamvault",
+      "Mana-Tombs",
+      "Auchenai Crypts",
+      "Sethekk Halls",
+      "Shadow Labyrinth",
+      "Old Hillsbrad Foothills",
+      "The Black Morass"
+     ]
+    ]
+   ]
+  },
+  {
+   "exp": 1000,
+   "name": "Classic",
+   "zones": [
+    [
+     1005,
+     "Temple of Ahn'Qiraj",
+     [
+      "Normal"
+     ],
+     [
+      "The Prophet Skeram",
+      "Silithid Royalty",
+      "Battleguard Sartura",
+      "Fankriss the Unyielding",
+      "Viscidus",
+      "Princess Huhuran",
+      "Twin Emperors",
+      "Ouro",
+      "C'Thun"
+     ]
+    ],
+    [
+     1004,
+     "Ruins of Ahn'Qiraj",
+     [
+      "Normal"
+     ],
+     [
+      "Kurinnaxx",
+      "General Rajaxx",
+      "Moam",
+      "Buru the Gorger",
+      "Ayamiss the Hunter",
+      "Ossirian the Unscarred"
+     ]
+    ],
+    [
+     1003,
+     "Zul'Gurub",
+     [
+      "Normal"
+     ],
+     [
+      "High Priest Venoxis",
+      "High Priestess Jeklik",
+      "High Priestess Mar'li",
+      "Bloodlord Mandokir",
+      "Edge of Madness",
+      "High Priest Thekal",
+      "Gahz'ranka",
+      "High Priestess Arlokk",
+      "Jin'do the Hexxer",
+      "Hakkar",
+      "Hakkar (Hard Mode)"
+     ]
+    ],
+    [
+     1002,
+     "Blackwing Lair",
+     [
+      "Normal"
+     ],
+     [
+      "Razorgore the Untamed",
+      "Vaelastrasz the Corrupt",
+      "Broodlord Lashlayer",
+      "Firemaw",
+      "Ebonroc",
+      "Flamegor",
+      "Chromaggus",
+      "Nefarian",
+      "Ebonroc / Flamegor"
+     ]
+    ],
+    [
+     1001,
+     "Onyxia",
+     [
+      "Normal"
+     ],
+     [
+      "Onyxia"
+     ]
+    ],
+    [
+     1000,
+     "Molten Core",
+     [
+      "Normal"
+     ],
+     [
+      "Lucifron",
+      "Magmadar",
+      "Gehennas",
+      "Garr",
+      "Shazzrah",
+      "Baron Geddon",
+      "Sulfuron Harbinger",
+      "Golemagg the Incinerator",
+      "Majordomo Executus",
+      "Ragnaros"
+     ]
+    ]
+   ]
+  }
+ ],
+ "api_forever": "JSONDecodeError('Expecting value: line 1 column 1 (char 0)')",
+ "api_fresh": [
+  {
+   "exp": 1001,
+   "name": "The Burning Crusade",
+   "zones": [
+    [
+     1010,
+     "SSC / TK",
+     [
+      "Normal"
+     ],
+     [
+      "Hydross the Unstable",
+      "The Lurker Below",
+      "Leotheras the Blind",
+      "Fathom-Lord Karathress",
+      "Morogrim Tidewalker",
+      "Lady Vashj",
+      "Al'ar",
+      "Void Reaver",
+      "High Astromancer Solarian",
+      "Kael'thas Sunstrider"
+     ]
+    ],
+    [
+     1008,
+     "Gruul / Magtheridon",
+     [
+      "Normal"
+     ],
+     [
+      "High King Maulgar",
+      "Gruul the Dragonkiller",
+      "Magtheridon"
+     ]
+    ],
+    [
+     1047,
+     "Karazhan",
+     [
+      "Normal"
+     ],
+     [
+      "Attumen the Huntsman",
+      "Moroes",
+      "Maiden of Virtue",
+      "Opera Hall",
+      "The Curator",
+      "Terestian Illhoof",
+      "Shade of Aran",
+      "Netherspite",
+      "Prince Malchezaar",
+      "Nightbane"
+     ]
+    ],
+    [
+     1012,
+     "Zul'Aman",
+     [
+      "Normal"
+     ],
+     [
+      "Akil'zon",
+      "Nalorakk",
+      "Jan'alai",
+      "Halazzi",
+      "Hex Lord Malacrass",
+      "Daakara"
+     ]
+    ],
+    [
+     1007,
+     "Karazhan",
+     [
+      "Normal"
+     ],
+     [
+      "Attumen the Huntsman",
+      "Moroes",
+      "Maiden of Virtue",
+      "Opera Hall",
+      "The Curator",
+      "Terestian Illhoof",
+      "Shade of Aran",
+      "Netherspite",
+      "Prince Malchezaar",
+      "Nightbane"
+     ]
+    ],
+    [
+     1009,
+     "Heroic Dungeons",
+     [
+      "Dungeon"
+     ],
+     [
+      "Hellfire Ramparts",
+      "The Blood Furnace",
+      "The Shattered Halls",
+      "The Slave Pens",
+      "The Underbog",
+      "The Steamvault",
+      "Mana-Tombs",
+      "Auchenai Crypts",
+      "Sethekk Halls",
+      "Shadow Labyrinth",
+      "Old Hillsbrad Foothills",
+      "The Black Morass"
+     ]
+    ]
+   ]
+  },
+  {
+   "exp": 1000,
+   "name": "Classic",
+   "zones": [
+    [
+     1005,
+     "Temple of Ahn'Qiraj",
+     [
+      "Normal"
+     ],
+     [
+      "The Prophet Skeram",
+      "Silithid Royalty",
+      "Battleguard Sartura",
+      "Fankriss the Unyielding",
+      "Viscidus",
+      "Princess Huhuran",
+      "Twin Emperors",
+      "Ouro",
+      "C'Thun"
+     ]
+    ],
+    [
+     1004,
+     "Ruins of Ahn'Qiraj",
+     [
+      "Normal"
+     ],
+     [
+      "Kurinnaxx",
+      "General Rajaxx",
+      "Moam",
+      "Buru the Gorger",
+      "Ayamiss the Hunter",
+      "Ossirian the Unscarred"
+     ]
+    ],
+    [
+     1003,
+     "Zul'Gurub",
+     [
+      "Normal"
+     ],
+     [
+      "High Priest Venoxis",
+      "High Priestess Jeklik",
+      "High Priestess Mar'li",
+      "Bloodlord Mandokir",
+      "Edge of Madness",
+      "High Priest Thekal",
+      "Gahz'ranka",
+      "High Priestess Arlokk",
+      "Jin'do the Hexxer",
+      "Hakkar",
+      "Hakkar (Hard Mode)"
+     ]
+    ],
+    [
+     1002,
+     "Blackwing Lair",
+     [
+      "Normal"
+     ],
+     [
+      "Razorgore the Untamed",
+      "Vaelastrasz the Corrupt",
+      "Broodlord Lashlayer",
+      "Firemaw",
+      "Ebonroc",
+      "Flamegor",
+      "Chromaggus",
+      "Nefarian",
+      "Ebonroc / Flamegor"
+     ]
+    ],
+    [
+     1001,
+     "Onyxia",
+     [
+      "Normal"
+     ],
+     [
+      "Onyxia"
+     ]
+    ],
+    [
+     1000,
+     "Molten Core",
+     [
+      "Normal"
+     ],
+     [
+      "Lucifron",
+      "Magmadar",
+      "Gehennas",
+      "Garr",
+      "Shazzrah",
+      "Baron Geddon",
+      "Sulfuron Harbinger",
+      "Golemagg the Incinerator",
+      "Majordomo Executus",
+      "Ragnaros"
+     ]
+    ]
+   ]
+  }
+ ],
+ "api_sod": [
+  {
+   "exp": 2000,
+   "name": "Classic",
+   "zones": [
+    [
+     2005,
+     "Temple of Ahn'Qiraj",
+     [
+      "Normal"
+     ],
+     [
+      "The Prophet Skeram",
+      "Silithid Royalty",
+      "Battleguard Sartura",
+      "Fankriss the Unyielding",
+      "Viscidus",
+      "Princess Huhuran",
+      "Twin Emperors",
+      "Ouro",
+      "C'Thun"
+     ]
+    ],
+    [
+     2004,
+     "Ruins of Ahn'Qiraj",
+     [
+      "Normal"
+     ],
+     [
+      "Kurinnaxx",
+      "General Rajaxx",
+      "Moam",
+      "Buru the Gorger",
+      "Ayamiss the Hunter",
+      "Ossirian the Unscarred"
+     ]
+    ],
+    [
+     2003,
+     "Zul'Gurub",
+     [
+      "Normal"
+     ],
+     [
+      "High Priest Venoxis",
+      "High Priestess Jeklik",
+      "High Priestess Mar'li",
+      "Bloodlord Mandokir",
+      "Edge of Madness",
+      "High Priest Thekal",
+      "Gahz'ranka",
+      "High Priestess Arlokk",
+      "Jin'do the Hexxer",
+      "Hakkar",
+      "Hakkar (Hard Mode)"
+     ]
+    ],
+    [
+     2002,
+     "Blackwing Lair",
+     [
+      "Normal"
+     ],
+     [
+      "Razorgore the Untamed",
+      "Vaelastrasz the Corrupt",
+      "Broodlord Lashlayer",
+      "Firemaw",
+      "Ebonroc",
+      "Flamegor",
+      "Chromaggus",
+      "Nefarian",
+      "Ebonroc / Flamegor"
+     ]
+    ],
+    [
+     2001,
+     "Onyxia",
+     [
+      "Normal"
+     ],
+     [
+      "Onyxia"
+     ]
+    ],
+    [
+     2000,
+     "Molten Core",
+     [
+      "Normal"
+     ],
+     [
+      "Lucifron",
+      "Magmadar",
+      "Gehennas",
+      "Garr",
+      "Shazzrah",
+      "Baron Geddon",
+      "Sulfuron Harbinger",
+      "Golemagg the Incinerator",
+      "Majordomo Executus",
+      "Ragnaros"
+     ]
+    ]
+   ]
+  }
+ ],
+ "api_vanilla": [
+  {
+   "exp": 2000,
+   "name": "Classic",
+   "zones": [
+    [
+     2005,
+     "Temple of Ahn'Qiraj",
+     [
+      "Normal"
+     ],
+     [
+      "The Prophet Skeram",
+      "Silithid Royalty",
+      "Battleguard Sartura",
+      "Fankriss the Unyielding",
+      "Viscidus",
+      "Princess Huhuran",
+      "Twin Emperors",
+      "Ouro",
+      "C'Thun"
+     ]
+    ],
+    [
+     2004,
+     "Ruins of Ahn'Qiraj",
+     [
+      "Normal"
+     ],
+     [
+      "Kurinnaxx",
+      "General Rajaxx",
+      "Moam",
+      "Buru the Gorger",
+      "Ayamiss the Hunter",
+      "Ossirian the Unscarred"
+     ]
+    ],
+    [
+     2003,
+     "Zul'Gurub",
+     [
+      "Normal"
+     ],
+     [
+      "High Priest Venoxis",
+      "High Priestess Jeklik",
+      "High Priestess Mar'li",
+      "Bloodlord Mandokir",
+      "Edge of Madness",
+      "High Priest Thekal",
+      "Gahz'ranka",
+      "High Priestess Arlokk",
+      "Jin'do the Hexxer",
+      "Hakkar",
+      "Hakkar (Hard Mode)"
+     ]
+    ],
+    [
+     2002,
+     "Blackwing Lair",
+     [
+      "Normal"
+     ],
+     [
+      "Razorgore the Untamed",
+      "Vaelastrasz the Corrupt",
+      "Broodlord Lashlayer",
+      "Firemaw",
+      "Ebonroc",
+      "Flamegor",
+      "Chromaggus",
+      "Nefarian",
+      "Ebonroc / Flamegor"
+     ]
+    ],
+    [
+     2001,
+     "Onyxia",
+     [
+      "Normal"
+     ],
+     [
+      "Onyxia"
+     ]
+    ],
+    [
+     2000,
+     "Molten Core",
+     [
+      "Normal"
+     ],
+     [
+      "Lucifron",
+      "Magmadar",
+      "Gehennas",
+      "Garr",
+      "Shazzrah",
+      "Baron Geddon",
+      "Sulfuron Harbinger",
+      "Golemagg the Incinerator",
+      "Majordomo Executus",
+      "Ragnaros"
+     ]
+    ]
+   ]
+  }
+ ],
+ "api_www": [
+  {
+   "exp": 1,
+   "name": "Warlords of Draenor",
+   "zones": [
+    [
+     8,
+     "Hellfire Citadel",
+     [
+      "Mythic",
+      "Heroic",
+      "Normal",
+      "LFR"
+     ],
+     [
+      "Hellfire Assault",
+      "Iron Reaver",
+      "Kormrok",
+      "Hellfire High Council",
+      "Kilrogg Deadeye",
+      "Gorefiend",
+      "Shadow-Lord Iskar",
+      "Fel Lord Zakuun",
+      "Xhul'horac",
+      "Socrethar the Eternal",
+      "Tyrant Velhari",
+      "Mannoroth"
+     ]
+    ],
+    [
+     7,
+     "Blackrock Foundry",
+     [
+      "Mythic",
+      "Heroic",
+      "Normal",
+      "LFR"
+     ],
+     [
+      "Gruul",
+      "Oregorger the Devourer",
+      "Blast Furnace",
+      "Hans'gar & Franzok",
+      "Flamebender Ka'graz",
+      "Kromog, Legend of the Mountain",
+      "Beastlord Darmac",
+      "Operator Thogar",
+      "The Iron Maidens",
+      "Blackhand"
+     ]
+    ],
+    [
+     6,
+     "Highmaul",
+     [
+      "Mythic",
+      "Heroic",
+      "Normal",
+      "LFR"
+     ],
+     [
+      "Kargath Bladefist",
+      "The Butcher",
+      "Tectus, The Living Mountain",
+      "Brackenspore",
+      "Twin Ogron",
+      "Ko'ragh",
+      "Imperator Mar'gok"
+     ]
+    ],
+    [
+     3,
+     "Challenge Modes",
+     [
+      "Dungeon"
+     ],
+     [
+      "Auchindoun",
+      "Bloodmaul Slag Mines",
+      "Grimrail Depot",
+      "Iron Docks",
+      "Shadowmoon Burial Grounds",
+      "Skyreach",
+      "The Everbloom",
+      "Upper Blackrock Spire"
+     ]
+    ]
+   ]
+  },
+  {
+   "exp": 0,
+   "name": "Mists of Pandaria",
+   "zones": [
+    [
+     5,
+     "Siege of Orgrimmar",
+     [
+      "Mythic",
+      "Heroic",
+      "Normal",
+      "Flex",
+      "LFR"
+     ],
+     [
+      "Immerseus",
+      "Fallen Protectors",
+      "Norushen",
+      "Sha of Pride",
+      "Galakras",
+      "Iron Juggernaut",
+      "Kor'kron Dark Shaman",
+      "General Nazgrim",
+      "Malkorok",
+      "Spoils of Pandaria",
+      "Thok the Bloodthirsty",
+      "Siegecrafter Blackfuse"
+     ]
+    ],
+    [
+     4,
+     "Throne of Thunder",
+     [
+      "Heroic",
+      "Normal",
+      "LFR"
+     ],
+     [
+      "Jin'rokh the Breaker",
+      "Horridon",
+      "Council of Elders",
+      "Tortos",
+      "Megaera",
+      "Ji-Kun",
+      "Durumu the Forgotten",
+      "Primordius",
+      "Dark Animus",
+      "Iron Qon",
+      "Twin Empyreans",
+      "Lei Shen"
+     ]
+    ]
+   ]
+  }
+ ],
+ "forever_reports": "JSONDecodeError('Expecting value: line 1 column 1 (char 0)')"
 }

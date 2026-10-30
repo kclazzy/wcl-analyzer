@@ -1441,6 +1441,7 @@ def test_wow_forever():
     from wcl_analyzer.config import SITES, site_of_url
     assert site_of_url("https://forever.warcraftlogs.com/reports/AbCdEfGh1234#fight=3") == "forever"
     assert site_of_url("https://ru.forever.warcraftlogs.com/reports/AbCdEfGh1234") == "forever"
+    assert site_of_url("www.forever.warcraftlogs.com/reports/AbCdEfGh1234") == "forever", "www. перед версией — не основная игра"
     assert web.job_site({"site": "forever"}) == "forever"
     page = web._page().decode("utf-8")
     assert "const SITES = " + json.dumps([[k, v] for k, v in SITES.items()], ensure_ascii=False) + ";" in page

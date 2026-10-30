@@ -23,7 +23,7 @@ for s in cands:
     try:
         r = requests.get(f"https://{h}/", headers=H, timeout=30, allow_redirects=False)
         out[h] = f"{r.status_code} {r.headers.get('location','')} title={re.search(r'<title>(.*?)</title>', r.text, re.S).group(1).strip()[:120] if '<title>' in r.text else ''}"
-        if r.status_code == 200: live.append(s)
+        live.append(s)
     except Exception as e:
         out[h] = repr(e)
 q = "{worldData{expansions{id name zones{id name difficulties{id name} encounters{id name}}}}}"
@@ -32,7 +32,19 @@ for s in live:
         tok = requests.post(f"https://{s}.warcraftlogs.com/oauth/token", data={"grant_type": "client_credentials"}, auth=(cid, sec), timeout=30).json()["access_token"]
         r = requests.post(f"https://{s}.warcraftlogs.com/api/v2/client", json={"query": q}, headers={"Authorization": "Bearer " + tok}, timeout=60).json()
         exps = (r.get("data") or {}).get("worldData", {}).get("expansions") or []
-        out["api_" + s] = [{"exp": e["id"], "name": e["name"], "zones": [(z["id"], z["name"], [d["name"] for d in z.get("difficulties") or []], [x["name"] for x in z.get("encounters") or []][:12]) for z in (e.get("zones") or [])[-6:]]} for e in exps[-3:]] or r
+        out["api_" + s] = [{"exp": e["id"], "name": e["name"], "zones": [(z["id"], z["name"], [d["name"] for d in z.get("difficulties") or []], [x["name"] for x in z.get("encounters") or []][:12]) for z in (e.get("zones") or [])[-6:]]} for e in exps[-2:]] or r
     except Exception as e:
         out["api_" + s] = repr(e)
+json.dump(out, open("debug_forever.json", "w"), ensure_ascii=False, indent=1)
+
+# отчёты Forever: последние публичные по зонам последнего дополнения
+try:
+    tok = requests.post("https://forever.warcraftlogs.com/oauth/token", data={"grant_type": "client_credentials"}, auth=(cid, sec), timeout=30).json()["access_token"]
+    q2 = "{reportData{reports(limit:5){data{code title startTime zone{id name} fights{encounterID name difficulty kill size}}}}}"
+    r = requests.post("https://forever.warcraftlogs.com/api/v2/client", json={"query": q2}, headers={"Authorization": "Bearer " + tok}, timeout=60).json()
+    out["forever_reports"] = r
+    q3 = "{gameData{classes{id name specs{id name}}}}"
+    out["forever_classes"] = requests.post("https://forever.warcraftlogs.com/api/v2/client", json={"query": q3}, headers={"Authorization": "Bearer " + tok}, timeout=60).json()
+except Exception as e:
+    out["forever_reports"] = repr(e)
 json.dump(out, open("debug_forever.json", "w"), ensure_ascii=False, indent=1)

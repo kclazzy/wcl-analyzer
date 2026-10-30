@@ -1,5 +1,29 @@
 {
- "token_www.warcraftlogs.com": "200 application/json; charset=UTF-8 json",
- "token_forever.warcraftlogs.com": "404 text/html; charset=utf-8 <!DOCTYPE html>\n<html lang=\"en\">\n    <head>\n        <meta charset=\"utf-8\">\n        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"",
- "api_www_tok": "404 text/html; charset=utf-8 <!DOCTYPE html>\n<html lang=\"en\">\n    <head>\n        <meta charset=\"utf-8\">\n        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\n        <title>Not Found</title>\n\n        <style>\n            /*! normalize.css v8.0.1 | MIT License | github.com/necolas/normalize.css */html{line"
+ "page_forever": "202 ",
+ "page_classic": "202 ",
+ "page_mop-classic": "202 ",
+ "page_tbc": "202 ",
+ "page_cata": "202 ",
+ "page_wotlk": "202 ",
+ "page_sod": "202 ",
+ "page_classic-era": "202 ",
+ "env_1": "200 Огненный шар",
+ "env_2": "200 [Fireball]",
+ "env_3": "200 Огненный шар",
+ "env_4": "200 Огненный шар",
+ "env_5": "200 Огненный шар",
+ "env_6": "404 None",
+ "env_7": "404 None",
+ "env_8": "200 Огненный шар",
+ "env_9": "404 None",
+ "env_10": "200 [Fireball]",
+ "env_11": "200 Огненный шар",
+ "env_12": "200 Огненный шар",
+ "env_13": "200 Огненный шар",
+ "env_14": "200 Огненный шар",
+ "env_15": "200 Огненный шар",
+ "forever_dataenv": [],
+ "forever_envs": [
+  "16"
+ ]
 }

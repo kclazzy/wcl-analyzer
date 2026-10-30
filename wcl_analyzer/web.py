@@ -1180,8 +1180,10 @@ def _page() -> bytes:
     got = _PAGE_CACHE.get("page")
     if got and got[0] == mtime:
         return got[1]
+    from .config import SITES
     from .names_ru import CLASSES, SPECS
     html = STATIC.read_text(encoding="utf-8")
+    html = html.replace("/*SITES*/[]", json.dumps([[k, v] for k, v in SITES.items()], ensure_ascii=False))
     html = html.replace("/*CLASS_RU*/{}", json.dumps(CLASSES, ensure_ascii=False))
     html = html.replace("/*SPEC_RU*/{}", json.dumps({f"{c}|{s}": v for (c, s), v in SPECS.items()}, ensure_ascii=False))
     html = html.replace("<script>", f'<script nonce="{PAGE_NONCE}">')

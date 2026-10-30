@@ -389,6 +389,10 @@ class WCLClient:
                     break
                 time.sleep(min(30, 2 ** errors_5xx))
                 continue
+            if r.status_code == 404 and self.site != "www":
+                from .config import SITES
+                raise WCLError(f"Warcraft Logs пока не открыл API для версии «{SITES.get(self.site, self.site)}» "
+                               f"({self.api_url}). Попробуйте позже.")
             if r.status_code != 200:
                 raise WCLError(f"WCL API вернул {r.status_code}: {r.text[:300]}")
             body = r.json()

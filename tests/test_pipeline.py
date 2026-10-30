@@ -1411,7 +1411,61 @@ def test_events_multi_no_unused_var():
     print("OK пакетный запрос: без неиспользуемой переменной $fid")
 
 
+def test_wowhead_lookup_cache():
+    """Описание с Wowhead спрашивается один раз: повтор — из памяти, «не нашлось» — не раньше чем через 10 минут,
+    за раз — не больше limit запросов; save=False — на диск ничего."""
+    from wcl_analyzer import wowhead
+    calls = []
+    orig, mem, miss = wowhead.fetch, dict(wowhead._MEM), dict(wowhead._MISS)
+    wowhead.fetch = lambda i, timeout=8: calls.append(i) or ({"name": f"S{i}", "desc": "d"} if i != 13 else None)
+    wowhead._MEM.clear(); wowhead._MISS.clear()
+    try:
+        out = wowhead.lookup([11, 12, 13, 11, 0, "14", 3_000_000], save=False, limit=3)
+        assert out == {11: {"name": "S11", "desc": "d"}, 12: {"name": "S12", "desc": "d"}}, out
+        assert sorted(calls) == [11, 12, 13], calls
+        calls.clear()
+        out = wowhead.lookup([11, 13, 14], save=False)
+        assert calls == [14] and set(out) == {11, 14}, (calls, out)
+    finally:
+        wowhead.fetch = orig
+        wowhead._MEM.clear(); wowhead._MEM.update(mem); wowhead._MISS.clear(); wowhead._MISS.update(miss)
+    print("OK Wowhead: кэш, повтор «не нашлось», предел запросов")
+
+
+def test_wow_forever():
+    """WoW Forever (Classic+, с 4 ноября 2026): ссылка forever.warcraftlogs.com — своя версия игры со своим API;
+    список версий на странице — тот же, что в программе (один источник); пока Warcraft Logs не открыл API
+    версии (404) — понятная ошибка вместо HTML-страницы."""
+    from wcl_analyzer import web
+    from wcl_analyzer.api import MemoryCache, WCLClient, WCLError
+    from wcl_analyzer.config import SITES, site_of_url
+    assert site_of_url("https://forever.warcraftlogs.com/reports/AbCdEfGh1234#fight=3") == "forever"
+    assert site_of_url("https://ru.forever.warcraftlogs.com/reports/AbCdEfGh1234") == "forever"
+    assert web.job_site({"site": "forever"}) == "forever"
+    page = web._page().decode("utf-8")
+    assert "const SITES = " + json.dumps([[k, v] for k, v in SITES.items()], ensure_ascii=False) + ";" in page
+    cl = WCLClient("id", "secret", MemoryCache(5)).for_site("forever")
+
+    class R:
+        def __init__(self, url):
+            tok = "oauth" in url
+            self.status_code, self.headers = (200 if tok else 404), {}
+            self.text = '{"access_token": "t", "expires_in": 3600}' if tok else "<!DOCTYPE html><title>Not Found</title>"
+
+        def json(self):
+            return json.loads(self.text)
+    cl.session.post = lambda url, *a, **k: R(url)
+    try:
+        cl.query("{a}", {})
+        raise AssertionError("ожидалась ошибка")
+    except WCLError as e:
+        assert "WoW Forever" in str(e) and "DOCTYPE" not in str(e), str(e)
+    print("OK WoW Forever: ссылка, список версий из одного места, понятная ошибка до открытия API")
+
+
 if __name__ == "__main__":
+    test_wow_forever()
+    test_wowhead_lookup_cache()
     test_plan_no_duplicate_ability()
     test_shared_fight_data()
     test_guides()

@@ -16,8 +16,11 @@ jobs:
         env:
           WCL_CLIENT_ID: ${{ secrets.WCL_CLIENT_ID }}
           WCL_CLIENT_SECRET: ${{ secrets.WCL_CLIENT_SECRET }}
-        run: python tools/probe_forever.py || true
+          WCL_GAME_DATA: bundled
+        run: |
+          python tools/probe_forever.py || true
+          c=$(cat forever_code.txt 2>/dev/null); if [ -n "$c" ]; then python tools/check_log.py "https://forever.warcraftlogs.com/reports/$c" debug_forever_log.json > debug_forever_run.txt 2>&1 || true; fi
       - name: commit
         run: |
           git config user.name bot; git config user.email bot@users.noreply.github.com
-          git add -f debug_forever.json && git commit -m "forever" && git push
+          git add -f debug_forever.json debug_forever_log.json debug_forever_run.txt 2>/dev/null; git add -f debug_forever.json; git commit -m "forever" && git push

@@ -9,6 +9,8 @@ from wcl_analyzer.logs import parse_report_url
 
 url = sys.argv[1]
 cl = WCLClient(os.environ["WCL_CLIENT_ID"], os.environ["WCL_CLIENT_SECRET"], Cache("dbg_cache.sqlite"), verbose=False)
+from wcl_analyzer.config import site_of_url
+cl = cl.for_site(site_of_url(url))
 code, _, _ = parse_report_url(url)
 rep = cl.report(code)
 out = {"report": {"title": rep.get("title"), "zone": (rep.get("zone") or {}).get("name"),

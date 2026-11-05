@@ -25,7 +25,7 @@
 | Компьютер (Windows 10/11) | [WCL-Analyzer.exe](https://github.com/kclazzy/wcl-analyzer/releases/latest/download/WCL-Analyzer.exe) — 25 МБ | Двойной щелчок. Если Windows пишет «Система Windows защитила ваш компьютер» — «Подробнее» → «Выполнить в любом случае» (у программы нет платной подписи). |
 | Телефон (Android 7 и новее) | [WCL-Analyzer.apk](https://github.com/kclazzy/wcl-analyzer/releases/latest/download/WCL-Analyzer.apk) — 38 МБ | Откройте скачанный файл и разрешите установку из этого источника — обычный шаг для приложений не из Google Play. |
 
-Classic, Classic Anniversary, Season of Discovery и Classic Era: ссылку на отчёт с их сайта (`classic.`, `fresh.`, `sod.`, `vanilla.warcraftlogs.com`) программа понимает сама, ключ тот же. Таблицы кулдаунов программы — по основной игре, поэтому на этих версиях оценки «был готов», «нажато реже» и план танков не считаются (об этом пишет плашка над разбором).
+Classic, Classic Anniversary, Season of Discovery, Classic Era и WoW Forever (Classic+): ссылку на отчёт с их сайта (`classic.`, `fresh.`, `sod.`, `vanilla.`, `forever.warcraftlogs.com`) программа понимает сама, ключ тот же. WoW Forever выходит 4 ноября 2026: пока Warcraft Logs не откроет для него API, программа так и пишет — «пока не открыл API», а не ошибку. Таблицы кулдаунов программы — по основной игре, поэтому на этих версиях оценки «был готов», «нажато реже» и план танков не считаются (об этом пишет плашка над разбором).
 
 Все версии и список изменений — на странице [выпусков](https://github.com/kclazzy/wcl-analyzer/releases/latest). iPhone не поддерживается.
 
@@ -49,7 +49,7 @@ Classic, Classic Anniversary, Season of Discovery и Classic Era: ссылку �
 
 Основной сценарий — ссылка на отчёт и одна кнопка «Разобрать бой».
 
-1. Скопируйте ссылку на отчёт с warcraftlogs.com (вида `https://www.warcraftlogs.com/reports/…`; для Classic, Season of Discovery и других версий — с их сайта: `classic.`, `sod.`, `fresh.`, `vanilla.warcraftlogs.com`), вставьте в поле и нажмите **«Найти бой»**.
+1. Скопируйте ссылку на отчёт с warcraftlogs.com (вида `https://www.warcraftlogs.com/reports/…`; для Classic, Season of Discovery и других версий — с их сайта: `classic.`, `sod.`, `fresh.`, `vanilla.`, `forever.warcraftlogs.com`), вставьте в поле и нажмите **«Найти бой»**.
 2. Выберите:
     - **Бой** — конкретный пулл или «Все боссы отчёта»;
     - **Ротация: игрок** — «Все игроки» (все DPS) или один игрок для подробного разбора;

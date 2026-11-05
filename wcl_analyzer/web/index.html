@@ -355,7 +355,7 @@ dialog label.check input{width:auto;margin:0}
     <h2 id="startTitle">Чем ваш бой отличается от лучших игроков вашего спека</h2>
     <p class="lead">Вставьте ссылку на свой отчёт. Программа найдёт бой, сравнит его с лучшими игроками того же спека на том же боссе и покажет, что тренировать в первую очередь.</p>
     <form class="urlrow" id="findForm">
-      <input id="url" type="text" inputmode="url" placeholder="https://www.warcraftlogs.com/reports/… (или classic., sod., fresh., vanilla.)" aria-label="Ссылка на отчёт Warcraft Logs" autocomplete="off">
+      <input id="url" type="text" inputmode="url" placeholder="https://www.warcraftlogs.com/reports/… (или classic., sod., fresh., vanilla., forever.)" aria-label="Ссылка на отчёт Warcraft Logs" autocomplete="off">
       <button class="btn" id="findBtn" type="submit">Найти бой</button>
     </form>
     <div class="hint">Нет ключа или лога под рукой? Посмотрите на демо-данных: <button class="linkbtn" id="demoRaidBtn" type="button">разбор боя</button> или <button class="linkbtn" id="demoBtn" type="button">разбор игрока</button>.</div>
@@ -1005,8 +1005,7 @@ $("#liveBtn").onclick = () => {
 
 /* ---------- «Топ прогресса» без лога: версия игры, рейд, сложность, босс — с Warcraft Logs ---------- */
 const TP_DIFF = {5: "Эпохальный", 4: "Героический", 3: "Обычный", 1: "Поиск рейда"};
-const SITES = [["www", "Retail — основная игра"], ["classic", "Classic — прогрессия (Mists of Pandaria)"], ["fresh", "Classic Anniversary (TBC, Fresh)"],
-               ["sod", "Season of Discovery"], ["vanilla", "Classic Era / Hardcore"]];
+const SITES = /*SITES*/[];   // версии игры — из config.SITES
 const ZONES = {};          // версия игры → список рейдов
 const ZONES_FRESH = {};    // версия игры → список уже обновлён с Warcraft Logs при этом открытии страницы
 let TP_ZONES = null;       // список выбранной версии (совместимость)

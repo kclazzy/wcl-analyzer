@@ -9,13 +9,14 @@ TOKEN_URL = "https://www.warcraftlogs.com/oauth/token"
 SITE_URL = "https://www.warcraftlogs.com"
 
 # Версии игры: у каждой — свой сайт Warcraft Logs со своим API (ключ — общий, от warcraftlogs.com).
-# Порядок — как в списке «Версия игры».
+# Порядок и названия — как в списке «Версия игры» на странице (страница получает этот словарь при загрузке).
 SITES = {
     "www": "Retail — основная игра",
-    "classic": "Classic — прогрессия, Mists of Pandaria (classic.warcraftlogs.com)",
-    "fresh": "Classic Anniversary — TBC (fresh.warcraftlogs.com)",
-    "sod": "Season of Discovery (sod.warcraftlogs.com)",
-    "vanilla": "Classic Era / Hardcore (vanilla.warcraftlogs.com)",
+    "classic": "Classic — прогрессия (Mists of Pandaria)",
+    "fresh": "Classic Anniversary (TBC, Fresh)",
+    "sod": "Season of Discovery",
+    "vanilla": "Classic Era / Hardcore",
+    "forever": "WoW Forever (Classic+)",
 }
 
 
@@ -36,7 +37,7 @@ def token_url(site: str | None = None) -> str:
 
 
 def site_of_url(url: str | None) -> str:
-    """Версия игры по ссылке на отчёт: classic./fresh./sod./vanilla. (и их языковые варианты вроде
+    """Версия игры по ссылке на отчёт: classic./fresh./sod./vanilla./forever. (и их языковые варианты вроде
     ru.classic.) — свой сайт; www., ru., de. и т. п. — основная игра."""
     import re
     m = re.search(r"(?:https?://)?([a-z0-9.-]+)\.warcraftlogs\.com", (url or "").lower())

@@ -5,7 +5,7 @@ from wcl_analyzer.api import Cache, WCLClient
 base = WCLClient(os.environ["WCL_CLIENT_ID"], os.environ["WCL_CLIENT_SECRET"], Cache("dbg_probe.sqlite"), verbose=False)
 out = {}
 KEYS = ("forever", "hyjal", "barrow", "blackmaw", "shaper", "skyborne", "riverlands")
-for site in ["forever", "classic", "fresh", "sod", "vanilla", "www", "era", "classicplus", "plus"]:
+for site in ["forever", "classic", "fresh", "sod", "vanilla", "www"]:
     cl = base.for_site(site) if site in ("forever", "classic", "fresh", "sod", "vanilla", "www") else None
     if cl is None:
         import copy

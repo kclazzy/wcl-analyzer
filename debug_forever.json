@@ -1,29 +1,6 @@
 {
- "page_forever": "202 ",
- "page_classic": "202 ",
- "page_mop-classic": "202 ",
- "page_tbc": "202 ",
- "page_cata": "202 ",
- "page_wotlk": "202 ",
- "page_sod": "202 ",
- "page_classic-era": "202 ",
- "env_1": "200 Огненный шар",
- "env_2": "200 [Fireball]",
- "env_3": "200 Огненный шар",
- "env_4": "200 Огненный шар",
- "env_5": "200 Огненный шар",
- "env_6": "404 None",
- "env_7": "404 None",
- "env_8": "200 Огненный шар",
- "env_9": "404 None",
- "env_10": "200 [Fireball]",
- "env_11": "200 Огненный шар",
- "env_12": "200 Огненный шар",
- "env_13": "200 Огненный шар",
- "env_14": "200 Огненный шар",
- "env_15": "200 Огненный шар",
- "forever_dataenv": [],
- "forever_envs": [
-  "16"
- ]
+ "expansions": "WCLError('Warcraft Logs пока не открыл API для версии «WoW Forever (Classic+)» (https://forever.warcraftlogs.com/api/v2/client). Попробуйте позже.')",
+ "classes": "WCLError('Warcraft Logs пока не открыл API для версии «WoW Forever (Classic+)» (https://forever.warcraftlogs.com/api/v2/client). Попробуйте позже.')",
+ "reports": [],
+ "points_left": null
 }
